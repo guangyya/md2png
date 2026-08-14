@@ -6,18 +6,21 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     typealias Completion = (Result<NSImage, Error>) -> Void
 
     private struct Request {
+        let id: UUID
         let markdown: String
         let completion: Completion
     }
 
     private let webView: WKWebView
     private let hostWindow: NSWindow
-    private var isReady = false
-    private var isRendering = false
-    private var requests: [Request] = []
-    private var initializationError: Error?
+    private let pageURL: URL?
+    private var requests: [UUID: Request] = [:]
+    private var recoveryState: RendererRecoveryState
+    private var currentNavigation: WKNavigation?
 
     init(pageURL: URL? = RendererResources.pageURL) {
+        self.pageURL = pageURL
+        recoveryState = RendererRecoveryState(hasRendererPage: pageURL != nil)
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.websiteDataStore = .nonPersistent()
@@ -38,39 +41,46 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         hostWindow.orderBack(nil)
         webView.navigationDelegate = self
 
-        guard let pageURL else {
-            initializationError = AppError.rendererUnavailable
-            return
+        if pageURL != nil {
+            loadRendererPage()
         }
-        webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
     }
 
     func render(_ markdown: String, completion: @escaping Completion) {
-        if let initializationError {
-            completion(.failure(initializationError))
-            return
-        }
-        requests.append(Request(markdown: markdown, completion: completion))
-        processNextIfPossible()
+        let request = Request(id: UUID(), markdown: markdown, completion: completion)
+        requests[request.id] = request
+        perform(recoveryState.enqueue(request.id))
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        isReady = true
-        processNextIfPossible()
+        guard isCurrentNavigation(navigation) else { return }
+        currentNavigation = nil
+        perform(recoveryState.rendererDidLoad())
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        failPendingRequests(with: error)
+        rendererLoadFailed(navigation)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        failPendingRequests(with: error)
+        rendererLoadFailed(navigation)
     }
 
-    private func processNextIfPossible() {
-        guard isReady, !isRendering, !requests.isEmpty else { return }
-        isRendering = true
-        let request = requests.removeFirst()
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        handleContentProcessTermination(from: .delegate)
+    }
+
+#if DEBUG
+    func simulateContentProcessTerminationForTesting() {
+        webViewWebContentProcessDidTerminate(webView)
+    }
+#endif
+
+    private func start(_ execution: RendererRecoveryState.Execution) {
+        guard let request = requests[execution.requestID] else {
+            finish(execution, with: .failure(AppError.rendererUnavailable))
+            return
+        }
 
         Task { [weak self] in
             guard let self else { return }
@@ -81,32 +91,41 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     in: nil,
                     contentWorld: .page
                 )
+                guard self.recoveryState.isCurrent(execution) else { return }
                 guard let measurement = value as? [String: Any],
                       let rawWidth = measurement["width"] as? NSNumber,
                       let rawHeight = measurement["height"] as? NSNumber else {
-                    self.finish(request, with: .failure(AppError.invalidRendererResponse))
+                    self.finish(execution, with: .failure(AppError.invalidRendererResponse))
                     return
                 }
 
                 let width = max(520, Int(ceil(rawWidth.doubleValue)))
                 let height = max(80, Int(ceil(rawHeight.doubleValue)))
                 guard width <= 1600, height <= 16_000 else {
-                    self.finish(request, with: .failure(AppError.contentTooLarge(width: width, height: height)))
+                    self.finish(
+                        execution,
+                        with: .failure(AppError.contentTooLarge(width: width, height: height))
+                    )
                     return
                 }
 
                 self.webView.setFrameSize(NSSize(width: width, height: height))
                 self.hostWindow.setContentSize(NSSize(width: width, height: height))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
-                    self?.takeSnapshot(for: request, width: width, height: height)
+                    self?.takeSnapshot(for: execution, width: width, height: height)
                 }
             } catch {
-                self.finish(request, with: .failure(error))
+                self.handle(error, for: execution)
             }
         }
     }
 
-    private func takeSnapshot(for request: Request, width: Int, height: Int) {
+    private func takeSnapshot(
+        for execution: RendererRecoveryState.Execution,
+        width: Int,
+        height: Int
+    ) {
+        guard recoveryState.isCurrent(execution) else { return }
         let configuration = WKSnapshotConfiguration()
         configuration.rect = NSRect(x: 0, y: 0, width: width, height: height)
 
@@ -114,27 +133,97 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             guard let self else { return }
             MainActor.assumeIsolated {
                 if let error {
-                    self.finish(request, with: .failure(error))
+                    self.handle(error, for: execution)
                 } else if let image {
-                    self.finish(request, with: .success(image))
+                    self.finish(execution, with: .success(image))
                 } else {
-                    self.finish(request, with: .failure(AppError.pngEncodingFailed))
+                    self.finish(execution, with: .failure(AppError.pngEncodingFailed))
                 }
             }
         }
     }
 
-    private func finish(_ request: Request, with result: Result<NSImage, Error>) {
-        isRendering = false
-        request.completion(result)
-        processNextIfPossible()
+    private func finish(
+        _ execution: RendererRecoveryState.Execution,
+        with result: Result<NSImage, Error>
+    ) {
+        let transition = recoveryState.finish(execution)
+        guard let requestID = transition.completedRequestID else { return }
+        requests.removeValue(forKey: requestID)?.completion(result)
+        perform(transition.actions)
     }
 
-    private func failPendingRequests(with error: Error) {
-        isReady = false
-        isRendering = false
-        let pending = requests
-        requests.removeAll()
-        pending.forEach { $0.completion(.failure(error)) }
+    private func handle(
+        _ error: Error,
+        for execution: RendererRecoveryState.Execution
+    ) {
+        guard recoveryState.isCurrent(execution) else { return }
+        if Self.isContentProcessTermination(error) {
+            handleContentProcessTermination(from: .executionError(execution))
+        } else {
+            finish(execution, with: .failure(error))
+        }
+    }
+
+    nonisolated static func isContentProcessTermination(_ error: Error) -> Bool {
+        (error as? WKError)?.code == .webContentProcessTerminated
+    }
+
+    private func handleContentProcessTermination(
+        from signal: RendererRecoveryState.TerminationSignal
+    ) {
+        switch recoveryState.contentProcessTerminated(from: signal) {
+        case .ignored:
+            return
+        case let .handled(actions):
+            currentNavigation = nil
+            perform(actions)
+        }
+    }
+
+    private func loadRendererPage() {
+        guard let pageURL else {
+            perform(recoveryState.rendererLoadFailed())
+            return
+        }
+        currentNavigation = webView.loadFileURL(
+            pageURL,
+            allowingReadAccessTo: pageURL.deletingLastPathComponent()
+        )
+        if currentNavigation == nil {
+            perform(recoveryState.rendererLoadFailed())
+        }
+    }
+
+    private func rendererLoadFailed(_ navigation: WKNavigation?) {
+        guard isCurrentNavigation(navigation) else { return }
+        currentNavigation = nil
+        perform(recoveryState.rendererLoadFailed())
+    }
+
+    private func isCurrentNavigation(_ navigation: WKNavigation?) -> Bool {
+        guard let navigation, let currentNavigation else { return false }
+        return navigation === currentNavigation
+    }
+
+    private func perform(_ actions: [RendererRecoveryState.Action]) {
+        for action in actions {
+            switch action {
+            case .loadRenderer:
+                loadRendererPage()
+            case let .start(execution):
+                start(execution)
+            case let .fail(requestIDs, failure):
+                let error: AppError = switch failure {
+                case .rendererUnavailable:
+                    .rendererUnavailable
+                case .recoveryFailed:
+                    .rendererRecoveryFailed
+                }
+                for requestID in requestIDs {
+                    requests.removeValue(forKey: requestID)?.completion(.failure(error))
+                }
+            }
+        }
     }
 }
