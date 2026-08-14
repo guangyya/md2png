@@ -224,28 +224,12 @@ export function validateCoverageReport(report, expected = {}) {
   return report;
 }
 
-export function releaseVersionFromCoverageFilename(filename) {
-  const match = /^md2png-((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))-coverage\.json$/
-    .exec(path.basename(filename));
-  if (match === null) {
-    fail(`coverage baseline must use a versioned release filename: ${filename}`);
-  }
-  return match[1];
-}
-
 function markdownEscape(value) {
   return String(value).replaceAll("|", "\\|");
 }
 
-function signedPercentage(value) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)} pp`;
-}
-
-export function coverageMarkdown(report, baseline = null) {
+export function coverageMarkdown(report) {
   validateCoverageReport(report);
-  if (baseline !== null) {
-    validateCoverageReport(baseline);
-  }
 
   const lines = [
     "# Test coverage",
@@ -258,14 +242,6 @@ export function coverageMarkdown(report, baseline = null) {
     `| Coverable lines | ${report.totals.coverableLines.toLocaleString("en-US")} |`,
     `| Line coverage | **${report.totals.percentage.toFixed(2)}%** |`,
   ];
-
-  if (baseline !== null) {
-    const delta = Math.round((report.totals.percentage - baseline.totals.percentage) * 100) / 100;
-    lines.push(
-      `| Latest release baseline | ${markdownEscape(baseline.appVersion)} (${baseline.totals.percentage.toFixed(2)}%) |`,
-      `| Absolute delta | **${signedPercentage(delta)}** |`,
-    );
-  }
 
   lines.push(
     "",
@@ -292,7 +268,7 @@ export function parseArguments(argv) {
     fail("usage: coverage-report.mjs <generate|validate> [options]");
   }
   const allowedOptions = new Set(command === "generate"
-    ? ["input", "json", "markdown", "repo-root", "app-version", "commit", "swift-version", "xcode-version", "baseline"]
+    ? ["input", "json", "markdown", "repo-root", "app-version", "commit", "swift-version", "xcode-version"]
     : ["report", "app-version", "commit"]);
   const options = {};
   for (let index = 0; index < rest.length; index += 2) {
@@ -355,14 +331,8 @@ function main(argv) {
     xcodeVersion: requiredOption(options, "xcode-version"),
     repoRoot: requiredOption(options, "repo-root"),
   });
-  const baseline = options.baseline === undefined
-    ? null
-    : validateCoverageReport(readJSON(options.baseline, "coverage baseline"), {
-      appVersion: releaseVersionFromCoverageFilename(options.baseline),
-    });
-
   writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
-  writeFile(markdownPath, coverageMarkdown(report, baseline));
+  writeFile(markdownPath, coverageMarkdown(report));
   process.stdout.write(
     `Coverage: ${report.totals.coveredLines}/${report.totals.coverableLines} lines (${report.totals.percentage.toFixed(2)}%)\n`,
   );

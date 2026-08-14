@@ -97,11 +97,12 @@ set. The summaries contain counts and repository-relative paths only. Raw
 profiles, absolute paths, source text, fixtures, and rendered content must not
 be uploaded.
 
-Pull requests get one informational coverage job on the canonical macOS 15 /
-Xcode 26.2 runner in addition to the compatibility matrix. It reports the
-current total, a per-file table, and—when the latest release has a snapshot—the
-absolute percentage-point delta. Coverage generation and tests are required to
-succeed, but the percentage itself is not currently a merge threshold.
+Pull requests and pushes to `main` do not collect coverage. They continue to run
+the normal compatibility test matrix, including the focused report-generator
+tests, without repeating the full Swift test suite in a separate coverage job.
+The guarded official Release publisher alone collects coverage on the canonical
+Xcode 26.2 toolchain, validates it before publication, and uploads the normalized
+JSON and Markdown summaries with the Release.
 
 Stable Release JSON assets provide the durable version history. The pinned
 [Test coverage history issue](https://github.com/guangyya/md2png/issues/42)

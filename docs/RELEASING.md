@@ -184,10 +184,10 @@ This command refuses to continue unless:
   and exact commit.
 - Xcode 26.2 is selected for the canonical coverage snapshot.
 
-It first runs the same `make coverage` command used by the canonical CI runner,
-then builds and notarizes the arm64 ZIP and DMG, creates and pushes the annotated
-version tag, and publishes five assets using the matching changelog section as
-the Release Notes:
+It first runs `make coverage` on the canonical Xcode 26.2 release toolchain,
+then builds and notarizes the arm64 ZIP and DMG, creates and pushes the
+annotated version tag, and publishes five assets using the matching changelog
+section as the Release Notes:
 
 - the versioned ZIP archive, labeled `md2png <version> — macOS app archive
   (Apple silicon)`;
@@ -217,8 +217,9 @@ After publication, the least-privilege Coverage history workflow regenerates
 the pinned [Test coverage history issue](https://github.com/guangyya/md2png/issues/42)
 from all stable Release JSON assets. Its Markdown table is the accessibility and
 rendering fallback for the Mermaid chart. The workflow has `issues: write` only;
-pull-request coverage remains read-only. If the release event did not run it,
-dispatch `Coverage history` manually after confirming the Release assets.
+pull-request workflows remain read-only and do not collect coverage. If the
+release event did not run it, dispatch `Coverage history` manually after
+confirming the Release assets.
 
 The equivalent manual fallback is below. Prefer `make publish-release`; the
 manual path is useful only for diagnosing or recovering a partial publication.

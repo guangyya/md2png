@@ -24,10 +24,8 @@ VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 COVERAGE_DIR ?= .build/coverage
-COVERAGE_BASELINE ?=
 COVERAGE_JSON := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.json
 COVERAGE_MARKDOWN := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.md
-COVERAGE_BASELINE_FLAG = $(if $(strip $(COVERAGE_BASELINE)),--baseline "$(COVERAGE_BASELINE)",)
 RELEASE_QUALIFIER := $(if $(strip $(RELEASE_SUFFIX)),-$(strip $(RELEASE_SUFFIX)),)
 ARTIFACT_BASENAME := md2png-$(VERSION)-macOS-arm64$(RELEASE_QUALIFIER)
 RELEASE_ZIP := dist/$(ARTIFACT_BASENAME).zip
@@ -80,7 +78,7 @@ coverage: renderer coverage-tool-test
 			--app-version "$(VERSION)" \
 			--commit "$(SOURCE_COMMIT)" \
 			--swift-version "$$swift_version" \
-			--xcode-version "$$xcode_version" $(COVERAGE_BASELINE_FLAG)
+			--xcode-version "$$xcode_version"
 
 coverage-validate:
 	$(NODE) scripts/coverage-report.mjs validate \

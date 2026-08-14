@@ -7,7 +7,6 @@ import {
   createCoverageReport,
   normalizeSourcePath,
   parseArguments,
-  releaseVersionFromCoverageFilename,
   validateCoverageReport,
 } from "../coverage-report.mjs";
 
@@ -131,21 +130,11 @@ test("rejects malformed and internally inconsistent normalized summaries", () =>
   );
 });
 
-test("renders a compact per-file summary and release delta", () => {
+test("renders a compact per-file summary", () => {
   const report = sampleReport();
-  const baseline = {
-    ...report,
-    appVersion: "0.2.0",
-    totals: { coveredLines: 2, coverableLines: 6, percentage: 33.33 },
-    files: report.files.map((file, index) => index === 0
-      ? { ...file, coveredLines: 1, percentage: 33.33 }
-      : file),
-  };
-  const markdown = coverageMarkdown(report, baseline);
+  const markdown = coverageMarkdown(report);
 
   assert.match(markdown, /Line coverage \| \*\*50\.00%\*\*/);
-  assert.match(markdown, /Latest release baseline \| 0\.2\.0 \(33\.33%\)/);
-  assert.match(markdown, /Absolute delta \| \*\*\+16\.67 pp\*\*/);
   assert.match(markdown, /Sources\/MD2PNG\/AppDelegate\.swift/);
   assert.equal(markdown.includes(repoRoot), false);
 });
@@ -162,16 +151,5 @@ test("rejects unknown, duplicate, and incomplete command options", () => {
   assert.throws(
     () => parseArguments(["generate", "--input"]),
     /invalid argument/,
-  );
-});
-
-test("derives and validates the version encoded in release baseline filenames", () => {
-  assert.equal(
-    releaseVersionFromCoverageFilename(".build/coverage/md2png-0.10.2-coverage.json"),
-    "0.10.2",
-  );
-  assert.throws(
-    () => releaseVersionFromCoverageFilename("latest-release-baseline.json"),
-    /must use a versioned release filename/,
   );
 });
