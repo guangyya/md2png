@@ -47,7 +47,7 @@ coordination notes close to the repository.
 | FEAT-010 | [#10](https://github.com/guangyya/md2png/issues/10) | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
 | FEAT-011 | [#11](https://github.com/guangyya/md2png/issues/11) | M | FEAT-012 menu placement and file-access validation |
 | FEAT-012 | [#12](https://github.com/guangyya/md2png/issues/12) | M | Cross-cutting coordination for every item that adds UI or messages |
-| FEAT-013 | [#18](https://github.com/guangyya/md2png/issues/18) | M | FEAT-012 menu/messages, public GitHub Releases, and packaged project URL |
+| FEAT-013 | [#18](https://github.com/guangyya/md2png/issues/18) | L | FEAT-012 menu/messages, signed release assets, and packaged project URL |
 
 ## Settings delivery plan
 
@@ -189,35 +189,51 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>FEAT-013: Manual update check</strong></summary>
+<summary><strong>FEAT-013: Check for updates and download</strong></summary>
 
 - **Priority:** P2
-- **Problem:** Once md2png is installed, users have no direct way to tell
-  whether a newer signed release is available without manually visiting the
-  repository.
-- **Candidate scope:** Replace the current Releases prompt with an explicit
-  **Check for Updates…** action in the app menu and About window. On user
-  request, query the public GitHub latest-release metadata once, compare its
-  stable version with the installed `CFBundleShortVersionString`, and report
-  **Update Available**, **You’re Up to Date**, or a concise failure. When an
-  update is available, offer **Open Release…** in the default browser.
-- **Constraints:** Never check at launch, on a timer, or in the background. Do
-  not add Sparkle, an updater helper, credentials, telemetry, automatic
-  downloads, installation, or relaunch behavior. Make no request until the user
-  explicitly chooses the command, send no Markdown, clipboard data, device
-  identifier, or account data, and keep all rendering available offline. Accept
-  only a packaged `https://github.com/{owner}/{repository}` project URL, make at
-  most one in-flight request, use a bounded timeout, and do not retry rate-limit
-  or network failures automatically.
+- **Problem:** Once md2png is installed, users have no direct way to discover
+  and retrieve a newer signed release without manually navigating GitHub.
+- **Candidate scope:** Add **Check for Updates…** to the app menu and About
+  window. Only after the user invokes it, asynchronously request the public
+  GitHub latest-release JSON and compare its stable tag with the installed
+  `CFBundleShortVersionString`. If the installed version is current, report
+  **You’re Up to Date**. If a newer version exists, show **Updating to md2png
+  x.y.z…**, download the matching versioned Apple-silicon DMG in the background
+  with visible progress, verify it, and open the DMG with `NSWorkspace` when
+  complete. Keep GitHub pages out of the successful flow.
+- **Release asset contract:** From the latest non-draft, non-prerelease release,
+  select exactly one asset named
+  `md2png-{version}-macOS-arm64-developer-id.dmg` with the expected disk-image
+  content type, positive size, HTTPS download URL, and SHA-256 digest. Download
+  into an app-owned update cache through a temporary file, require the received
+  size and digest to match the release metadata, remove partial or invalid
+  files, and rely on the existing Developer ID signature, notarization,
+  stapling, and macOS Gatekeeper when opening the verified DMG.
+- **Installation boundary:** Opening the DMG is the final automated step. Do not
+  replace the running app, copy into Applications, request elevated privileges,
+  relaunch, or claim installation has completed. After the DMG opens, clearly
+  tell the user to drag md2png to Applications to finish the update.
+- **Failure fallback:** Check, metadata, version, download, integrity, file, or
+  open failures must preserve the installed app, remove unusable temporary
+  files, and offer **View Releases…** as an explicit browser fallback. Never
+  open GitHub automatically after a failure.
+- **Privacy and network constraints:** Never check at launch, on a timer, or
+  without the explicit command. Do not add Sparkle, an updater helper,
+  credentials, telemetry, or automatic retries. Send no Markdown, clipboard
+  data, device identifier, or account data; make at most one check/download
+  active at a time; use bounded timeouts; support cancellation; and keep
+  rendering fully available offline.
 - **Version rules:** Compare normalized numeric release versions rather than
-  strings, accept an optional leading `v`, ignore drafts and prereleases in the
-  initial scope, and treat malformed or unsupported release tags as a
-  recoverable check failure rather than claiming the app is current.
-- **Validation:** Cover newer, equal, and older release versions; `1.10.0`
-  versus `1.9.0`; optional `v` prefixes; malformed metadata; no published
-  release; offline, timeout, HTTP, and rate-limit failures; repeated clicks;
+  strings, accept an optional leading `v`, and treat malformed or unsupported
+  tags as a failure rather than claiming the app is current.
+- **Validation:** Cover newer, equal, and older versions; `1.10.0` versus
+  `1.9.0`; optional `v` prefixes; missing, duplicate, wrong-architecture,
+  wrong-type, wrong-size, or wrong-digest assets; no published release;
+  malformed JSON; offline, timeout, redirect, HTTP, and rate-limit failures;
+  cancellation and repeated clicks; cache cleanup; DMG open success/failure;
   missing or non-GitHub project URLs; English and Simplified Chinese copy; and
-  proof that launch and normal rendering create no network request.
+  proof that launch and normal rendering make no network request.
 - **Tracking issue:** [#18](https://github.com/guangyya/md2png/issues/18)
 
 </details>
@@ -396,7 +412,8 @@ should not be added to the backlog without an explicit product decision:
 - Monitor the clipboard and render automatically in the background.
 - Keep a persistent render history by default.
 - Turn the menu bar companion into a full Markdown editor.
-- Add an embedded background updater or repository credential.
+- Add scheduled or launch-time update checks, silently replace the installed
+  app, or add a repository credential.
 - Add Intel (`x86_64`) distribution without demonstrated user demand.
 
 ## Maintenance rules
