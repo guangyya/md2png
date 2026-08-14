@@ -47,6 +47,7 @@ coordination notes close to the repository.
 | FEAT-010 | [#10](https://github.com/guangyya/md2png/issues/10) | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
 | FEAT-011 | [#11](https://github.com/guangyya/md2png/issues/11) | M | FEAT-012 menu placement and file-access validation |
 | FEAT-012 | [#12](https://github.com/guangyya/md2png/issues/12) | M | Cross-cutting coordination for every item that adds UI or messages |
+| FEAT-013 | [#18](https://github.com/guangyya/md2png/issues/18) | M | FEAT-012 menu/messages, public GitHub Releases, and packaged project URL |
 
 ## Settings delivery plan
 
@@ -158,6 +159,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
   ──────────────────
   Settings…
   Show Welcome…
+  Check for Updates…
   About md2png
   ──────────────────
   Quit md2png
@@ -183,6 +185,40 @@ the menu as quick actions, with Settings reflecting the same stored values.
   Check keyboard access, VoiceOver names, truncation, multiline wrapping,
   terminology consistency, and localization key parity.
 - **Tracking issue:** [#12](https://github.com/guangyya/md2png/issues/12)
+
+</details>
+
+<details>
+<summary><strong>FEAT-013: Manual update check</strong></summary>
+
+- **Priority:** P2
+- **Problem:** Once md2png is installed, users have no direct way to tell
+  whether a newer signed release is available without manually visiting the
+  repository.
+- **Candidate scope:** Replace the current Releases prompt with an explicit
+  **Check for Updates…** action in the app menu and About window. On user
+  request, query the public GitHub latest-release metadata once, compare its
+  stable version with the installed `CFBundleShortVersionString`, and report
+  **Update Available**, **You’re Up to Date**, or a concise failure. When an
+  update is available, offer **Open Release…** in the default browser.
+- **Constraints:** Never check at launch, on a timer, or in the background. Do
+  not add Sparkle, an updater helper, credentials, telemetry, automatic
+  downloads, installation, or relaunch behavior. Make no request until the user
+  explicitly chooses the command, send no Markdown, clipboard data, device
+  identifier, or account data, and keep all rendering available offline. Accept
+  only a packaged `https://github.com/{owner}/{repository}` project URL, make at
+  most one in-flight request, use a bounded timeout, and do not retry rate-limit
+  or network failures automatically.
+- **Version rules:** Compare normalized numeric release versions rather than
+  strings, accept an optional leading `v`, ignore drafts and prereleases in the
+  initial scope, and treat malformed or unsupported release tags as a
+  recoverable check failure rather than claiming the app is current.
+- **Validation:** Cover newer, equal, and older release versions; `1.10.0`
+  versus `1.9.0`; optional `v` prefixes; malformed metadata; no published
+  release; offline, timeout, HTTP, and rate-limit failures; repeated clicks;
+  missing or non-GitHub project URLs; English and Simplified Chinese copy; and
+  proof that launch and normal rendering create no network request.
+- **Tracking issue:** [#18](https://github.com/guangyya/md2png/issues/18)
 
 </details>
 
