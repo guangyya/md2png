@@ -8,7 +8,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         var state = try readyState()
 
         let recoveryLoad = try loadAttempt(
-            from: handledActions(state.contentProcessTerminated())
+            from: handledActions(try terminateCurrentGeneration(in: &state))
         )
         XCTAssertEqual(state.phase, .recoveryLoad(recoveryLoad))
 
@@ -30,7 +30,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
         let recoveryLoad = try loadAttempt(
-            from: handledActions(state.contentProcessTerminated())
+            from: handledActions(try terminateCurrentGeneration(in: &state))
         )
         XCTAssertEqual(state.activeRequestID, firstID)
         XCTAssertEqual(state.pendingRequestIDs, [secondID])
@@ -62,12 +62,12 @@ final class RendererRecoveryStateTests: XCTestCase {
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
         let recoveryLoad = try loadAttempt(
-            from: handledActions(state.contentProcessTerminated())
+            from: handledActions(try terminateCurrentGeneration(in: &state))
         )
         _ = try startExecution(from: state.rendererDidLoad(recoveryLoad))
 
         XCTAssertEqual(
-            state.contentProcessTerminated(),
+            try terminateCurrentGeneration(in: &state),
             .handled([.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)])
         )
         XCTAssertEqual(state.phase, .needsReload)
@@ -88,9 +88,11 @@ final class RendererRecoveryStateTests: XCTestCase {
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        _ = try loadAttempt(from: handledActions(state.contentProcessTerminated()))
+        _ = try loadAttempt(
+            from: handledActions(try terminateCurrentGeneration(in: &state))
+        )
         XCTAssertEqual(
-            state.contentProcessTerminated(),
+            try terminateCurrentGeneration(in: &state),
             .handled([.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)])
         )
         XCTAssertEqual(state.phase, .needsReload)
@@ -103,7 +105,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
         let recoveryLoad = try loadAttempt(
-            from: handledActions(state.contentProcessTerminated())
+            from: handledActions(try terminateCurrentGeneration(in: &state))
         )
 
         XCTAssertEqual(
@@ -156,7 +158,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
         let recoveryLoad = try loadAttempt(
-            from: handledActions(state.contentProcessTerminated())
+            from: handledActions(try terminateCurrentGeneration(in: &state))
         )
 
         XCTAssertEqual(
@@ -212,12 +214,126 @@ final class RendererRecoveryStateTests: XCTestCase {
                 state.contentProcessTerminated(from: .executionError(execution))
             )
         )
-        XCTAssertEqual(state.contentProcessTerminated(), .ignored)
+        XCTAssertEqual(
+            state.contentProcessTerminated(
+                from: .delegate(
+                    rendererGenerationID: execution.rendererGenerationID
+                )
+            ),
+            .ignored
+        )
         XCTAssertEqual(state.phase, .recoveryLoad(recoveryLoad))
 
         let retryExecution = try startExecution(from: state.rendererDidLoad(recoveryLoad))
         XCTAssertEqual(retryExecution.requestID, requestID)
         XCTAssertNotEqual(retryExecution.attemptID, execution.attemptID)
+    }
+
+    func testMissingDelegateDoesNotSwallowLaterIdleTermination() throws {
+        var state = try readyState()
+        let requestID = makeID(1)
+        let execution = try startExecution(from: state.enqueue(requestID))
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(
+                state.contentProcessTerminated(from: .executionError(execution))
+            )
+        )
+
+        let retryExecution = try startExecution(from: state.rendererDidLoad(recoveryLoad))
+        XCTAssertEqual(state.finish(retryExecution).completedRequestID, requestID)
+        XCTAssertEqual(
+            state.currentRendererGenerationID,
+            retryExecution.rendererGenerationID
+        )
+
+        let nextRecoveryLoad = try loadAttempt(
+            from: handledActions(try terminateCurrentGeneration(in: &state))
+        )
+        XCTAssertNotEqual(nextRecoveryLoad.id, recoveryLoad.id)
+        XCTAssertEqual(state.phase, .recoveryLoad(nextRecoveryLoad))
+    }
+
+    func testDelayedDelegateFromObsoleteGenerationIsIgnoredAfterRetryStarts() throws {
+        var state = try readyState()
+        let requestID = makeID(1)
+        let firstExecution = try startExecution(from: state.enqueue(requestID))
+        let obsoleteGenerationID = firstExecution.rendererGenerationID
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(
+                state.contentProcessTerminated(from: .executionError(firstExecution))
+            )
+        )
+        let retryExecution = try startExecution(from: state.rendererDidLoad(recoveryLoad))
+
+        XCTAssertEqual(
+            state.contentProcessTerminated(
+                from: .delegate(rendererGenerationID: obsoleteGenerationID)
+            ),
+            .ignored
+        )
+        XCTAssertEqual(state.phase, .rendering(retryExecution, stage: .javaScript))
+        XCTAssertEqual(state.finish(retryExecution).completedRequestID, requestID)
+    }
+
+    func testSuccessfulIdleReloadRetiresThePreviousGeneration() throws {
+        var state = try readyState()
+        let obsoleteGenerationID = try XCTUnwrap(state.currentRendererGenerationID)
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(try terminateCurrentGeneration(in: &state))
+        )
+        XCTAssertTrue(state.rendererDidLoad(recoveryLoad).isEmpty)
+        XCTAssertEqual(state.phase, .ready)
+
+        XCTAssertEqual(
+            state.contentProcessTerminated(
+                from: .delegate(rendererGenerationID: obsoleteGenerationID)
+            ),
+            .ignored
+        )
+        XCTAssertEqual(state.phase, .ready)
+
+        let nextRecoveryLoad = try loadAttempt(
+            from: handledActions(try terminateCurrentGeneration(in: &state))
+        )
+        XCTAssertNotEqual(nextRecoveryLoad.id, recoveryLoad.id)
+    }
+
+    func testLateTerminationSignalsStayObsoleteAcrossNeedsReloadAndFreshLoad() throws {
+        var state = try readyState()
+        let firstGenerationID = try XCTUnwrap(state.currentRendererGenerationID)
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(try terminateCurrentGeneration(in: &state))
+        )
+        let recoveryGenerationID = recoveryLoad.id
+
+        XCTAssertEqual(
+            try terminateCurrentGeneration(in: &state),
+            .handled([])
+        )
+        XCTAssertEqual(state.phase, .needsReload)
+        for obsoleteGenerationID in [firstGenerationID, recoveryGenerationID] {
+            XCTAssertEqual(
+                state.contentProcessTerminated(
+                    from: .delegate(rendererGenerationID: obsoleteGenerationID)
+                ),
+                .ignored
+            )
+        }
+
+        let laterID = makeID(2)
+        let freshLoad = try loadAttempt(from: state.enqueue(laterID))
+        let freshExecution = try startExecution(from: state.rendererDidLoad(freshLoad))
+        XCTAssertNotEqual(freshExecution.rendererGenerationID, recoveryGenerationID)
+        XCTAssertEqual(
+            state.contentProcessTerminated(
+                from: .delegate(rendererGenerationID: firstGenerationID)
+            ),
+            .ignored
+        )
+
+        _ = try loadAttempt(
+            from: handledActions(try terminateCurrentGeneration(in: &state))
+        )
     }
 
     func testDelegateThenExecutionErrorIsHandledAsOneTermination() throws {
@@ -226,7 +342,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         let execution = try startExecution(from: state.enqueue(requestID))
 
         let recoveryLoad = try loadAttempt(
-            from: handledActions(state.contentProcessTerminated())
+            from: handledActions(try terminateCurrentGeneration(in: &state))
         )
         XCTAssertEqual(
             state.contentProcessTerminated(from: .executionError(execution)),
@@ -258,7 +374,11 @@ final class RendererRecoveryStateTests: XCTestCase {
     func testRendererReloadsAfterSimulatedInitialProcessTermination() async throws {
         _ = NSApplication.shared
         let renderer = MarkdownRenderer()
+        let initialGenerationID = try XCTUnwrap(renderer.rendererGenerationIDForTesting)
+        let initialWebViewIdentity = renderer.webViewIdentityForTesting
         renderer.simulateContentProcessTerminationForTesting()
+        XCTAssertNotEqual(renderer.rendererGenerationIDForTesting, initialGenerationID)
+        XCTAssertNotEqual(renderer.webViewIdentityForTesting, initialWebViewIdentity)
 
         let completion = expectation(description: "renderer reload completed")
         var capturedResult: Result<NSImage, Error>?
@@ -436,6 +556,15 @@ final class RendererRecoveryStateTests: XCTestCase {
             throw TestError.expectedHandledTransition
         }
         return actions
+    }
+
+    private func terminateCurrentGeneration(
+        in state: inout RendererRecoveryState
+    ) throws -> RendererRecoveryState.TerminationTransition {
+        let generationID = try XCTUnwrap(state.currentRendererGenerationID)
+        return state.contentProcessTerminated(
+            from: .delegate(rendererGenerationID: generationID)
+        )
     }
 
     private func loadAttempt(
