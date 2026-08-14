@@ -36,6 +36,38 @@ struct PreviewLayout {
     }
 }
 
+struct PreviewWindowLayout {
+    let contentSize: NSSize
+
+    static func calculate(
+        imageSize: NSSize,
+        visibleScreenSize: NSSize,
+        horizontalImagePadding: CGFloat = 48,
+        horizontalScreenMargin: CGFloat = 80,
+        verticalScreenMargin: CGFloat = 120,
+        minimumContentWidth: CGFloat = 520,
+        preferredContentHeight: CGFloat = 640
+    ) -> PreviewWindowLayout {
+        let maximumContentWidth = max(
+            1,
+            visibleScreenSize.width - horizontalScreenMargin
+        )
+        let minimumWidth = min(minimumContentWidth, maximumContentWidth)
+        let desiredWidth = max(
+            minimumWidth,
+            imageSize.width + horizontalImagePadding
+        )
+        let maximumContentHeight = max(
+            1,
+            visibleScreenSize.height - verticalScreenMargin
+        )
+        return PreviewWindowLayout(contentSize: NSSize(
+            width: min(desiredWidth, maximumContentWidth),
+            height: min(preferredContentHeight, maximumContentHeight)
+        ))
+    }
+}
+
 final class PreviewCanvasView: NSView {
     override var isFlipped: Bool { true }
 }
@@ -80,7 +112,6 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
     var documentVisibleRect: NSRect { scrollView.documentVisibleRect }
     var canvasUsesAutoLayout: Bool { !canvasView.translatesAutoresizingMaskIntoConstraints }
     var imageIsAttachedToWindow: Bool { imageView.window === window }
-
     func renderedImageSnapshot() -> NSBitmapImageRep? {
         imageView.displayIfNeeded()
         guard let bitmap = imageView.bitmapImageRepForCachingDisplay(in: imageView.bounds) else {
@@ -125,8 +156,15 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show(image: NSImage) {
+    func show(
+        image: NSImage,
+        widthPreset: RenderWidthPreset? = nil
+    ) {
         imageView.image = image
+        updateWindowTitle(image: image, widthPreset: widthPreset)
+        if window?.isVisible != true {
+            resizeWindowToReflectImageWidth(image)
+        }
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -135,6 +173,43 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
 
     func windowDidResize(_ notification: Notification) {
         updateLayout(scrollToTop: false)
+    }
+
+    private func updateWindowTitle(
+        image: NSImage,
+        widthPreset: RenderWidthPreset?
+    ) {
+        guard let widthPreset else {
+            window?.title = L10n.text(
+                "preview.window_title",
+                defaultValue: "Last Markdown Render"
+            )
+            return
+        }
+        window?.title = L10n.format(
+            "preview.window_title_with_width",
+            defaultValue: "Last Markdown Render — %@ · %ld × %ld pt",
+            widthPreset.menuTitle,
+            Int(image.size.width.rounded()),
+            Int(image.size.height.rounded())
+        )
+    }
+
+    private func resizeWindowToReflectImageWidth(_ image: NSImage) {
+        guard let window,
+              let visibleFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else {
+            return
+        }
+        let layout = PreviewWindowLayout.calculate(
+            imageSize: image.size,
+            visibleScreenSize: visibleFrame.size
+        )
+        window.setContentSize(layout.contentSize)
+        let centeredOrigin = NSPoint(
+            x: visibleFrame.midX - window.frame.width / 2,
+            y: visibleFrame.midY - window.frame.height / 2
+        )
+        window.setFrameOrigin(centeredOrigin)
     }
 
     private func updateLayout(scrollToTop: Bool) {

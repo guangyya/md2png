@@ -135,6 +135,31 @@ final class PreviewLayoutTests: XCTestCase {
         ))
     }
 
+    @MainActor
+    func testPreviewTitleIdentifiesPresetAndActualDimensions() throws {
+        _ = NSApplication.shared
+        let image = try makeImage(
+            pixelsWide: 720,
+            pixelsHigh: 1_120,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+        let controller = PreviewController()
+        controller.show(image: image, widthPreset: .compact)
+        defer { controller.close() }
+
+        XCTAssertEqual(
+            controller.window?.title,
+            L10n.format(
+                "preview.window_title_with_width",
+                defaultValue: "Last Markdown Render — %@ · %ld × %ld pt",
+                RenderWidthPreset.compact.menuTitle,
+                720,
+                1_120
+            )
+        )
+    }
+
     private func containsDarkContent(in bitmap: NSBitmapImageRep) -> Bool {
         var darkPixels = 0
         for y in stride(from: 0, to: bitmap.pixelsHigh, by: 4) {
@@ -242,5 +267,27 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertGreaterThan(layout.canvasSize.height, 580)
         XCTAssertEqual(layout.imageFrame.minX, 24, accuracy: 0.001)
         XCTAssertEqual(layout.imageFrame.minY, 24, accuracy: 0.001)
+    }
+
+    func testPreviewWindowWidthReflectsPresetUntilLimitedByScreen() {
+        let screenSize = NSSize(width: 1_440, height: 900)
+        let compact = PreviewWindowLayout.calculate(
+            imageSize: NSSize(width: 720, height: 1_120),
+            visibleScreenSize: screenSize
+        )
+        let standard = PreviewWindowLayout.calculate(
+            imageSize: NSSize(width: 1_120, height: 928),
+            visibleScreenSize: screenSize
+        )
+        let wide = PreviewWindowLayout.calculate(
+            imageSize: NSSize(width: 1_520, height: 880),
+            visibleScreenSize: screenSize
+        )
+
+        XCTAssertEqual(compact.contentSize, NSSize(width: 768, height: 640))
+        XCTAssertEqual(standard.contentSize, NSSize(width: 1_168, height: 640))
+        XCTAssertEqual(wide.contentSize, NSSize(width: 1_360, height: 640))
+        XCTAssertLessThan(compact.contentSize.width, standard.contentSize.width)
+        XCTAssertLessThan(standard.contentSize.width, wide.contentSize.width)
     }
 }

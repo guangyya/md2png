@@ -85,14 +85,20 @@ A GFM table needs a separator row:
 | Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
+| Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and immediately renders the selected bundled sample |
 | About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current
-clipboard. While a render is running, additional render commands and examples
-are temporarily disabled. Restore Last Markdown becomes available only after a
-successful render and asks before replacing clipboard content changed by another
-application.
+clipboard. Standard preserves the original output sizing; Compact wraps prose
+sooner, while Wide gives large tables and diagrams more room. While a render is
+running, additional render commands, width changes, and examples are temporarily
+disabled. Restore Last Markdown becomes available only after a successful render
+and asks before replacing clipboard content changed by another application. The
+Last Render window opens at a width that reflects the output, within the current
+screen, and identifies the preset and actual dimensions in its title.
+See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
+dimensions and same-source reference renders.
 
 ## Samples
 
