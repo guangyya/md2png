@@ -217,8 +217,6 @@ Examples/                   Markdown samples bundled with the app
 Tests/                      Swift and end-to-end rendering tests
 Assets/AppIcon/             Approved app icon source
 docs/                       Product, privacy, troubleshooting, and release documentation
-BACKLOG.md                  Prioritized candidate, deferred, and excluded product work
-TECH_DEBT.md                Internal architecture work and migration ordering
 .github/ISSUE_TEMPLATE/     Structured GitHub feature request entry point
 ```
 
@@ -227,7 +225,8 @@ TECH_DEBT.md                Internal architecture work and migration ordering
 Focused bug reports and improvements are welcome. Use the
 [Feature request template](../../issues/new?template=feature_request.yml)
 for new ideas. Accepted and candidate directions are tracked in the
-[Product backlog](BACKLOG.md); inclusion does not promise a version or date.
+[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1);
+inclusion does not promise a version or date.
 Read [Contributing](CONTRIBUTING.md) before opening a pull request and use the
 [Security policy](SECURITY.md) for vulnerabilities.
 

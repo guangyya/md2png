@@ -80,6 +80,8 @@ sending it.
 
 ## Backlog
 
-Candidate features and deliberately deferred ideas are maintained in the
-repository's single [Product backlog](../BACKLOG.md). Backlog placement confirms
-product fit, not a release date or implementation commitment.
+Candidate features, technical debt, and deliberately deferred ideas are
+maintained in the
+[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1).
+Each linked issue is the source for scope, constraints, and validation. Backlog
+placement confirms product fit, not a release date or implementation commitment.
