@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   buildHistorySection,
   HISTORY_END_MARKER,
+  HISTORY_ISSUE_NUMBER,
   HISTORY_START_MARKER,
   replaceGeneratedSection,
+  validateHistoryIssue,
 } from "../coverage-history.mjs";
 
 function report(version, commit, coveredLines, coverableLines) {
@@ -127,5 +129,31 @@ test("rejects a report whose commit differs from its release tag", () => {
       report: report("0.3.0", "a".repeat(40), 6, 10),
     }], []),
     /report commit does not match its release tag/,
+  );
+});
+
+test("targets issue 42 regardless of title or open state", () => {
+  const issue = {
+    number: HISTORY_ISSUE_NUMBER,
+    title: "Renamed coverage dashboard",
+    state: "closed",
+    body: `${HISTORY_START_MARKER}\n${HISTORY_END_MARKER}`,
+  };
+
+  assert.equal(validateHistoryIssue(issue), issue);
+});
+
+test("rejects the wrong issue number and pull request targets", () => {
+  assert.throws(
+    () => validateHistoryIssue({ number: 41, body: "body" }),
+    /issue number must be 42/,
+  );
+  assert.throws(
+    () => validateHistoryIssue({
+      number: HISTORY_ISSUE_NUMBER,
+      body: "body",
+      pull_request: { url: "https://api.github.com/example" },
+    }),
+    /must be an issue, not a pull request/,
   );
 });

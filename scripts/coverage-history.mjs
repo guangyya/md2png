@@ -6,7 +6,7 @@ import { validateCoverageReport } from "./coverage-report.mjs";
 
 export const HISTORY_START_MARKER = "<!-- coverage-history:start -->";
 export const HISTORY_END_MARKER = "<!-- coverage-history:end -->";
-export const HISTORY_ISSUE_TITLE = "Test coverage history";
+export const HISTORY_ISSUE_NUMBER = 42;
 
 function fail(message) {
   throw new Error(message);
@@ -136,6 +136,22 @@ export function replaceGeneratedSection(issueBody, generatedSection) {
   return `${issueBody.slice(0, start)}${generatedSection}${issueBody.slice(suffixStart)}`;
 }
 
+export function validateHistoryIssue(issue) {
+  if (!issue || typeof issue !== "object" || Array.isArray(issue)) {
+    fail("coverage history issue response must be an object");
+  }
+  if (issue.number !== HISTORY_ISSUE_NUMBER) {
+    fail(`coverage history issue number must be ${HISTORY_ISSUE_NUMBER}`);
+  }
+  if (issue.pull_request) {
+    fail(`coverage history target #${HISTORY_ISSUE_NUMBER} must be an issue, not a pull request`);
+  }
+  if (typeof issue.body !== "string") {
+    fail(`coverage history issue #${HISTORY_ISSUE_NUMBER} must have a body`);
+  }
+  return issue;
+}
+
 async function githubRequest(url, token, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -250,12 +266,11 @@ export async function updateCoverageHistory(environment = process.env) {
     }
   }
 
-  const issues = await paginatedJSON(apiUrl, token, `/repos/${repository}/issues?state=open`);
-  const historyIssues = issues.filter((issue) => !issue.pull_request && issue.title === HISTORY_ISSUE_TITLE);
-  if (historyIssues.length !== 1) {
-    fail(`expected exactly one open issue named ${HISTORY_ISSUE_TITLE}, found ${historyIssues.length}`);
-  }
-  const issue = historyIssues[0];
+  const issueResponse = await githubRequest(
+    `${apiUrl}/repos/${repository}/issues/${HISTORY_ISSUE_NUMBER}`,
+    token,
+  );
+  const issue = validateHistoryIssue(await issueResponse.json());
   const generatedSection = buildHistorySection(snapshots, warnings, { repository, serverUrl });
   const body = replaceGeneratedSection(issue.body ?? "", generatedSection);
   if (body === issue.body) {

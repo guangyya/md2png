@@ -16,6 +16,94 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  coverage-backfill-v0-3-0:
+    name: One-time v0.3.0 coverage backfill
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 43
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      NODE_VERSION: "24.18.0"
+      PNPM_VERSION: "11.19.0"
+      RELEASE_COMMIT: 9530ed4522e1023f0df2960c7a83eecb9df8fc1b
+
+    steps:
+      - name: Check out report tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out v0.3.0 release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_COMMIT }}
+          path: release-source
+          persist-credentials: false
+
+      - name: Verify pinned inputs
+        shell: bash
+        run: |
+          test "$(git -C release-source rev-parse HEAD)" = "$RELEASE_COMMIT"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' release-source/Info.plist)" = "0.3.0"
+          test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "26.2"
+          swift --version
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          architecture: arm64
+          package-manager-cache: false
+
+      - name: Install pinned renderer dependencies
+        shell: bash
+        run: |
+          npm install --global "pnpm@$PNPM_VERSION"
+          test "$(pnpm --version)" = "$PNPM_VERSION"
+          pnpm --dir release-source/WebRenderer install --frozen-lockfile --fetch-timeout=300000 --network-concurrency=1
+          pnpm --dir release-source/WebRenderer run build
+
+      - name: Generate and validate release coverage
+        shell: bash
+        run: |
+          cd release-source
+          swift test --enable-code-coverage
+          coverage_source="$(swift test --show-codecov-path | tail -n 1)"
+          test -s "$coverage_source"
+          swift_version="$(swift --version | sed -n '1p')"
+          xcode_version="$(xcodebuild -version | paste -s -d ' ' -)"
+          node ../scripts/coverage-report.mjs generate \
+            --input "$coverage_source" \
+            --json ../.build/coverage-backfill/md2png-0.3.0-coverage.json \
+            --markdown ../.build/coverage-backfill/md2png-0.3.0-coverage.md \
+            --repo-root "$PWD" \
+            --app-version 0.3.0 \
+            --commit "$RELEASE_COMMIT" \
+            --swift-version "$swift_version" \
+            --xcode-version "$xcode_version"
+          node ../scripts/coverage-report.mjs validate \
+            --report ../.build/coverage-backfill/md2png-0.3.0-coverage.json \
+            --app-version 0.3.0 \
+            --commit "$RELEASE_COMMIT"
+          node -e '
+            const report = require("../.build/coverage-backfill/md2png-0.3.0-coverage.json");
+            const expected = { coveredLines: 2392, coverableLines: 3733, percentage: 64.08 };
+            if (JSON.stringify(report.totals) !== JSON.stringify(expected)) {
+              throw new Error(`unexpected v0.3.0 coverage totals: ${JSON.stringify(report.totals)}`);
+            }
+          '
+
+      - name: Upload normalized backfill summaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: v0.3.0-coverage-backfill-${{ github.run_id }}
+          path: |
+            .build/coverage-backfill/md2png-0.3.0-coverage.json
+            .build/coverage-backfill/md2png-0.3.0-coverage.md
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
   verify:
     name: CI / ${{ matrix.check_name }}
     runs-on: ${{ matrix.runner }}

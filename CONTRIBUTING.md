@@ -104,10 +104,11 @@ The guarded official Release publisher alone collects coverage on the canonical
 Xcode 26.2 toolchain, validates it before publication, and uploads the normalized
 JSON and Markdown summaries with the Release.
 
-Stable Release JSON assets provide the durable version history. The pinned
-[Test coverage history issue](https://github.com/guangyya/md2png/issues/42)
-is a derived chart and accessible table; missing or malformed release snapshots
-are reported there rather than silently omitted.
+Stable Release JSON assets provide the durable version history. Pinned issue
+[#42](https://github.com/guangyya/md2png/issues/42) is the fixed dashboard
+target, independent of its title or open/closed state. It contains a derived
+chart and accessible table; missing or malformed release snapshots are reported
+there rather than silently omitted.
 
 ## Pull requests
 

@@ -214,12 +214,13 @@ record or package uncommitted renderer output. The GitHub CLI uses
 the account authenticated for `GH_HOST`; no token is stored in the application.
 
 After publication, the least-privilege Coverage history workflow regenerates
-the pinned [Test coverage history issue](https://github.com/guangyya/md2png/issues/42)
-from all stable Release JSON assets. Its Markdown table is the accessibility and
-rendering fallback for the Mermaid chart. The workflow has `issues: write` only;
-pull-request workflows remain read-only and do not collect coverage. If the
-release event did not run it, dispatch `Coverage history` manually after
-confirming the Release assets.
+pinned issue [#42](https://github.com/guangyya/md2png/issues/42) from all stable
+Release JSON assets. The issue number is fixed; renaming or closing it does not
+stop updates, while a missing issue or damaged generated-section markers fail
+visibly. Its Markdown table is the accessibility and rendering fallback for the
+Mermaid chart. The workflow has `issues: write` only; pull-request workflows
+remain read-only and do not collect coverage. If the release event did not run
+it, dispatch `Coverage history` manually after confirming the Release assets.
 
 The equivalent manual fallback is below. Prefer `make publish-release`; the
 manual path is useful only for diagnosing or recovering a partial publication.
