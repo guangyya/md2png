@@ -227,8 +227,8 @@ a {
 }
 
 html[lang="en"] .hero h1 {
-  font-size: clamp(42px, 12.5cqw, 80px);
-  word-spacing: 0.1em;
+  font-size: clamp(36px, 11.4cqw, 80px);
+  word-spacing: 0.06em;
 }
 
 html[lang="en"] .hero h1 > span {
