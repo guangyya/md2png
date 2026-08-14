@@ -45,6 +45,7 @@
 "about.build_release" = "正式版";
 "about.release_notes_unavailable" = "此版本没有可用的发布说明。";
 "about.version_build" = "版本 %@  •  构建 %@";
+"about.version_build_commit" = "版本 %@  •  构建 %@  •  Commit %@";
 "about.whats_new" = "%@ 的新内容";
 "about.description" = "将剪贴板中的 Markdown 转为精美 PNG——全程本地，保护隐私。";
 "about.project" = "项目";
@@ -74,6 +75,7 @@
 "about.copy_version_info" = "复制版本信息";
 "about.version_info_copied" = "已复制";
 "about.version_info" = "md2png %@ (%@) · %@ · macOS %@ · %@";
+"about.version_info_commit" = "md2png %@ (%@) · commit %@ · %@ · macOS %@ · %@";
 "about.done" = "完成";
 "release_section.added" = "新增";
 "release_section.changed" = "变更";

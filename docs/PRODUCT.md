@@ -48,8 +48,8 @@ sending it.
 - Short, long, formatting, code, checklist, table, flowchart, sequence, and
   Gantt samples that render immediately when selected.
 - English and Simplified Chinese UI selected from macOS language settings.
-- About window with Debug/Release identification, version/build, release notes,
-  project link, update action, and copyable diagnostics.
+- About window with Debug/Release identification, version/build/source commit,
+  release notes, project link, update action, and copyable diagnostics.
 - Silent update discovery in About, backed by a 24-hour successful-result cache
   and a rate-limited **Check Again** action. A newer signed DMG downloads only
   after **Download Update** is clicked, is verified, and opens for the user to

@@ -23,8 +23,11 @@ enum AppBuildConfiguration: Equatable {
 }
 
 struct AppMetadata {
+    static let sourceCommitInfoDictionaryKey = "MD2PNGSourceCommit"
+
     let version: String
     let build: String
+    let sourceCommit: String?
     let buildConfiguration: AppBuildConfiguration
     let releaseNotes: String
     let projectURL: URL?
@@ -32,12 +35,14 @@ struct AppMetadata {
     init(
         version: String,
         build: String,
+        sourceCommit: String? = nil,
         buildConfiguration: AppBuildConfiguration = .current,
         releaseNotes: String,
         projectURL: URL?
     ) {
         self.version = version
         self.build = build
+        self.sourceCommit = Self.shortSourceCommit(from: sourceCommit)
         self.buildConfiguration = buildConfiguration
         self.releaseNotes = releaseNotes
         self.projectURL = projectURL
@@ -47,6 +52,9 @@ struct AppMetadata {
         let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? L10n.text("about.development", defaultValue: "Development")
         let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        let sourceCommit = bundle.object(
+            forInfoDictionaryKey: sourceCommitInfoDictionaryKey
+        ) as? String
         let notes: String
 
         if let changelogURL = AppResources.changelogURL(resourcesURL: bundle.resourceURL),
@@ -63,9 +71,41 @@ struct AppMetadata {
         return AppMetadata(
             version: version,
             build: build,
+            sourceCommit: sourceCommit,
             buildConfiguration: .current,
             releaseNotes: notes,
             projectURL: ProjectLinks.project
+        )
+    }
+
+    static func shortSourceCommit(from value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hexadecimalCharacters = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+        guard (7...64).contains(trimmedValue.count),
+              trimmedValue.unicodeScalars.allSatisfy(hexadecimalCharacters.contains) else {
+            return nil
+        }
+        return String(trimmedValue.prefix(7)).lowercased()
+    }
+
+    func versionBuildText(localizationBundle: Bundle? = nil) -> String {
+        guard let sourceCommit else {
+            return L10n.format(
+                "about.version_build",
+                defaultValue: "Version %@  •  Build %@",
+                bundle: localizationBundle,
+                version,
+                build
+            )
+        }
+        return L10n.format(
+            "about.version_build_commit",
+            defaultValue: "Version %@  •  Build %@  •  Commit %@",
+            bundle: localizationBundle,
+            version,
+            build,
+            sourceCommit
         )
     }
 
@@ -74,13 +114,27 @@ struct AppMetadata {
         architecture: String = AppRuntimeInfo.architecture,
         localizationBundle: Bundle? = nil
     ) -> String {
-        L10n.format(
+        let configuration = buildConfiguration.displayName(bundle: localizationBundle)
+        if let sourceCommit {
+            return L10n.format(
+                "about.version_info_commit",
+                defaultValue: "md2png %@ (%@) · commit %@ · %@ · macOS %@ · %@",
+                bundle: localizationBundle,
+                version,
+                build,
+                sourceCommit,
+                configuration,
+                macOSVersion,
+                architecture
+            )
+        }
+        return L10n.format(
             "about.version_info",
             defaultValue: "md2png %@ (%@) · %@ · macOS %@ · %@",
             bundle: localizationBundle,
             version,
             build,
-            buildConfiguration.displayName(bundle: localizationBundle),
+            configuration,
             macOSVersion,
             architecture
         )
@@ -305,6 +359,7 @@ final class AboutController: NSWindowController {
     var displayedReleasesFallbackIsHidden: Bool { secondaryUpdateButton.isHidden }
     var displayedSecondaryUpdateButtonTitle: String { secondaryUpdateButton.title }
     var displayedCopyVersionButtonToolTip: String? { copyVersionButton.toolTip }
+    var displayedVersionBuild: String { versionLabel.stringValue }
     var displayedVersionInfo: String { versionInfo }
     var releaseNotesVisibleOrigin: NSPoint { notesScrollView.contentView.bounds.origin }
     var displayedUpdateCardFrame: NSRect { frameInContent(updateRow) }
@@ -349,12 +404,7 @@ final class AboutController: NSWindowController {
 
     func show(metadata: AppMetadata = .current()) {
         buildBadgeView.configure(metadata.buildConfiguration)
-        versionLabel.stringValue = L10n.format(
-            "about.version_build",
-            defaultValue: "Version %@  •  Build %@",
-            metadata.version,
-            metadata.build
-        )
+        versionLabel.stringValue = metadata.versionBuildText()
         releaseHeadingLabel.stringValue = L10n.format(
             "about.whats_new",
             defaultValue: "What’s new in %@",

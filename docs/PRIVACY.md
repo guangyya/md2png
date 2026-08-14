@@ -12,7 +12,7 @@ The app accesses the clipboard only in response to visible user actions:
 | Open the menu | Reads a short plain-text preview in memory |
 | Render Clipboard as Image | Reads non-empty plain text; writes PNG and TIFF only after a successful render |
 | Choose an Example | Writes the selected bundled Markdown, then renders it and writes PNG/TIFF on success |
-| Copy Version Info | Writes app version, build type, macOS version, and architecture as plain text |
+| Copy Version Info | Writes app version, source commit, build type, macOS version, and architecture as plain text |
 
 If **Render Clipboard as Image** fails, the source Markdown remains on the
 clipboard. If a bundled Example fails, that explicitly selected sample remains
