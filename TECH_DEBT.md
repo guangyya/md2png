@@ -32,8 +32,8 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 
 - **Overall priority:** P3
 - **Effort:** L
-- **Dependencies / coordination:** BL-004, BL-008, BL-010, and later changes to
-  About or Last Render provide migration opportunities.
+- **Dependencies / coordination:** FEAT-004, FEAT-008, FEAT-010, and later
+  changes to About or Last Render provide migration opportunities.
 - **Tracking issue:** [#13](https://github.com/guangyya/md2png/issues/13)
 - **Problem:** Several presentation-only controllers use substantial hand-built
   AppKit layout, especially About. Repeating that approach for Settings,
@@ -118,7 +118,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
   bundle, missing Examples/resources, empty snapshot, wrong architecture, or
   renderer initialization failure produces a nonzero result. Keep the existing
   codesign, Gatekeeper, notarization, and DMG checks.
-- **Coordination:** Share the underlying self-test runner with BL-010 so About
+- **Coordination:** Share the underlying self-test runner with FEAT-010 so About
   can expose **Run Renderer Self-Test** without duplicating the test content or
   result model.
 
@@ -141,7 +141,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
   termination while idle, during an active render, during reload, and with
   queued requests. Verify success writes one image and terminal failure
   preserves the source clipboard.
-- **Coordination:** Integrate terminal recovery errors with BL-010 diagnostics
+- **Coordination:** Integrate terminal recovery errors with FEAT-010 diagnostics
   and exercise the packaged recovery path through TD-002 where practical.
 
 ## TD-004: Accessibility and keyboard audit
@@ -165,8 +165,8 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
   Chinese, add automated checks for stable labels and shortcut routing where
   possible, and ensure every icon-only or custom control exposes a useful name,
   value, role, and enabled state.
-- **Coordination:** Apply this audit to BL-001, BL-004, BL-008, BL-010, BL-012,
-  and each SwiftUI migration step in TD-001.
+- **Coordination:** Apply this audit to FEAT-001, FEAT-004, FEAT-008, FEAT-010,
+  FEAT-012, and each SwiftUI migration step in TD-001.
 
 ## TD-005: Privacy-safe diagnostic logging
 
@@ -183,7 +183,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
   lookup, and user-initiated Releases actions. Persist a small rolling log
   locally so a failure can be investigated after restart. Give each render a
   short random operation ID for correlating stages without identifying a user
-  or device. Define a single redacted export model that BL-010 can expose as
+  or device. Define a single redacted export model that FEAT-010 can expose as
   **Copy Diagnostic Logs** or **Save Diagnostic Logs…**, including app/build,
   macOS, architecture, and the selected recent time window.
 - **Privacy constraints:** Never record Markdown or clipboard text, rendered
@@ -207,7 +207,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
   never changes the clipboard except for an explicit **Copy Diagnostic Logs**
   action, adds network traffic, delays rendering, or weakens the existing
   failure-preservation behavior.
-- **Coordination:** Share error categories and operation IDs with BL-010, log
+- **Coordination:** Share error categories and operation IDs with FEAT-010, log
   packaged self-test stages from TD-002, and cover TD-003 recovery attempts and
   terminal failures. Include the export controls in the TD-004 accessibility
   audit and document the final storage path and deletion procedure in Privacy

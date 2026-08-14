@@ -35,18 +35,18 @@ coordination notes close to the repository.
 
 | ID | Issue | Effort | Dependencies / coordination |
 |---|:---:|:---:|---|
-| BL-001 | [#1](https://github.com/guangyya/md2png/issues/1) | L | Coordinate preview commands with BL-012 and accessibility with TD-004 |
-| BL-002 | [#2](https://github.com/guangyya/md2png/issues/2) | L | Prefer BL-001 Save/export foundations before designing split output |
-| BL-003 | [#3](https://github.com/guangyya/md2png/issues/3) | M | Settings delivery plan and BL-012 menu state |
-| BL-004 | [#4](https://github.com/guangyya/md2png/issues/4) | L | Settings delivery plan, TD-001 SwiftUI path, and TD-004 |
-| BL-005 | [#5](https://github.com/guangyya/md2png/issues/5) | L | Requires packaging, signing, and cross-application investigation |
-| BL-006 | [#6](https://github.com/guangyya/md2png/issues/6) | L | Settings delivery plan, BL-012 menu state, and per-theme renderer tests |
-| BL-007 | [#7](https://github.com/guangyya/md2png/issues/7) | M | Settings delivery plan and BL-012 copy/menu placement |
-| BL-008 | [#8](https://github.com/guangyya/md2png/issues/8) | M | TD-001 SwiftUI path, TD-004, and BL-012 terminology |
-| BL-009 | [#9](https://github.com/guangyya/md2png/issues/9) | M | BL-012 menu placement and clipboard ownership handling |
-| BL-010 | [#10](https://github.com/guangyya/md2png/issues/10) | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
-| BL-011 | [#11](https://github.com/guangyya/md2png/issues/11) | M | BL-012 menu placement and file-access validation |
-| BL-012 | [#12](https://github.com/guangyya/md2png/issues/12) | M | Cross-cutting coordination for every item that adds UI or messages |
+| FEAT-001 | [#1](https://github.com/guangyya/md2png/issues/1) | L | Coordinate preview commands with FEAT-012 and accessibility with TD-004 |
+| FEAT-002 | [#2](https://github.com/guangyya/md2png/issues/2) | L | Prefer FEAT-001 Save/export foundations before designing split output |
+| FEAT-003 | [#3](https://github.com/guangyya/md2png/issues/3) | M | Settings delivery plan and FEAT-012 menu state |
+| FEAT-004 | [#4](https://github.com/guangyya/md2png/issues/4) | L | Settings delivery plan, TD-001 SwiftUI path, and TD-004 |
+| FEAT-005 | [#5](https://github.com/guangyya/md2png/issues/5) | L | Requires packaging, signing, and cross-application investigation |
+| FEAT-006 | [#6](https://github.com/guangyya/md2png/issues/6) | L | Settings delivery plan, FEAT-012 menu state, and per-theme renderer tests |
+| FEAT-007 | [#7](https://github.com/guangyya/md2png/issues/7) | M | Settings delivery plan and FEAT-012 copy/menu placement |
+| FEAT-008 | [#8](https://github.com/guangyya/md2png/issues/8) | M | TD-001 SwiftUI path, TD-004, and FEAT-012 terminology |
+| FEAT-009 | [#9](https://github.com/guangyya/md2png/issues/9) | M | FEAT-012 menu placement and clipboard ownership handling |
+| FEAT-010 | [#10](https://github.com/guangyya/md2png/issues/10) | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
+| FEAT-011 | [#11](https://github.com/guangyya/md2png/issues/11) | M | FEAT-012 menu placement and file-access validation |
+| FEAT-012 | [#12](https://github.com/guangyya/md2png/issues/12) | M | Cross-cutting coordination for every item that adds UI or messages |
 
 ## Settings delivery plan
 
@@ -63,7 +63,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 ## Ready for design
 
 <details>
-<summary><strong>BL-001: Last Render preview actions</strong></summary>
+<summary><strong>FEAT-001: Last Render preview actions</strong></summary>
 
 - **Priority:** P1
 - **Problem:** The preview confirms the output, but saving or reusing it requires
@@ -87,7 +87,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-008: First-launch guide</strong></summary>
+<summary><strong>FEAT-008: First-launch guide</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A menu bar-only app can appear to do nothing after launch, and a
@@ -110,7 +110,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-009: Last Source actions</strong></summary>
+<summary><strong>FEAT-009: Last Source actions</strong></summary>
 
 - **Priority:** P1
 - **Problem:** A successful render replaces the clipboard Markdown with an
@@ -131,7 +131,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-012: Menu, message, and localization polish</strong></summary>
+<summary><strong>FEAT-012: Menu, message, and localization polish</strong></summary>
 
 - **Priority:** P2
 - **Problem:** Accepted features will add commands, states, and errors to a
@@ -189,7 +189,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 ## Proposed
 
 <details>
-<summary><strong>BL-002: Split very tall renders</strong></summary>
+<summary><strong>FEAT-002: Split very tall renders</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A single tall image can be hard to review or paste, and content
@@ -204,7 +204,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-003: Render width presets</strong></summary>
+<summary><strong>FEAT-003: Render width presets</strong></summary>
 
 - **Priority:** P2
 - **Problem:** Chat-sized prose, wide tables, and large diagrams benefit from
@@ -218,7 +218,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-004: Configurable global shortcuts</strong></summary>
+<summary><strong>FEAT-004: Configurable global shortcuts</strong></summary>
 
 - **Priority:** P2
 - **Problem:** System-wide shortcuts can conflict with browsers, developer
@@ -232,7 +232,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-006: Built-in render themes</strong></summary>
+<summary><strong>FEAT-006: Built-in render themes</strong></summary>
 
 - **Priority:** P2
 - **Problem:** The current light rendering style works well for general content,
@@ -263,7 +263,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-007: Launch at login</strong></summary>
+<summary><strong>FEAT-007: Launch at login</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A menu bar companion is most useful when it is already available
@@ -283,7 +283,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-010: Renderer diagnostics</strong></summary>
+<summary><strong>FEAT-010: Renderer diagnostics</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A transient error HUD confirms that rendering failed but may not
@@ -311,7 +311,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 ## Deferred
 
 <details>
-<summary><strong>BL-005: macOS Services action</strong></summary>
+<summary><strong>FEAT-005: macOS Services action</strong></summary>
 
 - **Priority:** P3
 - **Problem:** Rendering selected Markdown currently requires an explicit copy
@@ -326,7 +326,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>BL-011: Render a Markdown file</strong></summary>
+<summary><strong>FEAT-011: Render a Markdown file</strong></summary>
 
 - **Priority:** P3
 - **Problem:** Rendering an existing long Markdown file requires opening it,
@@ -365,7 +365,8 @@ should not be added to the backlog without an explicit product decision:
 
 ## Maintenance rules
 
-- Use a stable `BL-###` identifier in related issues, commits, and release notes.
+- Use a stable `FEAT-###` identifier in related issues, commits, and release
+  notes.
 - Keep design and implementation discussion in the linked issue rather than
   expanding this file indefinitely.
 - When an item ships, move its Project status to **Done**, close the linked
