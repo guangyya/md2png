@@ -12,6 +12,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Show the source commit for each build in About and copied version diagnostics.
 - Add an offline packaged-renderer self-test and require it for CI and release
   artifacts before publication.
+- Keep the latest successfully rendered Markdown in memory so it can be
+  restored to the clipboard. External clipboard changes require confirmation
+  before the action replaces them.
 
 ## [0.2.0] - 2026-08-14
 

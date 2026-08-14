@@ -6,6 +6,7 @@ enum AppError: LocalizedError {
     case invalidRendererResponse
     case contentTooLarge(width: Int, height: Int)
     case pngEncodingFailed
+    case clipboardWriteFailed
     case exampleUnavailable(String)
 
     var errorDescription: String? {
@@ -36,6 +37,11 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.png_encoding_failed",
                 defaultValue: "The rendered image could not be encoded as PNG."
+            )
+        case .clipboardWriteFailed:
+            return L10n.text(
+                "error.clipboard_write_failed",
+                defaultValue: "The clipboard could not be updated."
             )
         case let .exampleUnavailable(name):
             return L10n.format(

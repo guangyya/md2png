@@ -45,6 +45,8 @@ sending it.
 - Global render and last-preview shortcuts plus equivalent menu commands.
 - Compact clipboard preview, non-activating HUD, and an in-memory preview of the
   latest successful render.
+- In-memory access to re-render or restore the latest successful Markdown,
+  guarded by clipboard ownership checks and explicit replacement confirmation.
 - Short, long, formatting, code, checklist, table, flowchart, sequence, and
   Gantt samples that render immediately when selected.
 - English and Simplified Chinese UI selected from macOS language settings.
@@ -65,6 +67,7 @@ sending it.
 - Block external Markdown images so rendering cannot fetch a message-derived URL.
 - Bundle all JavaScript, CSS, localization, and examples required at runtime.
 - Keep the last render in memory only; do not create a content history.
+- Keep only its paired latest source Markdown in memory and discard it on quit.
 
 ## Deliberate non-goals
 

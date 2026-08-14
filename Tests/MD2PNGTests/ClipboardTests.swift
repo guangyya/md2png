@@ -140,6 +140,14 @@ final class ClipboardTests: XCTestCase {
         )
     }
 
+    func testMarkdownValidationPreservesTheExactSource() throws {
+        let markdown = "\n  # Keep surrounding whitespace  \n"
+
+        XCTAssertEqual(try Clipboard.markdownText(from: markdown), markdown)
+        XCTAssertThrowsError(try Clipboard.markdownText(from: " \n\t "))
+        XCTAssertThrowsError(try Clipboard.markdownText(from: nil))
+    }
+
     @MainActor
     func testClipboardPreviewViewHasFixedCompactSize() {
         let view = ClipboardPreviewView()
@@ -155,6 +163,7 @@ final class ClipboardTests: XCTestCase {
         XCTAssertNotNil(AppError.invalidRendererResponse.errorDescription)
         XCTAssertNotNil(AppError.contentTooLarge(width: 1, height: 2).errorDescription)
         XCTAssertNotNil(AppError.pngEncodingFailed.errorDescription)
+        XCTAssertNotNil(AppError.clipboardWriteFailed.errorDescription)
         XCTAssertNotNil(AppError.exampleUnavailable("Short Sample").errorDescription)
     }
 
