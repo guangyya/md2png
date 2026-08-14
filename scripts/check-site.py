@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import plistlib
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
@@ -68,7 +67,7 @@ def resolve_local(page: Path, value: str) -> Path | None:
     return target.resolve()
 
 
-def check_page(relative_path: str, canonical: str, version: str) -> None:
+def check_page(relative_path: str, canonical: str) -> None:
     page = SITE / relative_path
     parser = PageParser()
     parser.feed(page.read_text(encoding="utf-8"))
@@ -90,8 +89,8 @@ def check_page(relative_path: str, canonical: str, version: str) -> None:
     metadata = json.loads(parser.json_ld_blocks[0])
     if metadata.get("@type") != "SoftwareApplication":
         fail(f"{relative_path} JSON-LD is not a SoftwareApplication")
-    if metadata.get("softwareVersion") != version:
-        fail(f"{relative_path} advertises version {metadata.get('softwareVersion')}, expected {version}")
+    if "softwareVersion" in metadata:
+        fail(f"{relative_path} must not hard-code a release version")
 
     for attribute, value in parser.links:
         target = resolve_local(page, value)
@@ -100,11 +99,8 @@ def check_page(relative_path: str, canonical: str, version: str) -> None:
 
 
 def main() -> None:
-    with (ROOT / "Info.plist").open("rb") as stream:
-        version = plistlib.load(stream)["CFBundleShortVersionString"]
-
-    check_page("index.html", f"{PRODUCTION_ORIGIN}/", version)
-    check_page("zh/index.html", f"{PRODUCTION_ORIGIN}/zh/", version)
+    check_page("index.html", f"{PRODUCTION_ORIGIN}/")
+    check_page("zh/index.html", f"{PRODUCTION_ORIGIN}/zh/")
 
     not_found_path = SITE / "404.html"
     not_found = not_found_path.read_text(encoding="utf-8")
@@ -143,7 +139,7 @@ def main() -> None:
     if f"Sitemap: {PRODUCTION_ORIGIN}/sitemap.xml" not in robots:
         fail("robots.txt does not advertise the production sitemap")
 
-    print(f"site-check: ok (version {version}, 2 localized pages, custom 404)")
+    print("site-check: ok (release-independent, 2 localized pages, custom 404)")
 
 
 if __name__ == "__main__":
