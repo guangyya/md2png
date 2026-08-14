@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://guangyya.github.io/md2png/sitemap.xml
