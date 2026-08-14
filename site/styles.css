@@ -202,6 +202,10 @@ a {
   gap: 54px;
 }
 
+.hero-copy {
+  container-type: inline-size;
+}
+
 .eyebrow,
 .section-kicker {
   margin: 0 0 20px;
@@ -223,7 +227,13 @@ a {
 }
 
 html[lang="en"] .hero h1 {
+  font-size: clamp(42px, 12.5cqw, 80px);
   word-spacing: 0.1em;
+}
+
+html[lang="en"] .hero h1 > span {
+  display: block;
+  white-space: nowrap;
 }
 
 .headline-accent {
