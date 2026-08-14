@@ -20,6 +20,7 @@ ICONSET_DIR := .build/AppIcon.iconset
 APP_ICON := .build/AppIcon.icns
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
+SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 RELEASE_QUALIFIER := $(if $(strip $(RELEASE_SUFFIX)),-$(strip $(RELEASE_SUFFIX)),)
 ARTIFACT_BASENAME := md2png-$(VERSION)-macOS-arm64$(RELEASE_QUALIFIER)
 RELEASE_ZIP := dist/$(ARTIFACT_BASENAME).zip
@@ -73,6 +74,13 @@ app: build icon
 		*) ;; \
 	esac
 	/usr/bin/plutil -replace CFBundleIdentifier -string "$(BUNDLE_IDENTIFIER)" "$(CONTENTS)/Info.plist"
+	@if [ -n "$(SOURCE_COMMIT)" ]; then \
+		if ! /usr/bin/printf '%s\n' "$(SOURCE_COMMIT)" | /usr/bin/grep -Eq '^[0-9a-fA-F]{7,64}$$'; then \
+			echo "SOURCE_COMMIT must contain 7 to 64 hexadecimal characters"; \
+			exit 1; \
+		fi; \
+		/usr/bin/plutil -insert MD2PNGSourceCommit -string "$(SOURCE_COMMIT)" "$(CONTENTS)/Info.plist"; \
+	fi
 	@if [ -n "$(PROJECT_URL)" ]; then \
 		case "$(PROJECT_URL)" in \
 			https://*) ;; \
