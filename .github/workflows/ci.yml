@@ -105,7 +105,9 @@ jobs:
 
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Signature=adhoc"
-          test "$(lipo -archs "$executable")" = "arm64"
+          actual_architectures="$(lipo -archs "$executable")"
+          printf 'Executable architectures: %s\n' "$actual_architectures"
+          test "$actual_architectures" = "arm64"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = "$BUNDLE_IDENTIFIER"
           test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$app/Contents/Info.plist")" = "$PROJECT_URL"
           test -s "$swift_resources/renderer.bundle.js"
