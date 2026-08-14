@@ -28,6 +28,9 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 5. **TD-001 incremental SwiftUI rewrite (P3)** only through related product
    work, following its component migration order.
 
+Items with **Priority: TBD** are intentionally excluded from this delivery order
+until backlog prioritization. TD-008 is currently in that state.
+
 ## TD-001: Incremental SwiftUI rewrite
 
 - **Overall priority:** P3
@@ -212,3 +215,36 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
   terminal failures. Include the export controls in the TD-004 accessibility
   audit and document the final storage path and deletion procedure in Privacy
   and Troubleshooting when this work ships.
+
+## TD-008: Update-channel isolation and Debug run hygiene
+
+- **Priority:** TBD — schedule only after backlog prioritization
+- **Effort:** S
+- **Dependencies / coordination:** Follow up FEAT-013 without changing its
+  user-initiated, About-only update behavior.
+- **Tracking issue:** [#30](https://github.com/guangyya/md2png/issues/30)
+- **Problem:** Debug builds currently query the stable GitHub latest-release
+  endpoint even though a Release build is the only meaningful result. Repeated
+  local app verification can also leave more than one Debug status item running
+  in the menu bar.
+- **Scope:** Introduce an explicit packaged update channel. Release builds check
+  only the stable Release channel; Debug builds perform no real update check.
+  Keep deterministic Debug update-state mocks available without network access.
+  Structure endpoint selection and the successful-response cache so a future
+  nightly build checks and caches only nightly metadata without sharing Release
+  results; adding nightly publication itself is out of scope.
+- **Debug run hygiene:** For the supported local Debug run workflow, replace or
+  reuse only the prior Debug instance launched from the same checkout so
+  repeated verification keeps at most one menu bar item. This is secondary
+  scope: implement it only when the prior instance can be identified reliably.
+  Never terminate an installed Release build, another checkout, or an unrelated
+  process; otherwise retain the current behavior and document manual quit.
+- **Constraints:** Preserve About-only, user-initiated update discovery, the
+  local-first privacy boundary, and the no-Accessibility basic workflow. Do not
+  add a background updater, automatic installation, telemetry, or network-backed
+  Debug mocks.
+- **Validation:** Prove a normal Debug build makes no update request and hides
+  or disables real update actions; Release still checks only stable
+  non-prerelease metadata; cached results cannot cross channels; Debug mocks
+  remain offline; and repeated supported Debug runs never affect an installed
+  Release instance.
