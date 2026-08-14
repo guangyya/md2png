@@ -39,6 +39,7 @@ the same semantic version in `CHANGELOG.md`. Add the matching version to
 
 ```sh
 make test
+make coverage
 make verify-dist CONFIGURATION=release \
   PROJECT_URL="$PROJECT_URL" \
   BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
@@ -179,10 +180,14 @@ This command refuses to continue unless:
 - the version does not already have a GitHub Release.
 - the packaged app passes signature, architecture, bundled-resource, and
   renderer self-tests.
+- the normalized coverage JSON and Markdown summaries match the release version
+  and exact commit.
+- Xcode 26.2 is selected for the canonical coverage snapshot.
 
-It then builds and notarizes the arm64 ZIP and DMG, creates and pushes the
-annotated version tag, and publishes three assets using the matching changelog
-section as the Release Notes:
+It first runs the same `make coverage` command used by the canonical CI runner,
+then builds and notarizes the arm64 ZIP and DMG, creates and pushes the annotated
+version tag, and publishes five assets using the matching changelog section as
+the Release Notes:
 
 - the versioned ZIP archive, labeled `md2png <version> — macOS app archive
   (Apple silicon)`;
@@ -190,6 +195,9 @@ section as the Release Notes:
   silicon)`;
 - an identical `md2png-latest.dmg`, labeled `md2png — latest macOS
   installer (Apple silicon)`.
+- `md2png-<version>-coverage.json`, the normalized machine-readable source-line
+  coverage snapshot;
+- `md2png-<version>-coverage.md`, the human-readable coverage summary.
 
 The release is explicitly marked as the latest release, making this a stable
 download URL across versions:
@@ -198,8 +206,19 @@ download URL across versions:
 ${PROJECT_URL}/releases/latest/download/md2png-latest.dmg
 ```
 
-The script verifies all three asset names after publishing. The GitHub CLI uses
+The script verifies all five asset names after publishing. It refuses an
+existing Release and validates the report schema, app version, and exact commit
+before uploading. It also rechecks that coverage generation left the release
+worktree clean, so rerunning a version cannot silently replace its coverage
+record or package uncommitted renderer output. The GitHub CLI uses
 the account authenticated for `GH_HOST`; no token is stored in the application.
+
+After publication, the least-privilege Coverage history workflow regenerates
+the pinned [Test coverage history issue](https://github.com/guangyya/md2png/issues/42)
+from all stable Release JSON assets. Its Markdown table is the accessibility and
+rendering fallback for the Mermaid chart. The workflow has `issues: write` only;
+pull-request coverage remains read-only. If the release event did not run it,
+dispatch `Coverage history` manually after confirming the Release assets.
 
 The equivalent manual fallback is below. Prefer `make publish-release`; the
 manual path is useful only for diagnosing or recovering a partial publication.
@@ -230,6 +249,8 @@ gh release create "v${version}" \
   "dist/md2png-${version}-macOS-arm64-developer-id.zip#md2png ${version} — macOS app archive (Apple silicon)" \
   "dist/md2png-${version}-macOS-arm64-developer-id.dmg#md2png ${version} — macOS installer (Apple silicon)" \
   "dist/md2png-latest.dmg#md2png — latest macOS installer (Apple silicon)" \
+  ".build/coverage/md2png-${version}-coverage.json#md2png ${version} — normalized source-line coverage (JSON)" \
+  ".build/coverage/md2png-${version}-coverage.md#md2png ${version} — source-line coverage summary (Markdown)" \
   --title "md2png ${version}" \
   --notes-file ".build/release-notes-${version}.md" \
   --repo "${GH_HOST}/${GH_REPO}" \
