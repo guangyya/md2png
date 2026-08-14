@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 import XCTest
 @testable import MD2PNG
 
@@ -146,6 +147,25 @@ final class RendererRecoveryStateTests: XCTestCase {
             .ignored
         )
         XCTAssertEqual(state.phase, .recoveryLoad)
+    }
+
+    func testWebKitContentProcessTerminationErrorClassification() {
+        let terminationError = NSError(
+            domain: WKErrorDomain,
+            code: WKError.Code.webContentProcessTerminated.rawValue
+        )
+        let otherWebKitError = NSError(
+            domain: WKErrorDomain,
+            code: WKError.Code.javaScriptExceptionOccurred.rawValue
+        )
+        let sameCodeFromAnotherDomain = NSError(
+            domain: NSCocoaErrorDomain,
+            code: WKError.Code.webContentProcessTerminated.rawValue
+        )
+
+        XCTAssertTrue(MarkdownRenderer.isContentProcessTermination(terminationError))
+        XCTAssertFalse(MarkdownRenderer.isContentProcessTermination(otherWebKitError))
+        XCTAssertFalse(MarkdownRenderer.isContentProcessTermination(sameCodeFromAnotherDomain))
     }
 
     @MainActor

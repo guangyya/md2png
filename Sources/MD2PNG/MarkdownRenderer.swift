@@ -158,11 +158,15 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         for execution: RendererRecoveryState.Execution
     ) {
         guard recoveryState.isCurrent(execution) else { return }
-        if (error as? WKError)?.code == .webContentProcessTerminated {
+        if Self.isContentProcessTermination(error) {
             handleContentProcessTermination(from: .executionError(execution))
         } else {
             finish(execution, with: .failure(error))
         }
+    }
+
+    nonisolated static func isContentProcessTermination(_ error: Error) -> Bool {
+        (error as? WKError)?.code == .webContentProcessTerminated
     }
 
     private func handleContentProcessTermination(
