@@ -57,11 +57,16 @@ tracking issues when a candidate is ready for deeper design.
 
 ## Continuous integration
 
-Pull requests targeting `main` and pushes to `main` run the required
-`CI / macOS arm64` check on a versioned GitHub-hosted macOS runner. The workflow
-uses Xcode 26.2 with Swift 6.2.3, Node.js 24.18.0, and pnpm 11.19.0; installs the
-committed renderer lockfile in frozen mode; runs `make test`; and builds and
-verifies the release-configured arm64 app.
+Pull requests targeting `main` and pushes to `main` run independent checks on
+macOS 15 with Xcode 26.2 and macOS 26 with Xcode 26.6. Both stable checks are
+required. An `Xcode 27 preview` check exercises the preview compiler and SDK on
+macOS 26 without blocking merges. Matrix fail-fast is disabled so every check
+finishes and reports its own result when another environment fails.
+
+Every check uses Node.js 24.18.0 and pnpm 11.19.0, installs the committed
+renderer lockfile in frozen mode, runs `make test`, and builds and verifies the
+release-configured arm64 app. Stable jobs select an exact Xcode installation;
+the preview job follows GitHub's versioned `xcode-27` preview image.
 
 CI also fails when renderer regeneration changes the committed bundle or when
 the app has the wrong identity, project URL, architecture, ad-hoc signature, or

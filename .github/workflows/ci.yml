@@ -17,13 +17,36 @@ concurrency:
 
 jobs:
   verify:
-    name: CI / macOS arm64
-    runs-on: macos-15
+    name: CI / ${{ matrix.check_name }}
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check_name: macOS 15 / Xcode 26.2
+            runner: macos-15
+            macos_major: "15"
+            developer_dir: /Applications/Xcode_26.2.app/Contents/Developer
+            xcode_version: "26.2"
+            experimental: false
+          - check_name: macOS 26 / Xcode 26.6
+            runner: macos-26
+            macos_major: "26"
+            developer_dir: /Applications/Xcode_26.6.app/Contents/Developer
+            xcode_version: "26.6"
+            experimental: false
+          - check_name: Xcode 27 preview
+            runner: xcode-27
+            macos_major: "26"
+            developer_dir: /Applications/Xcode.app/Contents/Developer
+            xcode_version: "27.0"
+            experimental: true
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
-      EXPECTED_XCODE_VERSION: "26.2"
-      EXPECTED_SWIFT_VERSION: "6.2.3"
+      DEVELOPER_DIR: ${{ matrix.developer_dir }}
+      EXPECTED_MACOS_MAJOR: ${{ matrix.macos_major }}
+      EXPECTED_XCODE_VERSION: ${{ matrix.xcode_version }}
       NODE_VERSION: "24.18.0"
       PNPM_VERSION: "11.19.0"
       PROJECT_URL: https://github.com/guangyya/md2png
@@ -39,9 +62,11 @@ jobs:
         shell: bash
         run: |
           test -d "$DEVELOPER_DIR"
+          sw_vers
+          test "$(sw_vers -productVersion | cut -d. -f1)" = "$EXPECTED_MACOS_MAJOR"
           test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "$EXPECTED_XCODE_VERSION"
+          xcodebuild -version
           swift --version
-          swift --version | grep -F "Apple Swift version $EXPECTED_SWIFT_VERSION"
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
