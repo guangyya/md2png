@@ -106,6 +106,9 @@ make test
 make app CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
+make verify-dist \
+  PROJECT_URL=https://github.com/OWNER/REPOSITORY \
+  BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
@@ -139,6 +142,9 @@ make run CONFIGURATION=debug \
 `PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与更新控件。
 源码不包含固定仓库地址。`BUNDLE_IDENTIFIER`
 默认读取 `Info.plist` 中的个人标识，也可在构建时覆盖。
+`make verify-dist` 会重新构建 App，检查签名和 arm64 架构，再通过内置
+Markdown、GFM 表格、高亮 Swift 代码和 Mermaid 图执行离线渲染自测；
+该过程不会读取或修改剪贴板。
 
 发布、Developer ID 签名和 Apple 公证流程见 [Releasing](docs/RELEASING.md)。
 

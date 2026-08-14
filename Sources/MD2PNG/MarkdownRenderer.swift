@@ -17,7 +17,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     private var requests: [Request] = []
     private var initializationError: Error?
 
-    override init() {
+    init(pageURL: URL? = RendererResources.pageURL) {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.websiteDataStore = .nonPersistent()
@@ -38,7 +38,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         hostWindow.orderBack(nil)
         webView.navigationDelegate = self
 
-        guard let pageURL = RendererResources.pageURL else {
+        guard let pageURL else {
             initializationError = AppError.rendererUnavailable
             return
         }

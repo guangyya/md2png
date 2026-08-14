@@ -64,9 +64,12 @@ macOS 26 without blocking merges. Matrix fail-fast is disabled so every check
 finishes and reports its own result when another environment fails.
 
 Every check uses Node.js 24.18.0 and pnpm 11.19.0, installs the committed
-renderer lockfile in frozen mode, runs `make test`, and builds and verifies the
-release-configured arm64 app. Stable jobs select an exact Xcode installation;
-the preview job follows GitHub's versioned `xcode-27` preview image.
+renderer lockfile in frozen mode, runs `make test`, and uses `make verify-dist`
+to build and verify the release-configured arm64 app. The packaged self-test
+renders bundled Markdown, a GFM table, highlighted code, and Mermaid through
+the production renderer without touching the clipboard. Stable jobs select an
+exact Xcode installation; the preview job follows GitHub's versioned
+`xcode-27` preview image.
 
 CI also fails when renderer regeneration changes the committed bundle or when
 the app has the wrong identity, project URL, architecture, ad-hoc signature, or

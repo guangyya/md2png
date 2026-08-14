@@ -136,6 +136,9 @@ make test
 make app CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
+make verify-dist \
+  PROJECT_URL=https://github.com/OWNER/REPOSITORY \
+  BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
@@ -173,6 +176,9 @@ signing identity is supplied. `PROJECT_URL` is optional; when omitted, About
 hides the project and update controls. The source contains
 no repository URL. `BUNDLE_IDENTIFIER` defaults to the personal identifier in
 `Info.plist` and can be overridden without editing source files.
+`make verify-dist` rebuilds the app, verifies its signature and arm64
+architecture, then renders a bundled Markdown, GFM table, highlighted Swift
+snippet, and Mermaid diagram without reading or modifying the clipboard.
 
 ## Release artifacts
 

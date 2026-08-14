@@ -33,7 +33,7 @@ ifneq ($(SIGN_IDENTITY),-)
 SIGN_FLAGS += --options runtime --timestamp
 endif
 
-.PHONY: bootstrap renderer icon test build app release package-dmg dmg notarize publish-release run clean
+.PHONY: bootstrap renderer icon test build app verify-dist release package-dmg dmg notarize publish-release run clean
 
 bootstrap:
 	cd WebRenderer && $(PNPM) install --frozen-lockfile=false
@@ -112,11 +112,15 @@ app: build icon
 	cp CHANGELOG.md "$(CONTENTS)/Resources/CHANGELOG.md"
 	cp -R Examples "$(CONTENTS)/Resources/Examples"
 	codesign $(SIGN_FLAGS) "$(APP_DIR)"
-release: app
-	rm -f "$(RELEASE_ZIP)"
-	ditto -c -k --sequesterRsrc --keepParent "$(APP_DIR)" "$(RELEASE_ZIP)"
+
+verify-dist: app
 	codesign --verify --deep --strict --verbose=2 "$(APP_DIR)"
 	test "$$(lipo -archs "$(CONTENTS)/MacOS/$(TARGET_NAME)")" = "arm64"
+	"$(CONTENTS)/MacOS/$(TARGET_NAME)" --self-test
+
+release: verify-dist
+	rm -f "$(RELEASE_ZIP)"
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_DIR)" "$(RELEASE_ZIP)"
 
 package-dmg:
 	rm -rf "$(DMG_DIR)"
