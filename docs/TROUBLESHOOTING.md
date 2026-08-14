@@ -77,11 +77,24 @@ Use a notarized DMG from the project Releases page when a public binary release
 is available, not an ad-hoc or Apple Development build copied from another Mac.
 The distributed app requires macOS 14 or newer and Apple silicon.
 
-## Updating does not happen automatically
+## The update check in About fails
 
-This is intentional. **View All Releases…** in About only confirms before opening
-the Releases page; md2png never contacts an update API or downloads software. Quit the app,
-download the newest DMG, and replace the existing copy in Applications.
+Open **About md2png** and confirm that the Mac can reach `api.github.com` and
+`github.com`, then use **Try Again**. A corporate proxy or GitHub rate limit can
+also block the request. Successful results are cached for 24 hours; manual
+checks allow at most one request per 60 seconds, and the button remains disabled
+until any GitHub-provided retry time has passed. Checking is deliberately silent,
+so no checking label or progress dialog is expected.
+
+The app downloads only the versioned Apple silicon Developer ID DMG advertised
+by the latest stable Release. It removes incomplete downloads and rejects files
+whose size or SHA-256 digest does not match the Release metadata. Download
+percentage, verification, and opening status appear in About after **Download
+Update** is clicked. If the flow still fails, choose **View Releases** and
+download the DMG manually.
+
+After md2png opens the verified DMG, drag the app into Applications and confirm
+replacement in Finder. md2png does not silently replace or relaunch itself.
 
 ## Information to include in a bug report
 

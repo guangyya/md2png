@@ -230,20 +230,59 @@ final class BuildBadgeView: NSView {
     }
 }
 
+final class UpdateStatusCardView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 8
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.07).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.20).cgColor
+    }
+}
+
+final class SelectAllOnDoubleClickTextField: NSTextField {
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        if event.clickCount == 2 {
+            selectText(nil)
+        }
+    }
+}
+
 @MainActor
 final class AboutController: NSWindowController {
     private let versionLabel = NSTextField(labelWithString: "")
     private let buildBadgeView = BuildBadgeView()
+    private let descriptionLabel = NSTextField(wrappingLabelWithString: "")
     private let releaseHeadingLabel = NSTextField(labelWithString: "")
     private let releaseNotesView = NSTextView()
     private let notesScrollView = NSScrollView()
+    private let updateSlot = NSView()
+    private let updateRow = UpdateStatusCardView()
+    private let updateStatusIcon = NSImageView()
+    private let updateStatusLabel = SelectAllOnDoubleClickTextField(labelWithString: "")
+    private let updateDetailLabel = NSTextField(wrappingLabelWithString: "")
+    private let updateActionButton = NSButton()
+    private let secondaryUpdateButton = NSButton()
     private let projectTitle = NSTextField(labelWithString: "")
     private let projectButton = NSButton()
-    private let releasesButton = NSButton()
     private let copyVersionButton = NSButton()
-    private let updateController = UpdateController()
+    private let updateController: UpdateController
+    private var updateStatusObserverID: UUID?
+    private var updateRowHeightConstraint: NSLayoutConstraint!
     private var projectURL: URL?
-    private var releasesURL: URL?
+    private var updateFeatureAvailable = false
     private var versionInfo = ""
     private var copyResetWorkItem: DispatchWorkItem?
 
@@ -253,16 +292,43 @@ final class AboutController: NSWindowController {
     }
     var displayedProjectButtonTitle: String { projectButton.title }
     var displayedProjectButtonIsHidden: Bool { projectButton.isHidden }
-    var displayedReleasesButtonTitle: String { releasesButton.title }
-    var displayedReleasesButtonIsHidden: Bool { releasesButton.isHidden }
+    var displayedUpdateButtonTitle: String { updateActionButton.title }
+    var displayedUpdateButtonIsHidden: Bool { updateRow.isHidden }
+    var displayedUpdateStatus: String { updateStatusLabel.stringValue }
+    var displayedUpdateDetail: String { updateDetailLabel.stringValue }
+    var displayedUpdateDetailMaximumNumberOfLines: Int {
+        updateDetailLabel.maximumNumberOfLines
+    }
+    var displayedUpdateDetailLineBreakMode: NSLineBreakMode {
+        updateDetailLabel.lineBreakMode
+    }
+    var displayedReleasesFallbackIsHidden: Bool { secondaryUpdateButton.isHidden }
+    var displayedSecondaryUpdateButtonTitle: String { secondaryUpdateButton.title }
     var displayedCopyVersionButtonToolTip: String? { copyVersionButton.toolTip }
     var displayedVersionInfo: String { versionInfo }
     var releaseNotesVisibleOrigin: NSPoint { notesScrollView.contentView.bounds.origin }
+    var displayedUpdateCardFrame: NSRect { frameInContent(updateRow) }
+    var displayedReleaseHeadingFrame: NSRect { frameInContent(releaseHeadingLabel) }
+    var displayedDescriptionFrame: NSRect { frameInContent(descriptionLabel) }
+    var displayedUpdateStatusSelectedRange: NSRange? {
+        updateStatusLabel.currentEditor()?.selectedRange
+    }
+
+    func selectAllUpdateStatusForTesting() {
+        updateStatusLabel.selectText(nil)
+    }
+
+    private func frameInContent(_ view: NSView) -> NSRect {
+        guard let contentView = window?.contentView,
+              let superview = view.superview else { return .zero }
+        return superview.convert(view.frame, to: contentView)
+    }
 #endif
 
-    init() {
+    init(updateController: UpdateController = UpdateController()) {
+        self.updateController = updateController
         let window = PreviewWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 490),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -272,6 +338,9 @@ final class AboutController: NSWindowController {
         window.center()
         super.init(window: window)
         configureContent()
+        updateStatusObserverID = updateController.observeStatus { [weak self] status in
+            self?.applyUpdateStatus(status)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -293,21 +362,23 @@ final class AboutController: NSWindowController {
         )
         applyReleaseNotesStyle(metadata.releaseNotes)
         projectURL = metadata.projectURL
-        releasesURL = metadata.projectURL.map(ProjectLinks.releasesURL(for:))
+        updateFeatureAvailable = metadata.projectURL.flatMap(
+            GitHubRepository.init(projectURL:)
+        ) != nil
+        updateSlot.isHidden = !updateFeatureAvailable
         versionInfo = metadata.versionInfo()
         projectTitle.isHidden = metadata.projectURL == nil
         projectButton.isHidden = metadata.projectURL == nil
-        releasesButton.isHidden = releasesURL == nil
         projectButton.title = L10n.text(
             "about.open_project",
             defaultValue: "Open Project"
         )
         projectButton.toolTip = metadata.projectURL?.absoluteString
-        releasesButton.title = L10n.text(
-            "about.view_all_releases",
-            defaultValue: "View All Releases…"
+        updateRow.toolTip = L10n.text(
+            "about.check_for_updates_help",
+            defaultValue: "Checks GitHub when About opens; successful results are cached for 24 hours."
         )
-        releasesButton.toolTip = releasesURL?.absoluteString
+        applyUpdateStatus(updateController.status)
         resetCopyVersionButton()
 
         showWindow(nil)
@@ -316,6 +387,9 @@ final class AboutController: NSWindowController {
         window?.makeKeyAndOrderFront(nil)
         window?.contentView?.layoutSubtreeIfNeeded()
         updateReleaseNotesLayout()
+        if updateFeatureAvailable {
+            updateController.refreshIfNeeded()
+        }
     }
 
     private func configureContent() {
@@ -365,21 +439,70 @@ final class AboutController: NSWindowController {
         versionRow.spacing = 6
         versionRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let descriptionLabel = NSTextField(
-            wrappingLabelWithString: L10n.text(
-                "about.description",
-                defaultValue: "Turn clipboard Markdown into a polished PNG — locally, privately, and without automatic sending."
-            )
+        updateSlot.translatesAutoresizingMaskIntoConstraints = false
+        updateRow.translatesAutoresizingMaskIntoConstraints = false
+
+        updateStatusIcon.imageScaling = .scaleProportionallyDown
+        updateStatusIcon.translatesAutoresizingMaskIntoConstraints = false
+
+        updateStatusLabel.font = .systemFont(ofSize: 11.5)
+        updateStatusLabel.isSelectable = true
+        updateStatusLabel.maximumNumberOfLines = 1
+        updateStatusLabel.lineBreakMode = .byTruncatingTail
+        updateStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        updateStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        updateDetailLabel.font = .systemFont(ofSize: 10.5)
+        updateDetailLabel.textColor = .secondaryLabelColor
+        updateDetailLabel.maximumNumberOfLines = 2
+        updateDetailLabel.lineBreakMode = .byWordWrapping
+        updateDetailLabel.preferredMaxLayoutWidth = 351
+        updateDetailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        updateDetailLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        updateActionButton.target = self
+        updateActionButton.action = #selector(performUpdateAction)
+        updateActionButton.bezelStyle = .rounded
+        updateActionButton.controlSize = .small
+        updateActionButton.translatesAutoresizingMaskIntoConstraints = false
+
+        secondaryUpdateButton.title = L10n.text(
+            "about.view_all_releases",
+            defaultValue: "View Releases"
         )
-        descriptionLabel.font = .systemFont(ofSize: 13)
+        secondaryUpdateButton.target = self
+        secondaryUpdateButton.action = #selector(performSecondaryUpdateAction)
+        secondaryUpdateButton.isBordered = false
+        secondaryUpdateButton.font = .systemFont(ofSize: 11)
+        secondaryUpdateButton.contentTintColor = .linkColor
+        secondaryUpdateButton.translatesAutoresizingMaskIntoConstraints = false
+
+        for view in [
+            updateStatusIcon, updateStatusLabel, updateDetailLabel,
+            secondaryUpdateButton, updateActionButton
+        ] {
+            updateRow.addSubview(view)
+        }
+        updateSlot.addSubview(updateRow)
+
+        descriptionLabel.stringValue = L10n.text(
+            "about.description",
+            defaultValue: "Turn clipboard Markdown into a polished PNG — locally and privately."
+        )
+        descriptionLabel.font = .systemFont(ofSize: 12)
         descriptionLabel.textColor = .secondaryLabelColor
-        descriptionLabel.maximumNumberOfLines = 2
+        descriptionLabel.maximumNumberOfLines = 1
+        descriptionLabel.lineBreakMode = .byTruncatingTail
+        descriptionLabel.preferredMaxLayoutWidth = 396
+        descriptionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        let headerText = NSStackView(views: [titleRow, versionRow, descriptionLabel])
+        let headerText = NSStackView(views: [titleRow, descriptionLabel, versionRow, updateSlot])
         headerText.orientation = .vertical
         headerText.alignment = .leading
         headerText.spacing = 5
+        headerText.setCustomSpacing(2, after: titleRow)
+        headerText.setCustomSpacing(10, after: versionRow)
         headerText.translatesAutoresizingMaskIntoConstraints = false
 
         let divider = NSBox()
@@ -433,19 +556,6 @@ final class AboutController: NSWindowController {
         projectButton.imagePosition = .imageLeading
         projectButton.translatesAutoresizingMaskIntoConstraints = false
 
-        releasesButton.target = self
-        releasesButton.action = #selector(viewAllReleases)
-        releasesButton.isBordered = false
-        releasesButton.font = .systemFont(ofSize: 12)
-        releasesButton.contentTintColor = .linkColor
-        releasesButton.alignment = .left
-        releasesButton.image = NSImage(
-            systemSymbolName: "arrow.up.right.square",
-            accessibilityDescription: nil
-        )
-        releasesButton.imagePosition = .imageLeading
-        releasesButton.translatesAutoresizingMaskIntoConstraints = false
-
         let closeButton = NSButton(
             title: L10n.text("about.done", defaultValue: "Done"),
             target: self,
@@ -457,10 +567,12 @@ final class AboutController: NSWindowController {
 
         for view in [
             iconView, headerText, divider, releaseHeadingLabel, notesScrollView,
-            projectTitle, projectButton, releasesButton, closeButton
+            projectTitle, projectButton, closeButton
         ] {
             contentView.addSubview(view)
         }
+
+        updateRowHeightConstraint = updateRow.heightAnchor.constraint(equalToConstant: 36)
 
         NSLayoutConstraint.activate([
             iconView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 28),
@@ -470,11 +582,41 @@ final class AboutController: NSWindowController {
 
             headerText.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 20),
             headerText.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -28),
-            headerText.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
+            headerText.topAnchor.constraint(equalTo: iconView.topAnchor),
+
+            descriptionLabel.widthAnchor.constraint(equalTo: headerText.widthAnchor),
+            descriptionLabel.heightAnchor.constraint(equalToConstant: 20),
+            updateSlot.widthAnchor.constraint(equalTo: headerText.widthAnchor),
+            updateSlot.heightAnchor.constraint(equalToConstant: 66),
+            updateRow.leadingAnchor.constraint(equalTo: updateSlot.leadingAnchor),
+            updateRow.trailingAnchor.constraint(equalTo: updateSlot.trailingAnchor),
+            updateRow.topAnchor.constraint(equalTo: updateSlot.topAnchor),
+            updateRowHeightConstraint,
+
+            updateStatusIcon.leadingAnchor.constraint(equalTo: updateRow.leadingAnchor, constant: 10),
+            updateStatusIcon.topAnchor.constraint(equalTo: updateRow.topAnchor, constant: 9),
+            updateStatusIcon.widthAnchor.constraint(equalToConstant: 18),
+            updateStatusIcon.heightAnchor.constraint(equalToConstant: 18),
+
+            updateStatusLabel.leadingAnchor.constraint(equalTo: updateStatusIcon.trailingAnchor, constant: 7),
+            updateStatusLabel.centerYAnchor.constraint(equalTo: updateStatusIcon.centerYAnchor),
+            updateStatusLabel.trailingAnchor.constraint(lessThanOrEqualTo: secondaryUpdateButton.leadingAnchor, constant: -8),
+
+            updateDetailLabel.leadingAnchor.constraint(equalTo: updateStatusLabel.leadingAnchor),
+            updateDetailLabel.trailingAnchor.constraint(equalTo: updateRow.trailingAnchor, constant: -10),
+            updateDetailLabel.topAnchor.constraint(equalTo: updateStatusLabel.bottomAnchor, constant: 3),
+            updateDetailLabel.bottomAnchor.constraint(lessThanOrEqualTo: updateRow.bottomAnchor, constant: -7),
+
+            secondaryUpdateButton.centerYAnchor.constraint(equalTo: updateStatusIcon.centerYAnchor),
+            secondaryUpdateButton.trailingAnchor.constraint(equalTo: updateActionButton.leadingAnchor, constant: -8),
+
+            updateActionButton.centerYAnchor.constraint(equalTo: updateStatusIcon.centerYAnchor),
+            updateActionButton.trailingAnchor.constraint(equalTo: updateRow.trailingAnchor, constant: -10),
 
             divider.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 28),
             divider.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -28),
-            divider.topAnchor.constraint(equalTo: iconView.bottomAnchor, constant: 22),
+            divider.topAnchor.constraint(greaterThanOrEqualTo: iconView.bottomAnchor, constant: 22),
+            divider.topAnchor.constraint(equalTo: headerText.bottomAnchor, constant: 22),
 
             releaseHeadingLabel.leadingAnchor.constraint(equalTo: divider.leadingAnchor),
             releaseHeadingLabel.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 20),
@@ -482,19 +624,17 @@ final class AboutController: NSWindowController {
             notesScrollView.leadingAnchor.constraint(equalTo: divider.leadingAnchor),
             notesScrollView.trailingAnchor.constraint(equalTo: divider.trailingAnchor),
             notesScrollView.topAnchor.constraint(equalTo: releaseHeadingLabel.bottomAnchor, constant: 10),
-            notesScrollView.heightAnchor.constraint(equalToConstant: 205),
+            notesScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            notesScrollView.bottomAnchor.constraint(equalTo: projectTitle.topAnchor, constant: -18),
 
             projectTitle.leadingAnchor.constraint(equalTo: divider.leadingAnchor),
-            projectTitle.topAnchor.constraint(equalTo: notesScrollView.bottomAnchor, constant: 18),
-            projectTitle.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -24),
             projectButton.leadingAnchor.constraint(equalTo: projectTitle.trailingAnchor, constant: 10),
             projectButton.centerYAnchor.constraint(equalTo: projectTitle.centerYAnchor),
-            releasesButton.leadingAnchor.constraint(equalTo: projectButton.trailingAnchor, constant: 14),
-            releasesButton.centerYAnchor.constraint(equalTo: projectTitle.centerYAnchor),
-            releasesButton.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -16),
+            projectButton.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -16),
 
             closeButton.trailingAnchor.constraint(equalTo: divider.trailingAnchor),
             closeButton.centerYAnchor.constraint(equalTo: projectTitle.centerYAnchor),
+            closeButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
             closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80)
         ])
     }
@@ -504,8 +644,245 @@ final class AboutController: NSWindowController {
         NSWorkspace.shared.open(projectURL)
     }
 
-    @objc private func viewAllReleases() {
-        updateController.showReleasesPrompt(releasesURL: releasesURL)
+    @objc private func performUpdateAction() {
+        switch updateController.status.phase {
+        case .updateAvailable, .failed(_, _, _, .some):
+            updateController.downloadAvailableUpdate()
+        case .downloading, .verifying, .opening:
+            updateController.cancelUpdate()
+        case .upToDate, .failed:
+            updateController.checkAgain()
+        case .readyToInstall:
+            updateController.openDownloadedUpdate()
+        case .unknown:
+            break
+        }
+    }
+
+    @objc private func performSecondaryUpdateAction() {
+        if case .readyToInstall = updateController.status.phase {
+            updateController.revealDownloadedUpdate()
+        } else {
+            updateController.viewReleasesFallback()
+        }
+    }
+
+    private func applyUpdateStatus(_ status: UpdateStatus) {
+        guard updateFeatureAvailable else {
+            updateSlot.isHidden = true
+            updateRow.isHidden = true
+            return
+        }
+        updateSlot.isHidden = false
+        let symbolName: String
+        let tintColor: NSColor
+        let title: String
+        let actionTitle: String?
+        let canPerformAction: Bool
+        let emphasizesAction: Bool
+        let secondaryActionTitle: String?
+        var detail: String?
+
+        switch status.phase {
+        case .unknown:
+            updateRow.isHidden = true
+            return
+        case let .upToDate(version):
+            detail = nil
+            symbolName = "checkmark.circle.fill"
+            tintColor = .systemGreen
+            title = L10n.format(
+                "about.update_up_to_date",
+                defaultValue: "Up to Date · %@",
+                version.description
+            )
+            switch status.manualCheckFeedback {
+            case .checking:
+                actionTitle = L10n.text(
+                    "about.update_checking",
+                    defaultValue: "Checking…"
+                )
+            case .completed where status.nextManualCheckAt != nil:
+                actionTitle = L10n.text(
+                    "about.update_checked_recently",
+                    defaultValue: "Checked just now"
+                )
+            case .none where status.nextManualCheckAt != nil:
+                actionTitle = L10n.text(
+                    "about.update_check_again_later",
+                    defaultValue: "Check Again Later"
+                )
+            case .none, .completed:
+                actionTitle = L10n.text(
+                    "about.update_check_again",
+                    defaultValue: "Check Again"
+                )
+            }
+            canPerformAction = !status.isChecking && status.nextManualCheckAt == nil
+            emphasizesAction = false
+            secondaryActionTitle = nil
+        case let .updateAvailable(update):
+            detail = nil
+            symbolName = "arrow.down.circle.fill"
+            tintColor = .systemBlue
+            title = L10n.format(
+                "about.update_available",
+                defaultValue: "Update available · %@",
+                update.version.description
+            )
+            actionTitle = L10n.text(
+                "about.update_download",
+                defaultValue: "Download Update"
+            )
+            canPerformAction = !status.isChecking
+            emphasizesAction = true
+            secondaryActionTitle = nil
+        case let .downloading(update, progressPercent):
+            detail = nil
+            symbolName = "arrow.down.circle"
+            tintColor = .systemBlue
+            title = L10n.format(
+                "about.update_downloading_progress",
+                defaultValue: "Downloading md2png %@ — %ld%%",
+                update.version.description,
+                progressPercent
+            )
+            actionTitle = L10n.text("common.cancel", defaultValue: "Cancel")
+            canPerformAction = true
+            emphasizesAction = false
+            secondaryActionTitle = nil
+        case let .verifying(update):
+            detail = nil
+            symbolName = "checkmark.shield"
+            tintColor = .systemBlue
+            title = L10n.format(
+                "about.update_verifying_version",
+                defaultValue: "Verifying md2png %@…",
+                update.version.description
+            )
+            actionTitle = L10n.text("common.cancel", defaultValue: "Cancel")
+            canPerformAction = true
+            emphasizesAction = false
+            secondaryActionTitle = nil
+        case let .opening(update):
+            detail = nil
+            symbolName = "opticaldiscdrive"
+            tintColor = .systemBlue
+            title = L10n.format(
+                "about.update_opening_version",
+                defaultValue: "Opening md2png %@…",
+                update.version.description
+            )
+            actionTitle = nil
+            canPerformAction = false
+            emphasizesAction = false
+            secondaryActionTitle = nil
+        case let .readyToInstall(update, _):
+            detail = L10n.text(
+                "about.update_ready_detail",
+                defaultValue: "Downloaded — open the DMG and drag md2png into Applications."
+            )
+            symbolName = "checkmark.circle.fill"
+            tintColor = .systemGreen
+            title = L10n.format(
+                "about.update_ready",
+                defaultValue: "Ready to install · %@",
+                update.version.description
+            )
+            actionTitle = L10n.text(
+                "about.update_open_again",
+                defaultValue: "Open"
+            )
+            canPerformAction = true
+            emphasizesAction = true
+            secondaryActionTitle = L10n.text(
+                "about.update_show_in_finder",
+                defaultValue: "Show in Finder"
+            )
+        case let .failed(message, releasesURL, _, availableUpdate):
+            symbolName = "exclamationmark.triangle.fill"
+            tintColor = .systemOrange
+            detail = message
+            title = availableUpdate == nil
+                ? L10n.text(
+                    "about.update_check_failed",
+                    defaultValue: "Update check failed"
+                )
+                : L10n.text(
+                    "about.update_download_failed",
+                    defaultValue: "Download failed"
+                )
+            if availableUpdate == nil {
+                if status.manualCheckFeedback == .checking {
+                    actionTitle = L10n.text(
+                        "about.update_checking",
+                        defaultValue: "Checking…"
+                    )
+                } else if status.nextManualCheckAt != nil {
+                    actionTitle = L10n.text(
+                        "about.update_try_again_later",
+                        defaultValue: "Try Again Later"
+                    )
+                } else {
+                    actionTitle = L10n.text(
+                        "about.update_retry_check",
+                        defaultValue: "Try Again"
+                    )
+                }
+            } else {
+                actionTitle = L10n.text(
+                    "about.update_retry_download",
+                    defaultValue: "Retry Download"
+                )
+            }
+            canPerformAction = !status.isChecking && (
+                availableUpdate != nil || status.nextManualCheckAt == nil
+            )
+            emphasizesAction = true
+            secondaryActionTitle = releasesURL == nil
+                ? nil
+                : L10n.text("about.view_all_releases", defaultValue: "View Releases")
+        }
+
+        updateRow.isHidden = false
+        updateStatusIcon.image = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: nil
+        )
+        updateStatusIcon.contentTintColor = tintColor
+        updateStatusLabel.stringValue = title
+        updateStatusLabel.setAccessibilityLabel(
+            detail.map { "\(title). \($0)" } ?? title
+        )
+        updateStatusLabel.toolTip = detail ?? title
+        updateDetailLabel.isHidden = detail == nil
+        updateDetailLabel.stringValue = detail ?? ""
+        updateDetailLabel.toolTip = detail
+        updateRowHeightConstraint.constant = detail == nil ? 36 : 66
+        updateActionButton.isHidden = actionTitle == nil
+        updateActionButton.title = actionTitle ?? ""
+        updateActionButton.isEnabled = canPerformAction
+        updateActionButton.isBordered = false
+        updateActionButton.bezelColor = nil
+        updateActionButton.font = .systemFont(
+            ofSize: 12,
+            weight: emphasizesAction ? .semibold : .regular
+        )
+        updateActionButton.contentTintColor = canPerformAction
+            ? .linkColor
+            : .secondaryLabelColor
+        secondaryUpdateButton.isHidden = secondaryActionTitle == nil
+        secondaryUpdateButton.title = secondaryActionTitle ?? ""
+
+        if !canPerformAction, let retryAt = status.nextManualCheckAt {
+            updateActionButton.toolTip = L10n.format(
+                "about.update_retry_after",
+                defaultValue: "Try again after %@.",
+                retryAt.formatted(date: .omitted, time: .shortened)
+            )
+        } else {
+            updateActionButton.toolTip = nil
+        }
     }
 
     @objc private func copyVersionInfo() {
@@ -583,7 +960,10 @@ final class AboutController: NSWindowController {
 
     private func updateReleaseNotesLayout() {
         let width = max(1, notesScrollView.contentSize.width)
-        releaseNotesView.setFrameSize(NSSize(width: width, height: 205))
+        releaseNotesView.setFrameSize(NSSize(
+            width: width,
+            height: notesScrollView.contentSize.height
+        ))
         releaseNotesView.textContainer?.containerSize = NSSize(
             width: width,
             height: .greatestFiniteMagnitude

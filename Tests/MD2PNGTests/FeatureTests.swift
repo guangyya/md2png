@@ -4,7 +4,7 @@ import XCTest
 @testable import MD2PNG
 
 final class FeatureTests: XCTestCase {
-    private let testProjectURL = URL(string: "https://example.com/owner/md2png")!
+    private let testProjectURL = URL(string: "https://github.com/owner/md2png")!
 
     func testEveryExampleResourceResolves() throws {
         let root = FileManager.default.temporaryDirectory
@@ -158,7 +158,7 @@ final class FeatureTests: XCTestCase {
     @MainActor
     func testAboutWindowHasStructuredLayout() throws {
         _ = NSApplication.shared
-        let controller = AboutController()
+        let controller = makeAboutController()
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
             build: "1",
@@ -181,7 +181,7 @@ final class FeatureTests: XCTestCase {
             window.title,
             L10n.text("about.window_title", defaultValue: "About md2png")
         )
-        XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size, NSSize(width: 560, height: 460))
+        XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size, NSSize(width: 560, height: 490))
         XCTAssertGreaterThanOrEqual(contentView.subviews.count, 8)
         XCTAssertEqual(controller.displayedBuildConfiguration, .debug)
         XCTAssertEqual(
@@ -189,10 +189,18 @@ final class FeatureTests: XCTestCase {
             L10n.text("about.open_project", defaultValue: "Open Project")
         )
         XCTAssertEqual(
-            controller.displayedReleasesButtonTitle,
-            L10n.text("about.view_all_releases", defaultValue: "View All Releases…")
+            controller.displayedUpdateButtonTitle,
+            L10n.text("about.update_check_again", defaultValue: "Check Again")
         )
-        XCTAssertFalse(controller.displayedReleasesButtonIsHidden)
+        XCTAssertFalse(controller.displayedUpdateButtonIsHidden)
+        XCTAssertEqual(
+            controller.displayedUpdateStatus,
+            L10n.format(
+                "about.update_up_to_date",
+                defaultValue: "Up to Date · %@",
+                "0.1.0"
+            )
+        )
         XCTAssertEqual(
             controller.displayedCopyVersionButtonToolTip,
             L10n.text("about.copy_version_info", defaultValue: "Copy Version Info")
@@ -206,6 +214,274 @@ final class FeatureTests: XCTestCase {
                 try png.write(to: URL(fileURLWithPath: outputPath))
             }
         }
+    }
+
+    @MainActor
+    func testAboutManualCheckShowsProgressAndRecentCompletionFeedback() {
+        _ = NSApplication.shared
+        let phase = UpdatePhase.upToDate(version: SemanticVersion("0.1.0")!)
+        let retryAt = Date().addingTimeInterval(60)
+        let metadata = AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Changed\n• Clear manual update feedback.",
+            projectURL: testProjectURL
+        )
+
+        let checkingController = makeAboutController(
+            phase: phase,
+            isChecking: true,
+            nextManualCheckAt: retryAt,
+            manualCheckFeedback: .checking
+        )
+        checkingController.show(metadata: metadata)
+        XCTAssertEqual(
+            checkingController.displayedUpdateButtonTitle,
+            L10n.text("about.update_checking", defaultValue: "Checking…")
+        )
+        checkingController.close()
+
+        let completedController = makeAboutController(
+            phase: phase,
+            nextManualCheckAt: retryAt,
+            manualCheckFeedback: .completed
+        )
+        completedController.show(metadata: metadata)
+        XCTAssertEqual(
+            completedController.displayedUpdateButtonTitle,
+            L10n.text("about.update_checked_recently", defaultValue: "Checked just now")
+        )
+        completedController.close()
+
+        let cooldownController = makeAboutController(
+            phase: phase,
+            nextManualCheckAt: retryAt
+        )
+        cooldownController.show(metadata: metadata)
+        XCTAssertEqual(
+            cooldownController.displayedUpdateButtonTitle,
+            L10n.text("about.update_check_again_later", defaultValue: "Check Again Later")
+        )
+        cooldownController.close()
+
+        let failedController = makeAboutController(
+            phase: .failed(
+                message: UpdateError.networkUnavailable.localizedDescription,
+                releasesURL: testProjectURL.appendingPathComponent("releases"),
+                retryAt: retryAt,
+                availableUpdate: nil
+            ),
+            nextManualCheckAt: retryAt
+        )
+        failedController.show(metadata: metadata)
+        XCTAssertEqual(
+            failedController.displayedUpdateButtonTitle,
+            L10n.text("about.update_try_again_later", defaultValue: "Try Again Later")
+        )
+        failedController.close()
+    }
+
+    @MainActor
+    func testAboutWindowSeparatesFailureSummaryFromLongDetailAndActions() throws {
+        _ = NSApplication.shared
+        let message = UpdateError.networkUnavailable.localizedDescription
+        let controller = makeAboutController(phase: .failed(
+            message: message,
+            releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
+            retryAt: nil,
+            availableUpdate: nil
+        ))
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Added\n• Failure layout coverage.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        XCTAssertEqual(
+            controller.displayedUpdateStatus,
+            L10n.text("about.update_check_failed", defaultValue: "Update check failed")
+        )
+        XCTAssertEqual(controller.displayedUpdateDetail, message)
+        XCTAssertEqual(
+            controller.displayedUpdateButtonTitle,
+            L10n.text("about.update_retry_check", defaultValue: "Try Again")
+        )
+        XCTAssertFalse(controller.displayedReleasesFallbackIsHidden)
+        XCTAssertEqual(controller.displayedDescriptionFrame.height, 20, accuracy: 0.5)
+        XCTAssertEqual(
+            controller.displayedDescriptionFrame.maxX,
+            controller.displayedUpdateCardFrame.maxX,
+            accuracy: 2.5
+        )
+
+        if let outputPath = ProcessInfo.processInfo.environment[
+            "MD2PNG_ABOUT_FAILURE_SNAPSHOT_PATH"
+        ], let contentView = controller.window?.contentView,
+           let bitmap = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
+            contentView.cacheDisplay(in: contentView.bounds, to: bitmap)
+            if let png = bitmap.representation(using: .png, properties: [:]) {
+                try png.write(to: URL(fileURLWithPath: outputPath))
+            }
+        }
+    }
+
+    @MainActor
+    func testAboutDownloadFailureWrapsCompleteIntegrityMessage() throws {
+        _ = NSApplication.shared
+        let message = UpdateError.digestMismatch.localizedDescription
+        let update = AvailableUpdate(
+            version: SemanticVersion("0.2.0")!,
+            tagName: "v0.2.0",
+            assetName: "md2png-0.2.0-macOS-arm64-developer-id.dmg",
+            downloadURL: URL(string:
+                "https://github.com/owner/md2png/releases/download/v0.2.0/md2png-0.2.0-macOS-arm64-developer-id.dmg"
+            )!,
+            size: 1,
+            sha256: String(repeating: "0", count: 64)
+        )
+        let controller = makeAboutController(phase: .failed(
+            message: message,
+            releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
+            retryAt: nil,
+            availableUpdate: update
+        ))
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Added\n• Download failure layout coverage.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        XCTAssertEqual(controller.displayedUpdateDetail, message)
+        XCTAssertEqual(controller.displayedUpdateDetailMaximumNumberOfLines, 2)
+        XCTAssertEqual(controller.displayedUpdateDetailLineBreakMode, .byWordWrapping)
+
+        if let outputPath = ProcessInfo.processInfo.environment[
+            "MD2PNG_ABOUT_DOWNLOAD_FAILURE_SNAPSHOT_PATH"
+        ], let contentView = controller.window?.contentView,
+           let bitmap = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
+            contentView.cacheDisplay(in: contentView.bounds, to: bitmap)
+            if let png = bitmap.representation(using: .png, properties: [:]) {
+                try png.write(to: URL(fileURLWithPath: outputPath))
+            }
+        }
+    }
+
+    @MainActor
+    func testAboutReadyStatusCanBeSelectedAndOffersOpenAgain() throws {
+        _ = NSApplication.shared
+        let update = AvailableUpdate(
+            version: SemanticVersion("0.2.0")!,
+            tagName: "v0.2.0",
+            assetName: "md2png-0.2.0-macOS-arm64-developer-id.dmg",
+            downloadURL: URL(string:
+                "https://github.com/owner/md2png/releases/download/v0.2.0/md2png-0.2.0-macOS-arm64-developer-id.dmg"
+            )!,
+            size: 1,
+            sha256: String(repeating: "0", count: 64)
+        )
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            update.assetName
+        )
+        let controller = makeAboutController(phase: .readyToInstall(
+            update: update,
+            fileURL: fileURL
+        ))
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Added\n• Reopen downloaded DMGs.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        XCTAssertEqual(
+            controller.displayedUpdateButtonTitle,
+            L10n.text("about.update_open_again", defaultValue: "Open")
+        )
+        XCTAssertEqual(
+            controller.displayedSecondaryUpdateButtonTitle,
+            L10n.text("about.update_show_in_finder", defaultValue: "Show in Finder")
+        )
+        XCTAssertEqual(
+            controller.displayedUpdateDetail,
+            L10n.text(
+                "about.update_ready_detail",
+                defaultValue: "Downloaded — open the DMG and drag md2png into Applications."
+            )
+        )
+        controller.selectAllUpdateStatusForTesting()
+        XCTAssertEqual(
+            controller.displayedUpdateStatusSelectedRange,
+            NSRange(location: 0, length: (controller.displayedUpdateStatus as NSString).length)
+        )
+
+        if let outputPath = ProcessInfo.processInfo.environment[
+            "MD2PNG_ABOUT_READY_SNAPSHOT_PATH"
+        ], let contentView = controller.window?.contentView,
+           let bitmap = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
+            contentView.cacheDisplay(in: contentView.bounds, to: bitmap)
+            if let png = bitmap.representation(using: .png, properties: [:]) {
+                try png.write(to: URL(fileURLWithPath: outputPath))
+            }
+        }
+    }
+
+    @MainActor
+    func testAboutUpdateCardResizesWithoutMovingChangelog() throws {
+        _ = NSApplication.shared
+        let metadata = AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Added\n• Stable update layout.",
+            projectURL: testProjectURL
+        )
+
+        let compactController = makeAboutController()
+        compactController.show(metadata: metadata)
+        let compactCardFrame = compactController.displayedUpdateCardFrame
+        let compactDescriptionFrame = compactController.displayedDescriptionFrame
+        let compactHeadingFrame = compactController.displayedReleaseHeadingFrame
+        compactController.close()
+
+        let expandedController = makeAboutController(phase: .failed(
+            message: UpdateError.networkUnavailable.localizedDescription,
+            releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
+            retryAt: nil,
+            availableUpdate: nil
+        ))
+        expandedController.show(metadata: metadata)
+        defer { expandedController.close() }
+        let expandedCardFrame = expandedController.displayedUpdateCardFrame
+        let expandedDescriptionFrame = expandedController.displayedDescriptionFrame
+        let expandedHeadingFrame = expandedController.displayedReleaseHeadingFrame
+
+        XCTAssertEqual(compactCardFrame.height, 36, accuracy: 0.5)
+        XCTAssertEqual(expandedCardFrame.height, 66, accuracy: 0.5)
+        XCTAssertGreaterThan(compactDescriptionFrame.minY, compactCardFrame.maxY)
+        XCTAssertEqual(
+            compactDescriptionFrame.height,
+            expandedDescriptionFrame.height,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            compactHeadingFrame.origin.y,
+            expandedHeadingFrame.origin.y,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            compactHeadingFrame.height,
+            expandedHeadingFrame.height,
+            accuracy: 0.5
+        )
     }
 
     func testBuildConfigurationLabelsAreLocalized() {
@@ -280,7 +556,7 @@ final class FeatureTests: XCTestCase {
     @MainActor
     func testAboutWindowCanShowReleaseBuild() {
         _ = NSApplication.shared
-        let controller = AboutController()
+        let controller = makeAboutController()
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
             build: "1",
@@ -296,7 +572,7 @@ final class FeatureTests: XCTestCase {
     @MainActor
     func testAboutHidesRepositoryActionsWithoutPackagedURL() {
         _ = NSApplication.shared
-        let controller = AboutController()
+        let controller = makeAboutController()
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
             build: "1",
@@ -307,13 +583,13 @@ final class FeatureTests: XCTestCase {
         defer { controller.close() }
 
         XCTAssertTrue(controller.displayedProjectButtonIsHidden)
-        XCTAssertTrue(controller.displayedReleasesButtonIsHidden)
+        XCTAssertTrue(controller.displayedUpdateButtonIsHidden)
     }
 
     @MainActor
     func testAboutReleaseNotesStartScrolledToTop() {
         _ = NSApplication.shared
-        let controller = AboutController()
+        let controller = makeAboutController()
         let notes = (["Added"] + (1...30).map { "• Change \($0)" })
             .joined(separator: "\n")
         controller.show(metadata: AppMetadata(
@@ -340,6 +616,23 @@ final class FeatureTests: XCTestCase {
             releases.path,
             "/owner/md2png/releases"
         )
+    }
+
+    @MainActor
+    private func makeAboutController(
+        phase: UpdatePhase = .upToDate(version: SemanticVersion("0.1.0")!),
+        isChecking: Bool = false,
+        nextManualCheckAt: Date? = nil,
+        manualCheckFeedback: ManualCheckFeedback = .none
+    ) -> AboutController {
+        let updateController = UpdateController()
+        updateController.setStatusForTesting(UpdateStatus(
+            phase: phase,
+            isChecking: isChecking,
+            nextManualCheckAt: nextManualCheckAt,
+            manualCheckFeedback: manualCheckFeedback
+        ))
+        return AboutController(updateController: updateController)
     }
 
     func testProjectLinkRejectsMissingOrUnsafeConfiguration() {

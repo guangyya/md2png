@@ -7,7 +7,23 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- Add silent update discovery in About using public GitHub latest-release
+  metadata, a 24-hour successful-result cache, a 60-second manual cooldown, and
+  persisted server rate-limit handling. A newer version downloads only after
+  explicit confirmation; the app verifies the versioned Apple silicon DMG's
+  size and SHA-256 digest before asking macOS to open it for manual installation.
+  Verified downloads can be reopened or revealed in Finder for cleanup.
+
+### Changed
+
+- Replace the About window's manual Releases link with compact up-to-date or
+  available-version status and inline actions. Automatic checking is silent;
+  download progress stays in About and the status item, and Releases is a
+  failure fallback.
+- Give explicit update checks inline progress and recent-completion feedback
+  without adding a dialog or changing the displayed release result.
 
 ## [0.1.0] - 2026-08-14
 

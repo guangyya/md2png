@@ -5,8 +5,7 @@
 <h1 align="center">md2png for Mac</h1>
 
 <p align="center">
-  Turn clipboard Markdown into a polished PNG—locally, privately, and without
-  automatic sending.
+  Turn clipboard Markdown into a polished PNG—locally and privately.
 </p>
 
 <p align="center">
@@ -86,7 +85,7 @@ A GFM table needs a separator row:
 | Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
 | Examples | — | Copies and immediately renders the selected bundled sample |
-| About md2png | — | Shows version, build type, release notes, project and Releases links, and copyable diagnostics |
+| About md2png | — | Shows version, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current
 clipboard. While a render is running, additional render commands and examples
@@ -117,6 +116,10 @@ reference for tables, highlighted code, and multiple diagrams in one image.
   being fetched.
 - No analytics, telemetry, advertising, account integration, bot, or
   service-specific API is included.
+- Opening **About md2png** silently refreshes public GitHub Release metadata when
+  the last successful result is more than 24 hours old. **Check Again** is
+  available without exposing a GitHub account or credential; no Markdown or
+  clipboard data is included in the request.
 - The basic copy/render/paste workflow does not need Accessibility permission.
 - The app never pastes or sends content automatically.
 
@@ -138,9 +141,36 @@ make run CONFIGURATION=debug \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 ```
 
+To exercise a real update without editing the source version, override only the
+packaged test app:
+
+```sh
+make run CONFIGURATION=debug \
+  PROJECT_URL=https://github.com/guangyya/md2png \
+  TEST_UPDATE_VERSION=0.0.0
+```
+
+`TEST_UPDATE_VERSION` is rejected by `publish-release`; public releases always
+use `CFBundleShortVersionString` from `Info.plist`.
+
+Debug builds can also mock the About update row without making a request:
+
+```sh
+make run CONFIGURATION=debug \
+  PROJECT_URL=https://github.com/guangyya/md2png \
+  TEST_UPDATE_VERSION=0.0.0 \
+  TEST_UPDATE_STATE=up-to-date       # or check-failed / download-failed / ready-to-install
+```
+
+`TEST_UPDATE_STATE` is accepted only for local Debug app/run builds and is
+rejected by the release publisher. Download-related mocks use the immutable
+published v0.1.0 DMG metadata so retries run through real verification. If that
+cached DMG has been removed, `ready-to-install` starts at the recoverable
+download failure instead of exposing an invalid Open action.
+
 `make app` creates `dist/md2png.app`. Local builds are ad-hoc signed unless a
 signing identity is supplied. `PROJECT_URL` is optional; when omitted, About
-hides the project and Releases links. The source contains
+hides the project and update controls. The source contains
 no repository URL. `BUNDLE_IDENTIFIER` defaults to the personal identifier in
 `Info.plist` and can be overridden without editing source files.
 
@@ -159,7 +189,7 @@ make publish-release \
   GH_REPO=OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png \
   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE=md2pngNotary
+  NOTARY_PROFILE=MDPNGNotary
 ```
 
 Each published release contains a versioned ZIP, a versioned DMG, and the fixed

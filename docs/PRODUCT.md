@@ -49,9 +49,12 @@ sending it.
   Gantt samples that render immediately when selected.
 - English and Simplified Chinese UI selected from macOS language settings.
 - About window with Debug/Release identification, version/build, release notes,
-  project and Releases links, and copyable diagnostics.
-- Manual **View All Releases…** action in About with confirmation and no in-app
-  update request.
+  project link, update action, and copyable diagnostics.
+- Silent update discovery in About, backed by a 24-hour successful-result cache
+  and a rate-limited **Check Again** action. A newer signed DMG downloads only
+  after **Download Update** is clicked, is verified, and opens for the user to
+  finish installation. Progress stays in the About row and status item, with
+  milestone-only VoiceOver announcements rather than a modal progress window.
 - Duplicate render entry points disabled while one render is in progress.
 
 ## Safety and privacy constraints
@@ -67,7 +70,8 @@ sending it.
 
 - Editing Markdown inside the app.
 - Monitoring or intercepting another application's messages.
-- A background updater or embedded GitHub credential.
+- Launch-time or scheduled update checks, silent app replacement, or an embedded
+  GitHub credential.
 - Cloud rendering, shared storage, analytics, or telemetry.
 - Intel (`x86_64`) distribution.
 

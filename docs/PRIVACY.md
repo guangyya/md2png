@@ -43,17 +43,27 @@ history or silently save Markdown and images to files.
   used.
 - No message is pasted or sent automatically.
 - No Accessibility permission is required for the basic workflow.
-- No GitHub credential or release API client is embedded in the app.
+- No GitHub credential is embedded in the app.
 
 ## Network behavior
 
-md2png makes no automatic update request and does not contact a Releases API.
-Two explicit actions in About can ask macOS to open a web page in the default browser:
+md2png makes no update request at launch, on a background timer, or during
+rendering. Opening **About md2png** may contact the public GitHub latest-release
+API when the last successful result is more than 24 hours old; otherwise it
+uses the local cached response. **Check Again** can request a refresh, with at
+least 60 seconds between actual requests and longer server-provided rate-limit
+delays honored across launches. The request contains the repository path, app
+version in a User-Agent, and normal network metadata such as the source IP; it
+contains no Markdown, rendered image, clipboard content, device identifier,
+account data, or GitHub credential.
 
-- **View All Releases…** first displays a confirmation, then opens the Releases page
-  only when the user chooses **Open Releases**.
-- **Open Project** in About opens the repository page when clicked.
+When a newer stable version exists, the app downloads the matching versioned
+Apple silicon DMG from the GitHub Release asset URL into its caches directory,
+checks the advertised file size and SHA-256 digest, and asks macOS to open it.
+The user must still drag md2png into Applications. The app does not replace or
+relaunch itself, request administrator privileges, or report that installation
+has completed.
 
-Any browser traffic, authentication, or download after that point belongs to
-the user's default browser. The app itself never downloads or installs an
-update.
+**View Releases** is offered only after an update failure and opens the browser
+only when the user chooses it. **Open Project** in About also opens the configured
+repository page when clicked. Rendering remains fully available offline.

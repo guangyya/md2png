@@ -1,11 +1,13 @@
 PNPM ?= pnpm
 CONFIGURATION ?= release
 SIGN_IDENTITY ?= -
-NOTARY_PROFILE ?= md2pngNotary
+NOTARY_PROFILE ?= MDPNGNotary
 RELEASE_SUFFIX ?=
 GH_HOST ?= github.com
 GH_REPO ?=
 PROJECT_URL ?=
+TEST_UPDATE_VERSION ?=
+TEST_UPDATE_STATE ?=
 MINIMUM_MACOS_VERSION := 14.0
 TARGET_NAME := md2png
 RESOURCE_BUNDLE_NAME := md2png_MD2PNG.bundle
@@ -78,6 +80,24 @@ app: build icon
 		esac; \
 		/usr/bin/plutil -insert MD2PNGProjectURL -string "$(PROJECT_URL)" "$(CONTENTS)/Info.plist"; \
 	fi
+	@if [ -n "$(TEST_UPDATE_VERSION)" ]; then \
+		if ! /usr/bin/printf '%s\n' "$(TEST_UPDATE_VERSION)" | /usr/bin/grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$'; then \
+			echo "TEST_UPDATE_VERSION must be a stable semantic version such as 0.0.0"; \
+			exit 1; \
+		fi; \
+		/usr/bin/plutil -replace CFBundleShortVersionString -string "$(TEST_UPDATE_VERSION)" "$(CONTENTS)/Info.plist"; \
+	fi
+	@if [ -n "$(TEST_UPDATE_STATE)" ]; then \
+		if [ "$(CONFIGURATION)" != "debug" ]; then \
+			echo "TEST_UPDATE_STATE is only available for debug builds"; \
+			exit 1; \
+		fi; \
+		case "$(TEST_UPDATE_STATE)" in \
+			up-to-date|check-failed|download-failed|ready-to-install) ;; \
+			*) echo "TEST_UPDATE_STATE must be up-to-date, check-failed, download-failed, or ready-to-install"; exit 1 ;; \
+		esac; \
+		/usr/bin/plutil -insert MD2PNGTestUpdateState -string "$(TEST_UPDATE_STATE)" "$(CONTENTS)/Info.plist"; \
+	fi
 	cp "$(APP_ICON)" "$(CONTENTS)/Resources/AppIcon.icns"
 	cp -R "$(ARM64_BUILD_DIR)/$(RESOURCE_BUNDLE_NAME)" "$(CONTENTS)/Resources/"
 	cp CHANGELOG.md "$(CONTENTS)/Resources/CHANGELOG.md"
@@ -121,6 +141,10 @@ notarize: release
 	spctl --assess --type open --context context:primary-signature --verbose=2 "$(RELEASE_DMG)"
 
 publish-release:
+	@if [ -n "$(TEST_UPDATE_VERSION)" ] || [ -n "$(TEST_UPDATE_STATE)" ]; then \
+		echo "TEST_UPDATE_VERSION and TEST_UPDATE_STATE are only for local app/run builds"; \
+		exit 1; \
+	fi
 	SIGN_IDENTITY="$(SIGN_IDENTITY)" \
 	NOTARY_PROFILE="$(NOTARY_PROFILE)" \
 	GH_HOST="$(GH_HOST)" \

@@ -115,7 +115,7 @@ Store notarization credentials once. Use an app-specific password, not your
 Apple ID password:
 
 ```sh
-xcrun notarytool store-credentials md2pngNotary \
+xcrun notarytool store-credentials MDPNGNotary \
   --apple-id "you@example.com" \
   --team-id "TEAMID" \
   --password "APP-SPECIFIC-PASSWORD"
@@ -130,7 +130,7 @@ make notarize \
   PROJECT_URL="$PROJECT_URL" \
   BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE=md2pngNotary \
+  NOTARY_PROFILE=MDPNGNotary \
   RELEASE_SUFFIX=developer-id
 ```
 
@@ -154,7 +154,7 @@ make publish-release \
   GH_REPO="$GH_REPO" \
   BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE=md2pngNotary
+  NOTARY_PROFILE=MDPNGNotary
 ```
 
 This command refuses to continue unless:
@@ -228,9 +228,50 @@ Before announcing it, download the DMG on a second Mac and verify installation,
 clipboard rendering, Mermaid, a GFM table, and manual paste into the target chat
 application.
 
-## In-app Releases action
+## In-app update contract
 
-md2png does not implement an updater or call the Releases API. **View All Releases…**
-in About shows the installed version and asks the user whether to open this repository's
-Releases page. Release assets therefore remain a normal manual DMG installation,
-with no embedded GitHub credentials or additional deployment service.
+The update status in About uses the packaged `PROJECT_URL` to call the public
+GitHub latest-release API without credentials. Successful responses are cached
+for 24 hours; **Check Again** bypasses that cache while honoring a 60-second
+minimum request interval and GitHub rate-limit retry headers. `Info.plist`
+remains the single version source: `CFBundleShortVersionString` must match the
+stable tag `v${version}`, the changelog section, and the version inside the
+downloadable asset name:
+
+```text
+md2png-${version}-macOS-arm64-developer-id.dmg
+```
+
+The app requires that exact asset to have disk-image content type, positive size,
+an HTTPS GitHub Release download URL, and a `sha256:` digest. The publishing script
+checks those fields after creating the Release. Do not replace the versioned DMG
+with only the `md2png-latest.dmg` alias; the updater deliberately uses immutable,
+version-specific metadata.
+
+The successful in-app flow shows the available version before any download.
+Only **Download Update** downloads and verifies the DMG and asks macOS to open
+it. Installation remains manual: the user drags md2png into Applications. There
+is no embedded GitHub credential, privileged helper, silent replacement, or
+automatic relaunch.
+
+For a local end-to-end update test, keep the source version unchanged and run:
+
+```sh
+make run CONFIGURATION=debug \
+  PROJECT_URL=https://github.com/guangyya/md2png \
+  TEST_UPDATE_VERSION=0.0.0
+```
+
+The override changes only the packaged app before ad-hoc signing. The publish
+target rejects it so it cannot alter a public release version.
+
+To review deterministic About layouts without consuming a GitHub API request,
+add one of `TEST_UPDATE_STATE=up-to-date`, `check-failed`, `download-failed`, or
+`ready-to-install`
+to that Debug `make run` command. The mock key is written only to the packaged
+Debug app; both the Make target and release script reject it for publication.
+The download-related mocks use the immutable published v0.1.0 asset metadata,
+so retry actions exercise the real download and verification path. The
+`ready-to-install` state requires that verified DMG in the update cache; when it
+has been removed, the mock shows the recoverable download failure instead of a
+ready action pointing at a missing file.
