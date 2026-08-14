@@ -7,6 +7,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add Compact, Standard, and Wide output-width presets and remember the last
+  explicit selection locally.
+- Add same-source Retina reference renders that show the presets' actual
+  dimensions, wrapping, and table density.
+
+### Changed
+
+- Size the Last Render window to reflect the actual output width within the
+  current screen, and identify the preset and dimensions in its title.
+
 ### Fixed
 
 - Reload the bundled WebKit renderer after its content process terminates,

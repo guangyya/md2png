@@ -8,9 +8,14 @@
 "menu.rendering" = "Rendering…";
 "menu.restore_last_markdown" = "Restore Last Markdown";
 "menu.show_last_render" = "Show Last Render";
+"menu.render_width" = "Output Width";
 "menu.examples" = "Examples";
 "menu.about" = "About md2png";
 "menu.quit" = "Quit md2png";
+
+"render_width.compact" = "Compact";
+"render_width.standard" = "Standard";
+"render_width.wide" = "Wide";
 
 "clipboard.labeled" = "Clipboard: %@";
 "clipboard.png_image" = "PNG image";
@@ -45,6 +50,7 @@
 "error.example_unavailable" = "The %@ Markdown file could not be loaded.";
 
 "preview.window_title" = "Last Markdown Render";
+"preview.window_title_with_width" = "Last Markdown Render — %@ · %ld × %ld pt";
 
 "about.window_title" = "About md2png";
 "about.development" = "Development";

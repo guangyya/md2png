@@ -8,9 +8,14 @@
 "menu.rendering" = "正在渲染…";
 "menu.restore_last_markdown" = "恢复上次的 Markdown";
 "menu.show_last_render" = "显示上次渲染";
+"menu.render_width" = "输出宽度";
 "menu.examples" = "示例";
 "menu.about" = "关于 md2png";
 "menu.quit" = "退出 md2png";
+
+"render_width.compact" = "紧凑";
+"render_width.standard" = "标准";
+"render_width.wide" = "宽幅";
 
 "clipboard.labeled" = "剪贴板：%@";
 "clipboard.png_image" = "PNG 图片";
@@ -45,6 +50,7 @@
 "error.example_unavailable" = "无法加载“%@”Markdown 文件。";
 
 "preview.window_title" = "上次 Markdown 渲染";
+"preview.window_title_with_width" = "上次 Markdown 渲染 — %@ · %ld × %ld pt";
 
 "about.window_title" = "关于 md2png";
 "about.development" = "开发版本";

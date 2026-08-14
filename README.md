@@ -85,14 +85,29 @@ A GFM table needs a separator row:
 | Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
+| Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and immediately renders the selected bundled sample |
 | About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current
-clipboard. While a render is running, additional render commands and examples
-are temporarily disabled. Restore Last Markdown becomes available only after a
-successful render and asks before replacing clipboard content changed by another
-application.
+clipboard. Standard preserves the original output sizing; Compact wraps prose
+sooner, while Wide gives large tables and diagrams more room. While a render is
+running, additional render commands, width changes, and examples are temporarily
+disabled. Restore Last Markdown becomes available only after a successful render
+and asks before replacing clipboard content changed by another application. The
+Last Render window opens at a width that reflects the output, within the current
+screen, and identifies the preset and actual dimensions in its title.
+
+### Width preset comparison
+
+These are real Retina outputs from the same
+[width comparison source](Examples/width-presets.md). Click a preview to inspect
+the full-size PNG.
+
+| Compact | Standard | Wide |
+|:--:|:--:|:--:|
+| 720 × 1,120 pt<br>1,440 × 2,240 px | 1,120 × 928 pt<br>2,240 × 1,856 px | 1,520 × 880 pt<br>3,040 × 1,760 px |
+| [![Compact width preset render](docs/images/width-preset-compact.png)](docs/images/width-preset-compact.png) | [![Standard width preset render](docs/images/width-preset-standard.png)](docs/images/width-preset-standard.png) | [![Wide width preset render](docs/images/width-preset-wide.png)](docs/images/width-preset-wide.png) |
 
 ## Samples
 

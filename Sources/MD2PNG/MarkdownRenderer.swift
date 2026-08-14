@@ -8,6 +8,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     private struct Request {
         let id: UUID
         let markdown: String
+        let widthPreset: RenderWidthPreset
         let completion: Completion
     }
 
@@ -46,8 +47,17 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         }
     }
 
-    func render(_ markdown: String, completion: @escaping Completion) {
-        let request = Request(id: UUID(), markdown: markdown, completion: completion)
+    func render(
+        _ markdown: String,
+        widthPreset: RenderWidthPreset = .standard,
+        completion: @escaping Completion
+    ) {
+        let request = Request(
+            id: UUID(),
+            markdown: markdown,
+            widthPreset: widthPreset,
+            completion: completion
+        )
         requests[request.id] = request
         perform(recoveryState.enqueue(request.id))
     }
@@ -86,8 +96,14 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             guard let self else { return }
             do {
                 let value = try await self.webView.callAsyncJavaScript(
-                    "return await window.renderMarkdown(markdown)",
-                    arguments: ["markdown": request.markdown],
+                    """
+                    document.getElementById("card").style.maxWidth = maximumWidth + "px"
+                    return await window.renderMarkdown(markdown)
+                    """,
+                    arguments: [
+                        "markdown": request.markdown,
+                        "maximumWidth": request.widthPreset.cardMaximumWidth
+                    ],
                     in: nil,
                     contentWorld: .page
                 )

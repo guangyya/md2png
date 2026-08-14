@@ -58,6 +58,8 @@ sending it.
   finish installation. Progress stays in the About row and status item, with
   milestone-only VoiceOver announcements rather than a modal progress window.
 - Duplicate render entry points disabled while one render is in progress.
+- Compact, Standard, and Wide output-width presets, with the last explicit
+  selection remembered locally and Standard preserving the original sizing.
 
 ## Safety and privacy constraints
 

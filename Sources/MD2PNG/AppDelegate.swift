@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let renderer = MarkdownRenderer()
+    private let renderWidthPreference: RenderWidthPreference
     private let hud = HUDController()
     private let previewController = PreviewController()
     private let updateController = UpdateController()
@@ -10,17 +11,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
     private var lastImage: NSImage?
+    private var lastRenderWidthPreset: RenderWidthPreset?
     private var lastSource = LastSourceState()
     private let clipboardPreviewView = ClipboardPreviewView()
     private var renderMenuItem: NSMenuItem!
     private var restoreLastMarkdownMenuItem: NSMenuItem!
     private var previewMenuItem: NSMenuItem!
     private var examplesMenuItem: NSMenuItem!
+    private var renderWidthMenuItem: NSMenuItem!
+    private var renderWidthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
+    private var renderWidthPreset: RenderWidthPreset
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
     private var currentUpdateStatus = UpdateStatus()
     private var updateStatusObserverID: UUID?
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
+
+    override init() {
+        let renderWidthPreference = RenderWidthPreference()
+        self.renderWidthPreference = renderWidthPreference
+        renderWidthPreset = renderWidthPreference.selectedPreset
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -93,6 +105,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         previewMenuItem.isEnabled = false
 
         menu.addItem(.separator())
+        let renderWidthTitle = L10n.text(
+            "menu.render_width",
+            defaultValue: "Output Width"
+        )
+        renderWidthMenuItem = NSMenuItem(
+            title: renderWidthTitle,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let renderWidthMenu = NSMenu(title: renderWidthTitle)
+        for preset in RenderWidthPreset.allCases {
+            let item = renderWidthMenu.addItem(
+                withTitle: preset.menuTitle,
+                action: #selector(selectRenderWidthPreset(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = preset.rawValue
+            item.target = self
+            renderWidthMenuItems[preset] = item
+        }
+        renderWidthMenuItem.submenu = renderWidthMenu
+        updateRenderWidthMenuSelection()
+        menu.addItem(renderWidthMenuItem)
+
         let examplesTitle = L10n.text("menu.examples", defaultValue: "Examples")
         examplesMenuItem = NSMenuItem(title: examplesTitle, action: nil, keyEquivalent: "")
         let examplesMenu = NSMenu(title: examplesTitle)
@@ -148,7 +184,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showLastRender() {
         guard let lastImage else { return }
-        previewController.show(image: lastImage)
+        previewController.show(
+            image: lastImage,
+            widthPreset: lastRenderWidthPreset
+        )
     }
 
     @objc private func restoreLastMarkdown() {
@@ -185,8 +224,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    @objc private func selectRenderWidthPreset(_ sender: NSMenuItem) {
+        guard !renderActivity.isRendering,
+              let rawValue = sender.representedObject as? String,
+              let preset = RenderWidthPreset(rawValue: rawValue) else { return }
+        renderWidthPreset = preset
+        renderWidthPreference.select(preset)
+        updateRenderWidthMenuSelection()
+    }
+
+    private func updateRenderWidthMenuSelection() {
+        for (preset, item) in renderWidthMenuItems {
+            item.state = preset == renderWidthPreset ? .on : .off
+        }
+    }
+
     private func render(_ markdown: String) {
         guard renderActivity.begin() else { return }
+        let requestedWidthPreset = renderWidthPreset
         updateRenderingUI(isRendering: true)
         statusItem.button?.image = NSImage(
             systemSymbolName: "hourglass",
@@ -196,7 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         )
 
-        renderer.render(markdown) { [weak self] result in
+        renderer.render(markdown, widthPreset: requestedWidthPreset) { [weak self] result in
             guard let self else { return }
             defer {
                 self.renderActivity.finish()
@@ -208,6 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 do {
                     let changeCount = try Clipboard.write(image: image)
                     self.lastImage = image
+                    self.lastRenderWidthPreset = requestedWidthPreset
                     self.lastSource.recordSuccessfulRender(
                         markdown: markdown,
                         clipboardChangeCount: changeCount
@@ -235,6 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ? L10n.text("menu.rendering", defaultValue: "Rendering…")
             : L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
         examplesMenuItem.isEnabled = !isRendering
+        renderWidthMenuItem.isEnabled = !isRendering
         updateLastSourceActionAvailability()
         updateStatusItemAppearance()
     }

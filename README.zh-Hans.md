@@ -71,12 +71,25 @@ flowchart LR
 | 将剪贴板渲染为图片 | `Control-Command-X`（全局） | 成功后用 PNG/TIFF 替换剪贴板 |
 | 恢复上次的 Markdown | — | 将最近一次成功的源 Markdown 恢复到剪贴板 |
 | 显示上次渲染 | `Control-Command-Z`（全局） | 打开最近结果，可用 `Command-W` 关闭 |
+| 输出宽度 | — | 为后续渲染选择紧凑、标准或宽幅，并在本地记住选择 |
 | 示例 | — | 复制并立即渲染选中的内置 Sample |
 | 关于 md2png | — | 显示版本、发布说明、项目链接、更新状态与操作，以及可复制的诊断信息 |
 
-菜单顶部会显示紧凑的剪贴板预览。正在渲染时，新的渲染命令和 Sample
-会暂时禁用，避免重复渲染。只有成功渲染后才会启用“恢复上次的 Markdown”；
-如果其他应用已经修改剪贴板，覆盖前会要求确认。
+菜单顶部会显示紧凑的剪贴板预览。“标准”保持原有输出尺寸，“紧凑”会更早换行，
+“宽幅”则为大型表格和图表留出更多空间。正在渲染时，新的渲染命令、宽度切换和
+Sample 会暂时禁用，避免重复渲染。只有成功渲染后才会启用“恢复上次的 Markdown”；
+如果其他应用已经修改剪贴板，覆盖前会要求确认。“上次渲染”窗口会在当前屏幕范围内
+按输出宽度打开，并在标题中标明所用预设和实际尺寸。
+
+### 输出宽度对比
+
+以下图片均由同一份[宽度对比 Sample](Examples/width-presets.md)真实渲染而成。
+点击预览可查看完整尺寸的 Retina PNG。
+
+| 紧凑 | 标准 | 宽幅 |
+|:--:|:--:|:--:|
+| 720 × 1,120 pt<br>1,440 × 2,240 px | 1,120 × 928 pt<br>2,240 × 1,856 px | 1,520 × 880 pt<br>3,040 × 1,760 px |
+| [![紧凑宽度渲染效果](docs/images/width-preset-compact.png)](docs/images/width-preset-compact.png) | [![标准宽度渲染效果](docs/images/width-preset-standard.png)](docs/images/width-preset-standard.png) | [![宽幅渲染效果](docs/images/width-preset-wide.png)](docs/images/width-preset-wide.png) |
 
 ## Sample
 
