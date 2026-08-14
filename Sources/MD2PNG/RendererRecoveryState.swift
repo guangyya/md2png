@@ -1,18 +1,44 @@
 import Foundation
 
 struct RendererRecoveryState {
+    struct LoadAttempt: Equatable {
+        enum Kind: Equatable {
+            case initial
+            case recovery
+        }
+
+        let id: UUID
+        let kind: Kind
+
+        init(id: UUID = UUID(), kind: Kind) {
+            self.id = id
+            self.kind = kind
+        }
+    }
+
     struct Execution: Equatable {
         let requestID: UUID
         let attemptID: UUID
     }
 
+    enum Attempt: Equatable {
+        case load(LoadAttempt)
+        case render(Execution)
+    }
+
+    enum RenderStage: Equatable {
+        case javaScript
+        case snapshot
+    }
+
     enum Failure: Equatable {
         case rendererUnavailable
         case recoveryFailed
+        case timedOut
     }
 
     enum Action: Equatable {
-        case loadRenderer
+        case loadRenderer(LoadAttempt)
         case start(Execution)
         case fail(requestIDs: [UUID], failure: Failure)
     }
@@ -28,10 +54,10 @@ struct RendererRecoveryState {
     }
 
     enum Phase: Equatable {
-        case initialLoad
-        case recoveryLoad
+        case initialLoad(LoadAttempt)
+        case recoveryLoad(LoadAttempt)
         case ready
-        case rendering(Execution)
+        case rendering(Execution, stage: RenderStage)
         case needsReload
         case unavailable
     }
@@ -53,8 +79,13 @@ struct RendererRecoveryState {
 
     init(hasRendererPage: Bool = true) {
         phase = hasRendererPage
-            ? .initialLoad
+            ? .initialLoad(LoadAttempt(kind: .initial))
             : .unavailable
+    }
+
+    var initialActions: [Action] {
+        guard case let .initialLoad(attempt) = phase else { return [] }
+        return [.loadRenderer(attempt)]
     }
 
     // Internal observability for the pure state-machine tests.
@@ -67,8 +98,27 @@ struct RendererRecoveryState {
         queuedRequestIDs
     }
 
+    var currentLoadAttempt: LoadAttempt? {
+        switch phase {
+        case let .initialLoad(attempt), let .recoveryLoad(attempt):
+            attempt
+        case .ready, .rendering, .needsReload, .unavailable:
+            nil
+        }
+    }
+
     func isCurrent(_ execution: Execution) -> Bool {
-        phase == .rendering(execution)
+        guard case let .rendering(currentExecution, _) = phase else { return false }
+        return currentExecution == execution
+    }
+
+    func isCurrent(_ attempt: Attempt) -> Bool {
+        switch attempt {
+        case let .load(loadAttempt):
+            currentLoadAttempt == loadAttempt
+        case let .render(execution):
+            isCurrent(execution)
+        }
     }
 
     mutating func enqueue(_ requestID: UUID) -> [Action] {
@@ -78,34 +128,43 @@ struct RendererRecoveryState {
 
         queuedRequestIDs.append(requestID)
         if phase == .needsReload {
-            phase = .recoveryLoad
-            return [.loadRenderer]
+            return beginRecoveryLoad()
         }
 
         return startNextIfPossible()
     }
 
-    mutating func rendererDidLoad() -> [Action] {
-        guard phase == .initialLoad || phase == .recoveryLoad else { return [] }
+    mutating func rendererDidLoad(_ attempt: LoadAttempt) -> [Action] {
+        guard currentLoadAttempt == attempt else { return [] }
         phase = .ready
         return startNextIfPossible()
     }
 
-    mutating func rendererLoadFailed() -> [Action] {
-        switch phase {
-        case .initialLoad:
+    mutating func rendererLoadFailed(_ attempt: LoadAttempt) -> [Action] {
+        guard currentLoadAttempt == attempt else { return [] }
+        switch attempt.kind {
+        case .initial:
             return failAllRequests(
                 with: .rendererUnavailable,
                 nextPhase: .unavailable
             )
-        case .recoveryLoad:
+        case .recovery:
             return failAllRequests(
                 with: .recoveryFailed,
                 nextPhase: .needsReload
             )
-        case .ready, .rendering, .needsReload, .unavailable:
-            return []
         }
+    }
+
+    mutating func renderDidStartSnapshot(_ execution: Execution) -> Bool {
+        guard isCurrent(execution) else { return false }
+        phase = .rendering(execution, stage: .snapshot)
+        return true
+    }
+
+    mutating func timedOut(_ attempt: Attempt) -> [Action] {
+        guard isCurrent(attempt) else { return [] }
+        return failAllRequests(with: .timedOut, nextPhase: .needsReload)
     }
 
     mutating func contentProcessTerminated(
@@ -125,8 +184,7 @@ struct RendererRecoveryState {
         let actions: [Action]
         switch phase {
         case .initialLoad, .ready:
-            phase = .recoveryLoad
-            actions = [.loadRenderer]
+            actions = beginRecoveryLoad()
         case .recoveryLoad:
             actions = failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
         case .rendering:
@@ -142,8 +200,7 @@ struct RendererRecoveryState {
             }
             activeRequest.recoveryAttempts += 1
             self.activeRequest = activeRequest
-            phase = .recoveryLoad
-            actions = [.loadRenderer]
+            actions = beginRecoveryLoad()
         case .needsReload, .unavailable:
             actions = []
         }
@@ -151,7 +208,7 @@ struct RendererRecoveryState {
     }
 
     mutating func finish(_ execution: Execution) -> FinishTransition {
-        guard case let .rendering(currentExecution) = phase,
+        guard case let .rendering(currentExecution, _) = phase,
               currentExecution == execution,
               activeRequest?.id == execution.requestID else {
             return FinishTransition(completedRequestID: nil, actions: [])
@@ -164,6 +221,12 @@ struct RendererRecoveryState {
             completedRequestID: completedRequestID,
             actions: startNextIfPossible()
         )
+    }
+
+    private mutating func beginRecoveryLoad() -> [Action] {
+        let attempt = LoadAttempt(kind: .recovery)
+        phase = .recoveryLoad(attempt)
+        return [.loadRenderer(attempt)]
     }
 
     private mutating func startNextIfPossible() -> [Action] {
@@ -181,7 +244,7 @@ struct RendererRecoveryState {
             requestID: activeRequest.id,
             attemptID: UUID()
         )
-        phase = .rendering(execution)
+        phase = .rendering(execution, stage: .javaScript)
         return [.start(execution)]
     }
 

@@ -4,6 +4,7 @@ enum AppError: LocalizedError {
     case emptyClipboard
     case rendererUnavailable
     case rendererRecoveryFailed
+    case rendererTimedOut
     case invalidRendererResponse
     case contentTooLarge(width: Int, height: Int)
     case pngEncodingFailed
@@ -26,6 +27,11 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.renderer_recovery_failed",
                 defaultValue: "The local renderer stopped and could not recover. Try rendering again."
+            )
+        case .rendererTimedOut:
+            return L10n.text(
+                "error.renderer_timed_out",
+                defaultValue: "The local renderer took too long to respond. Try rendering again."
             )
         case .invalidRendererResponse:
             return L10n.text(

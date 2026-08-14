@@ -5,31 +5,33 @@ import XCTest
 
 final class RendererRecoveryStateTests: XCTestCase {
     func testIdleTerminationReloadsAndRunsARequestQueuedDuringRecovery() throws {
-        var state = RendererRecoveryState()
-        XCTAssertTrue(state.rendererDidLoad().isEmpty)
-        XCTAssertEqual(state.phase, .ready)
+        var state = try readyState()
 
-        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
-        XCTAssertEqual(state.phase, .recoveryLoad)
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(state.contentProcessTerminated())
+        )
+        XCTAssertEqual(state.phase, .recoveryLoad(recoveryLoad))
 
         let requestID = makeID(1)
         XCTAssertTrue(state.enqueue(requestID).isEmpty)
         XCTAssertEqual(state.pendingRequestIDs, [requestID])
 
-        let execution = try startExecution(from: state.rendererDidLoad())
+        let execution = try startExecution(from: state.rendererDidLoad(recoveryLoad))
         XCTAssertEqual(execution.requestID, requestID)
         XCTAssertEqual(state.activeRequestID, requestID)
         XCTAssertTrue(state.pendingRequestIDs.isEmpty)
     }
 
     func testActiveRequestRetriesOnceAndPreservesQueueOrder() throws {
-        var state = readyState()
+        var state = try readyState()
         let firstID = makeID(1)
         let secondID = makeID(2)
         let firstExecution = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(state.contentProcessTerminated())
+        )
         XCTAssertEqual(state.activeRequestID, firstID)
         XCTAssertEqual(state.pendingRequestIDs, [secondID])
 
@@ -37,7 +39,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         XCTAssertNil(staleFinish.completedRequestID)
         XCTAssertTrue(staleFinish.actions.isEmpty)
 
-        let retryExecution = try startExecution(from: state.rendererDidLoad())
+        let retryExecution = try startExecution(from: state.rendererDidLoad(recoveryLoad))
         XCTAssertEqual(retryExecution.requestID, firstID)
         XCTAssertNotEqual(retryExecution.attemptID, firstExecution.attemptID)
 
@@ -53,14 +55,16 @@ final class RendererRecoveryStateTests: XCTestCase {
     }
 
     func testSecondTerminationDuringRetriedRequestFailsActiveAndQueuedRequests() throws {
-        var state = readyState()
+        var state = try readyState()
         let firstID = makeID(1)
         let secondID = makeID(2)
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
-        _ = try startExecution(from: state.rendererDidLoad())
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(state.contentProcessTerminated())
+        )
+        _ = try startExecution(from: state.rendererDidLoad(recoveryLoad))
 
         XCTAssertEqual(
             state.contentProcessTerminated(),
@@ -71,20 +75,20 @@ final class RendererRecoveryStateTests: XCTestCase {
         XCTAssertTrue(state.pendingRequestIDs.isEmpty)
 
         let laterID = makeID(3)
-        XCTAssertEqual(state.enqueue(laterID), [.loadRenderer])
-        XCTAssertEqual(state.phase, .recoveryLoad)
-        let laterExecution = try startExecution(from: state.rendererDidLoad())
+        let laterLoad = try loadAttempt(from: state.enqueue(laterID))
+        XCTAssertEqual(state.phase, .recoveryLoad(laterLoad))
+        let laterExecution = try startExecution(from: state.rendererDidLoad(laterLoad))
         XCTAssertEqual(laterExecution.requestID, laterID)
     }
 
     func testTerminationDuringRecoveryLoadFailsWithoutStartingASecondReload() throws {
-        var state = readyState()
+        var state = try readyState()
         let firstID = makeID(1)
         let secondID = makeID(2)
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
+        _ = try loadAttempt(from: handledActions(state.contentProcessTerminated()))
         XCTAssertEqual(
             state.contentProcessTerminated(),
             .handled([.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)])
@@ -93,60 +97,142 @@ final class RendererRecoveryStateTests: XCTestCase {
     }
 
     func testRecoveryLoadFailureReturnsStructuredFailureInQueueOrder() throws {
-        var state = readyState()
+        var state = try readyState()
         let firstID = makeID(1)
         let secondID = makeID(2)
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
-        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(state.contentProcessTerminated())
+        )
 
         XCTAssertEqual(
-            state.rendererLoadFailed(),
+            state.rendererLoadFailed(recoveryLoad),
             [.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)]
         )
         XCTAssertEqual(state.phase, .needsReload)
     }
 
-    func testInitialLoadFailureUsesRendererUnavailableFailure() {
+    func testInitialLoadFailureUsesRendererUnavailableFailure() throws {
         var state = RendererRecoveryState()
+        let initialLoad = try loadAttempt(from: state.initialActions)
         let requestID = makeID(1)
         XCTAssertTrue(state.enqueue(requestID).isEmpty)
 
         XCTAssertEqual(
-            state.rendererLoadFailed(),
+            state.rendererLoadFailed(initialLoad),
             [.fail(requestIDs: [requestID], failure: .rendererUnavailable)]
         )
         XCTAssertEqual(state.phase, .unavailable)
     }
 
+    func testInitialLoadTimeoutFailsQueuedWorkAndLaterRequestCanRecover() throws {
+        var state = RendererRecoveryState()
+        let initialLoad = try loadAttempt(from: state.initialActions)
+        let firstID = makeID(1)
+        let secondID = makeID(2)
+        XCTAssertTrue(state.enqueue(firstID).isEmpty)
+        XCTAssertTrue(state.enqueue(secondID).isEmpty)
+
+        XCTAssertEqual(
+            state.timedOut(.load(initialLoad)),
+            [.fail(requestIDs: [firstID, secondID], failure: .timedOut)]
+        )
+        XCTAssertEqual(state.phase, .needsReload)
+        XCTAssertTrue(state.rendererDidLoad(initialLoad).isEmpty)
+
+        let laterID = makeID(3)
+        let laterLoad = try loadAttempt(from: state.enqueue(laterID))
+        XCTAssertEqual(state.phase, .recoveryLoad(laterLoad))
+        XCTAssertTrue(state.timedOut(.load(initialLoad)).isEmpty)
+        let laterExecution = try startExecution(from: state.rendererDidLoad(laterLoad))
+        XCTAssertEqual(laterExecution.requestID, laterID)
+    }
+
+    func testRecoveryLoadTimeoutFailsInterruptedAndQueuedWork() throws {
+        var state = try readyState()
+        let firstID = makeID(1)
+        let secondID = makeID(2)
+        _ = try startExecution(from: state.enqueue(firstID))
+        XCTAssertTrue(state.enqueue(secondID).isEmpty)
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(state.contentProcessTerminated())
+        )
+
+        XCTAssertEqual(
+            state.timedOut(.load(recoveryLoad)),
+            [.fail(requestIDs: [firstID, secondID], failure: .timedOut)]
+        )
+        XCTAssertEqual(state.phase, .needsReload)
+        XCTAssertTrue(state.rendererDidLoad(recoveryLoad).isEmpty)
+    }
+
+    func testJavaScriptTimeoutFailsActiveAndQueuedWorkAndIgnoresLateCallbacks() throws {
+        var state = try readyState()
+        let firstID = makeID(1)
+        let secondID = makeID(2)
+        let execution = try startExecution(from: state.enqueue(firstID))
+        XCTAssertEqual(state.phase, .rendering(execution, stage: .javaScript))
+        XCTAssertTrue(state.enqueue(secondID).isEmpty)
+
+        XCTAssertEqual(
+            state.timedOut(.render(execution)),
+            [.fail(requestIDs: [firstID, secondID], failure: .timedOut)]
+        )
+        XCTAssertEqual(state.phase, .needsReload)
+        XCTAssertFalse(state.renderDidStartSnapshot(execution))
+        XCTAssertNil(state.finish(execution).completedRequestID)
+        XCTAssertTrue(state.timedOut(.render(execution)).isEmpty)
+    }
+
+    func testSnapshotTimeoutFailsOnceAndIgnoresLateSnapshotCompletion() throws {
+        var state = try readyState()
+        let firstID = makeID(1)
+        let secondID = makeID(2)
+        let execution = try startExecution(from: state.enqueue(firstID))
+        XCTAssertTrue(state.renderDidStartSnapshot(execution))
+        XCTAssertEqual(state.phase, .rendering(execution, stage: .snapshot))
+        XCTAssertTrue(state.enqueue(secondID).isEmpty)
+
+        XCTAssertEqual(
+            state.timedOut(.render(execution)),
+            [.fail(requestIDs: [firstID, secondID], failure: .timedOut)]
+        )
+        XCTAssertNil(state.finish(execution).completedRequestID)
+        XCTAssertTrue(state.timedOut(.render(execution)).isEmpty)
+    }
+
     func testExecutionErrorThenDelegateIsHandledAsOneTermination() throws {
-        var state = readyState()
+        var state = try readyState()
         let requestID = makeID(1)
         let execution = try startExecution(from: state.enqueue(requestID))
 
-        XCTAssertEqual(
-            state.contentProcessTerminated(from: .executionError(execution)),
-            .handled([.loadRenderer])
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(
+                state.contentProcessTerminated(from: .executionError(execution))
+            )
         )
         XCTAssertEqual(state.contentProcessTerminated(), .ignored)
-        XCTAssertEqual(state.phase, .recoveryLoad)
+        XCTAssertEqual(state.phase, .recoveryLoad(recoveryLoad))
 
-        let retryExecution = try startExecution(from: state.rendererDidLoad())
+        let retryExecution = try startExecution(from: state.rendererDidLoad(recoveryLoad))
         XCTAssertEqual(retryExecution.requestID, requestID)
         XCTAssertNotEqual(retryExecution.attemptID, execution.attemptID)
     }
 
     func testDelegateThenExecutionErrorIsHandledAsOneTermination() throws {
-        var state = readyState()
+        var state = try readyState()
         let requestID = makeID(1)
         let execution = try startExecution(from: state.enqueue(requestID))
 
-        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
+        let recoveryLoad = try loadAttempt(
+            from: handledActions(state.contentProcessTerminated())
+        )
         XCTAssertEqual(
             state.contentProcessTerminated(from: .executionError(execution)),
             .ignored
         )
-        XCTAssertEqual(state.phase, .recoveryLoad)
+        XCTAssertEqual(state.phase, .recoveryLoad(recoveryLoad))
     }
 
     func testWebKitContentProcessTerminationErrorClassification() {
@@ -184,6 +270,88 @@ final class RendererRecoveryStateTests: XCTestCase {
 
         let result = try XCTUnwrap(capturedResult)
         let image = try result.get()
+        XCTAssertGreaterThanOrEqual(image.size.width, 520)
+        XCTAssertGreaterThan(image.size.height, 80)
+    }
+
+    @MainActor
+    func testInitialLoadWatchdogTimeoutFailsOnceAndNextRenderRecovers() async throws {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        let timedOut = expectation(description: "initial renderer load timed out")
+        var timedOutResult: Result<NSImage, Error>?
+        renderer.render("# Waiting during initial load") {
+            timedOutResult = $0
+            timedOut.fulfill()
+        }
+        renderer.simulateWatchdogTimeoutForTesting()
+        await fulfillment(of: [timedOut], timeout: 1)
+
+        let firstResult = try XCTUnwrap(timedOutResult)
+        guard case let .failure(error) = firstResult,
+              let appError = error as? AppError,
+              case .rendererTimedOut = appError else {
+            XCTFail("Expected rendererTimedOut, got \(firstResult)")
+            return
+        }
+
+        let recovered = expectation(description: "later render recovered")
+        var recoveredResult: Result<NSImage, Error>?
+        renderer.render("# Fresh request after timeout") {
+            recoveredResult = $0
+            recovered.fulfill()
+        }
+        await fulfillment(of: [recovered], timeout: 5)
+
+        let image = try XCTUnwrap(recoveredResult).get()
+        XCTAssertGreaterThanOrEqual(image.size.width, 520)
+        XCTAssertGreaterThan(image.size.height, 80)
+    }
+
+    @MainActor
+    func testScheduledWatchdogAutomaticallyTimesOutMatchingAttempt() async throws {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer(watchdogTimeout: 0)
+        let completion = expectation(description: "scheduled watchdog fired")
+        var capturedResult: Result<NSImage, Error>?
+
+        renderer.render("# Scheduled timeout") {
+            capturedResult = $0
+            completion.fulfill()
+        }
+        await fulfillment(of: [completion], timeout: 1)
+
+        let result = try XCTUnwrap(capturedResult)
+        guard case let .failure(error) = result,
+              let appError = error as? AppError,
+              case .rendererTimedOut = appError else {
+            XCTFail("Expected rendererTimedOut, got \(result)")
+            return
+        }
+    }
+
+    @MainActor
+    func testCompletionReentrancyCannotStartAnObsoleteQueuedExecution() async throws {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        let firstCompleted = expectation(description: "first render completed")
+        let queuedCompleted = expectation(description: "queued render recovered")
+        var queuedResult: Result<NSImage, Error>?
+
+        renderer.render("# First render") { result in
+            if case let .failure(error) = result {
+                XCTFail("First render failed: \(error)")
+            }
+            renderer.simulateContentProcessTerminationForTesting()
+            firstCompleted.fulfill()
+        }
+        renderer.render("# Queued render") {
+            queuedResult = $0
+            queuedCompleted.fulfill()
+        }
+
+        await fulfillment(of: [firstCompleted, queuedCompleted], timeout: 5)
+        let image = try XCTUnwrap(queuedResult).get()
         XCTAssertGreaterThanOrEqual(image.size.width, 520)
         XCTAssertGreaterThan(image.size.height, 80)
     }
@@ -237,33 +405,47 @@ final class RendererRecoveryStateTests: XCTestCase {
         XCTAssertGreaterThan(image.size.height, 80)
     }
 
-    func testRecoveryFailureMessagesInviteAnotherRender() throws {
+    func testRecoveryAndTimeoutMessagesInviteAnotherRender() throws {
         let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
         let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
-        let fallback = "missing recovery failure localization"
 
-        XCTAssertNotEqual(
-            L10n.text(
-                "error.renderer_recovery_failed",
-                defaultValue: fallback,
-                bundle: english
-            ),
-            fallback
-        )
-        XCTAssertNotEqual(
-            L10n.text(
-                "error.renderer_recovery_failed",
-                defaultValue: fallback,
-                bundle: chinese
-            ),
-            fallback
-        )
+        for key in ["error.renderer_recovery_failed", "error.renderer_timed_out"] {
+            let fallback = "missing \(key) localization"
+            XCTAssertNotEqual(
+                L10n.text(key, defaultValue: fallback, bundle: english),
+                fallback
+            )
+            XCTAssertNotEqual(
+                L10n.text(key, defaultValue: fallback, bundle: chinese),
+                fallback
+            )
+        }
     }
 
-    private func readyState() -> RendererRecoveryState {
+    private func readyState() throws -> RendererRecoveryState {
         var state = RendererRecoveryState()
-        XCTAssertTrue(state.rendererDidLoad().isEmpty)
+        let initialLoad = try loadAttempt(from: state.initialActions)
+        XCTAssertTrue(state.rendererDidLoad(initialLoad).isEmpty)
         return state
+    }
+
+    private func handledActions(
+        _ transition: RendererRecoveryState.TerminationTransition
+    ) throws -> [RendererRecoveryState.Action] {
+        guard case let .handled(actions) = transition else {
+            throw TestError.expectedHandledTransition
+        }
+        return actions
+    }
+
+    private func loadAttempt(
+        from actions: [RendererRecoveryState.Action]
+    ) throws -> RendererRecoveryState.LoadAttempt {
+        XCTAssertEqual(actions.count, 1)
+        guard case let .loadRenderer(attempt) = try XCTUnwrap(actions.first) else {
+            throw TestError.expectedLoadAction
+        }
+        return attempt
     }
 
     private func startExecution(
@@ -286,6 +468,8 @@ final class RendererRecoveryStateTests: XCTestCase {
     }
 
     private enum TestError: Error {
+        case expectedHandledTransition
+        case expectedLoadAction
         case expectedStartAction
     }
 }

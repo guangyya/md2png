@@ -12,15 +12,27 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         let completion: Completion
     }
 
+    private struct NavigationAttempt {
+        let navigation: WKNavigation
+        let loadAttempt: RendererRecoveryState.LoadAttempt
+    }
+
     private let webView: WKWebView
     private let hostWindow: NSWindow
     private let pageURL: URL?
+    private let watchdogTimeout: TimeInterval
     private var requests: [UUID: Request] = [:]
     private var recoveryState: RendererRecoveryState
-    private var currentNavigation: WKNavigation?
+    private var currentNavigation: NavigationAttempt?
+    private var watchdogAttempt: RendererRecoveryState.Attempt?
+    private var watchdogWorkItem: DispatchWorkItem?
 
-    init(pageURL: URL? = RendererResources.pageURL) {
+    init(
+        pageURL: URL? = RendererResources.pageURL,
+        watchdogTimeout: TimeInterval = 15
+    ) {
         self.pageURL = pageURL
+        self.watchdogTimeout = max(watchdogTimeout, 0)
         recoveryState = RendererRecoveryState(hasRendererPage: pageURL != nil)
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
@@ -41,10 +53,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         hostWindow.contentView = webView
         hostWindow.orderBack(nil)
         webView.navigationDelegate = self
-
-        if pageURL != nil {
-            loadRendererPage()
-        }
+        perform(recoveryState.initialActions)
     }
 
     func render(
@@ -63,9 +72,10 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        guard isCurrentNavigation(navigation) else { return }
+        guard let loadAttempt = loadAttempt(for: navigation) else { return }
         currentNavigation = nil
-        perform(recoveryState.rendererDidLoad())
+        cancelWatchdog(for: .load(loadAttempt))
+        perform(recoveryState.rendererDidLoad(loadAttempt))
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -84,13 +94,20 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     func simulateContentProcessTerminationForTesting() {
         webViewWebContentProcessDidTerminate(webView)
     }
+
+    func simulateWatchdogTimeoutForTesting() {
+        guard let watchdogAttempt else { return }
+        watchdogDidFire(for: watchdogAttempt)
+    }
 #endif
 
     private func start(_ execution: RendererRecoveryState.Execution) {
+        guard recoveryState.isCurrent(execution) else { return }
         guard let request = requests[execution.requestID] else {
             finish(execution, with: .failure(AppError.rendererUnavailable))
             return
         }
+        armWatchdog(for: .render(execution))
 
         Task { [weak self] in
             guard let self else { return }
@@ -141,7 +158,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         width: Int,
         height: Int
     ) {
-        guard recoveryState.isCurrent(execution) else { return }
+        guard recoveryState.renderDidStartSnapshot(execution) else { return }
         let configuration = WKSnapshotConfiguration()
         configuration.rect = NSRect(x: 0, y: 0, width: width, height: height)
 
@@ -165,6 +182,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     ) {
         let transition = recoveryState.finish(execution)
         guard let requestID = transition.completedRequestID else { return }
+        cancelWatchdog(for: .render(execution))
         requests.removeValue(forKey: requestID)?.completion(result)
         perform(transition.actions)
     }
@@ -192,41 +210,87 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         case .ignored:
             return
         case let .handled(actions):
+            cancelWatchdog()
             currentNavigation = nil
             perform(actions)
         }
     }
 
-    private func loadRendererPage() {
+    private func loadRendererPage(_ attempt: RendererRecoveryState.LoadAttempt) {
+        guard recoveryState.isCurrent(.load(attempt)) else { return }
         guard let pageURL else {
-            perform(recoveryState.rendererLoadFailed())
+            perform(recoveryState.rendererLoadFailed(attempt))
             return
         }
-        currentNavigation = webView.loadFileURL(
+        armWatchdog(for: .load(attempt))
+        guard let navigation = webView.loadFileURL(
             pageURL,
             allowingReadAccessTo: pageURL.deletingLastPathComponent()
-        )
-        if currentNavigation == nil {
-            perform(recoveryState.rendererLoadFailed())
+        ) else {
+            cancelWatchdog(for: .load(attempt))
+            perform(recoveryState.rendererLoadFailed(attempt))
+            return
         }
+        currentNavigation = NavigationAttempt(
+            navigation: navigation,
+            loadAttempt: attempt
+        )
     }
 
     private func rendererLoadFailed(_ navigation: WKNavigation?) {
-        guard isCurrentNavigation(navigation) else { return }
+        guard let loadAttempt = loadAttempt(for: navigation) else { return }
         currentNavigation = nil
-        perform(recoveryState.rendererLoadFailed())
+        cancelWatchdog(for: .load(loadAttempt))
+        perform(recoveryState.rendererLoadFailed(loadAttempt))
     }
 
-    private func isCurrentNavigation(_ navigation: WKNavigation?) -> Bool {
-        guard let navigation, let currentNavigation else { return false }
-        return navigation === currentNavigation
+    private func loadAttempt(
+        for navigation: WKNavigation?
+    ) -> RendererRecoveryState.LoadAttempt? {
+        guard let navigation, let currentNavigation,
+              navigation === currentNavigation.navigation else { return nil }
+        return currentNavigation.loadAttempt
+    }
+
+    private func armWatchdog(for attempt: RendererRecoveryState.Attempt) {
+        cancelWatchdog()
+        let workItem = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.watchdogDidFire(for: attempt)
+            }
+        }
+        watchdogAttempt = attempt
+        watchdogWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + watchdogTimeout,
+            execute: workItem
+        )
+    }
+
+    private func cancelWatchdog(for attempt: RendererRecoveryState.Attempt? = nil) {
+        if let attempt, watchdogAttempt != attempt { return }
+        watchdogWorkItem?.cancel()
+        watchdogWorkItem = nil
+        watchdogAttempt = nil
+    }
+
+    private func watchdogDidFire(for attempt: RendererRecoveryState.Attempt) {
+        guard watchdogAttempt == attempt else { return }
+        watchdogWorkItem = nil
+        watchdogAttempt = nil
+
+        if case let .load(loadAttempt) = attempt,
+           currentNavigation?.loadAttempt == loadAttempt {
+            currentNavigation = nil
+        }
+        perform(recoveryState.timedOut(attempt))
     }
 
     private func perform(_ actions: [RendererRecoveryState.Action]) {
         for action in actions {
             switch action {
-            case .loadRenderer:
-                loadRendererPage()
+            case let .loadRenderer(attempt):
+                loadRendererPage(attempt)
             case let .start(execution):
                 start(execution)
             case let .fail(requestIDs, failure):
@@ -235,6 +299,8 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     .rendererUnavailable
                 case .recoveryFailed:
                     .rendererRecoveryFailed
+                case .timedOut:
+                    .rendererTimedOut
                 }
                 for requestID in requestIDs {
                     requests.removeValue(forKey: requestID)?.completion(.failure(error))
