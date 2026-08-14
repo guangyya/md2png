@@ -25,7 +25,7 @@ enum AppError: LocalizedError {
         case .rendererRecoveryFailed:
             return L10n.text(
                 "error.renderer_recovery_failed",
-                defaultValue: "The local renderer stopped and could not recover. Quit and reopen md2png, then try again."
+                defaultValue: "The local renderer stopped and could not recover. Try rendering again."
             )
         case .invalidRendererResponse:
             return L10n.text(

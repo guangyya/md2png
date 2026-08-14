@@ -149,9 +149,8 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         with result: Result<NSImage, Error>
     ) {
         let transition = recoveryState.finish(execution)
-        guard let requestID = transition.completedRequestID,
-              let request = requests.removeValue(forKey: requestID) else { return }
-        request.completion(result)
+        guard let requestID = transition.completedRequestID else { return }
+        requests.removeValue(forKey: requestID)?.completion(result)
         perform(transition.actions)
     }
 

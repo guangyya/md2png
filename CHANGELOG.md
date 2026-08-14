@@ -11,7 +11,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Reload the bundled WebKit renderer after its content process terminates,
   retry the interrupted render once, and fail queued work deterministically if
-  recovery cannot complete.
+  recovery cannot complete. A later user-initiated render starts a fresh local
+  renderer load instead of requiring an app restart.
 
 ## [0.3.0] - 2026-08-14
 

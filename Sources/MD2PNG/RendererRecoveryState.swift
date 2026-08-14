@@ -22,6 +22,7 @@ struct RendererRecoveryState {
         case recoveryLoad
         case ready
         case rendering(Execution)
+        case needsReload
         case unavailable(Failure)
     }
 
@@ -45,10 +46,12 @@ struct RendererRecoveryState {
             : .unavailable(.rendererUnavailable)
     }
 
+    // Internal observability for the pure state-machine tests.
     var activeRequestID: UUID? {
         activeRequest?.id
     }
 
+    // Internal observability for the pure state-machine tests.
     var pendingRequestIDs: [UUID] {
         queuedRequestIDs
     }
@@ -60,6 +63,12 @@ struct RendererRecoveryState {
     mutating func enqueue(_ requestID: UUID) -> [Action] {
         if case let .unavailable(failure) = phase {
             return [.fail(requestIDs: [requestID], failure: failure)]
+        }
+
+        if phase == .needsReload {
+            queuedRequestIDs.append(requestID)
+            phase = .recoveryLoad
+            return [.loadRenderer]
         }
 
         queuedRequestIDs.append(requestID)
@@ -79,10 +88,15 @@ struct RendererRecoveryState {
             failure = .rendererUnavailable
         case .recoveryLoad:
             failure = .recoveryFailed
-        case .ready, .rendering, .unavailable:
+        case .ready, .rendering, .needsReload, .unavailable:
             return []
         }
-        return becomeUnavailable(failure)
+        return failAllRequests(
+            with: failure,
+            nextPhase: failure == .recoveryFailed
+                ? .needsReload
+                : .unavailable(failure)
+        )
     }
 
     mutating func contentProcessTerminated() -> [Action] {
@@ -91,19 +105,19 @@ struct RendererRecoveryState {
             phase = .recoveryLoad
             return [.loadRenderer]
         case .recoveryLoad:
-            return becomeUnavailable(.recoveryFailed)
+            return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
         case .rendering:
             guard var activeRequest else {
-                return becomeUnavailable(.recoveryFailed)
+                return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
             }
             guard activeRequest.recoveryAttempts == 0 else {
-                return becomeUnavailable(.recoveryFailed)
+                return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
             }
             activeRequest.recoveryAttempts += 1
             self.activeRequest = activeRequest
             phase = .recoveryLoad
             return [.loadRenderer]
-        case .unavailable:
+        case .needsReload, .unavailable:
             return []
         }
     }
@@ -143,7 +157,10 @@ struct RendererRecoveryState {
         return [.start(execution)]
     }
 
-    private mutating func becomeUnavailable(_ failure: Failure) -> [Action] {
+    private mutating func failAllRequests(
+        with failure: Failure,
+        nextPhase: Phase
+    ) -> [Action] {
         var requestIDs: [UUID] = []
         if let activeRequest {
             requestIDs.append(activeRequest.id)
@@ -152,7 +169,7 @@ struct RendererRecoveryState {
 
         activeRequest = nil
         queuedRequestIDs.removeAll()
-        phase = .unavailable(failure)
+        phase = nextPhase
         guard !requestIDs.isEmpty else { return [] }
         return [.fail(requestIDs: requestIDs, failure: failure)]
     }

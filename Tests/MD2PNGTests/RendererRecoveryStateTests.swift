@@ -65,15 +65,15 @@ final class RendererRecoveryStateTests: XCTestCase {
             state.contentProcessTerminated(),
             [.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)]
         )
-        XCTAssertEqual(state.phase, .unavailable(.recoveryFailed))
+        XCTAssertEqual(state.phase, .needsReload)
         XCTAssertNil(state.activeRequestID)
         XCTAssertTrue(state.pendingRequestIDs.isEmpty)
 
         let laterID = makeID(3)
-        XCTAssertEqual(
-            state.enqueue(laterID),
-            [.fail(requestIDs: [laterID], failure: .recoveryFailed)]
-        )
+        XCTAssertEqual(state.enqueue(laterID), [.loadRenderer])
+        XCTAssertEqual(state.phase, .recoveryLoad)
+        let laterExecution = try startExecution(from: state.rendererDidLoad())
+        XCTAssertEqual(laterExecution.requestID, laterID)
     }
 
     func testTerminationDuringRecoveryLoadFailsWithoutStartingASecondReload() throws {
@@ -88,7 +88,7 @@ final class RendererRecoveryStateTests: XCTestCase {
             state.contentProcessTerminated(),
             [.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)]
         )
-        XCTAssertEqual(state.phase, .unavailable(.recoveryFailed))
+        XCTAssertEqual(state.phase, .needsReload)
     }
 
     func testRecoveryLoadFailureReturnsStructuredFailureInQueueOrder() throws {
@@ -103,7 +103,7 @@ final class RendererRecoveryStateTests: XCTestCase {
             state.rendererLoadFailed(),
             [.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)]
         )
-        XCTAssertEqual(state.phase, .unavailable(.recoveryFailed))
+        XCTAssertEqual(state.phase, .needsReload)
     }
 
     func testInitialLoadFailureUsesRendererUnavailableFailure() {
@@ -124,37 +124,60 @@ final class RendererRecoveryStateTests: XCTestCase {
         let renderer = MarkdownRenderer()
         renderer.simulateContentProcessTerminationForTesting()
 
-        let result: Result<NSImage, Error> = await withCheckedContinuation { continuation in
-            renderer.render("# Recovery\n\nThe renderer reloaded locally.") {
-                continuation.resume(returning: $0)
-            }
+        let completion = expectation(description: "renderer reload completed")
+        var capturedResult: Result<NSImage, Error>?
+        renderer.render("# Recovery\n\nThe renderer reloaded locally.") {
+            capturedResult = $0
+            completion.fulfill()
         }
+        await fulfillment(of: [completion], timeout: 5)
 
+        let result = try XCTUnwrap(capturedResult)
         let image = try result.get()
         XCTAssertGreaterThanOrEqual(image.size.width, 520)
         XCTAssertGreaterThan(image.size.height, 80)
     }
 
     @MainActor
-    func testRepeatedSimulatedTerminationReturnsLocalizedRecoveryFailure() async throws {
+    func testNextRequestReloadsAfterRepeatedSimulatedTermination() async throws {
         _ = NSApplication.shared
         let renderer = MarkdownRenderer()
         renderer.simulateContentProcessTerminationForTesting()
         renderer.simulateContentProcessTerminationForTesting()
 
-        let result: Result<NSImage, Error> = await withCheckedContinuation { continuation in
-            renderer.render("# This request must fail") {
-                continuation.resume(returning: $0)
-            }
+        let completion = expectation(description: "fresh renderer load completed")
+        var capturedResult: Result<NSImage, Error>?
+        renderer.render("# Fresh request after recovery failure") {
+            capturedResult = $0
+            completion.fulfill()
         }
+        await fulfillment(of: [completion], timeout: 5)
 
-        guard case let .failure(error) = result else {
-            XCTFail("Expected recovery failure")
-            return
-        }
+        let result = try XCTUnwrap(capturedResult)
+        let image = try result.get()
+        XCTAssertGreaterThanOrEqual(image.size.width, 520)
+        XCTAssertGreaterThan(image.size.height, 80)
+    }
+
+    func testRecoveryFailureMessagesInviteAnotherRender() throws {
+        let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
+        let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+
         XCTAssertEqual(
-            error.localizedDescription,
-            AppError.rendererRecoveryFailed.localizedDescription
+            L10n.text(
+                "error.renderer_recovery_failed",
+                defaultValue: "fallback",
+                bundle: english
+            ),
+            "The local renderer stopped and could not recover. Try rendering again."
+        )
+        XCTAssertEqual(
+            L10n.text(
+                "error.renderer_recovery_failed",
+                defaultValue: "fallback",
+                bundle: chinese
+            ),
+            "本地渲染器已停止且无法恢复。请重新渲染。"
         )
     }
 
