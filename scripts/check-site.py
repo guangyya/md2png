@@ -139,7 +139,19 @@ def main() -> None:
     if f"Sitemap: {PRODUCTION_ORIGIN}/sitemap.xml" not in robots:
         fail("robots.txt does not advertise the production sitemap")
 
-    print("site-check: ok (release-independent, 2 localized pages, custom 404)")
+    font = SITE / "assets/fonts/Manrope-Variable.ttf"
+    license_file = SITE / "assets/fonts/Manrope-OFL.txt"
+    if not font.is_file() or font.stat().st_size < 100_000:
+        fail("the locally hosted Manrope variable font is missing or incomplete")
+    if "SIL OPEN FONT LICENSE Version 1.1" not in license_file.read_text(encoding="utf-8"):
+        fail("the Manrope OFL license must ship with the font")
+    styles = (SITE / "styles.css").read_text(encoding="utf-8")
+    if 'url("assets/fonts/Manrope-Variable.ttf")' not in styles:
+        fail("styles.css does not load the bundled Manrope font")
+    if "fonts.googleapis.com" in styles or "fonts.gstatic.com" in styles:
+        fail("site fonts must not depend on a third-party request")
+
+    print("site-check: ok (local OFL font, 2 localized pages, custom 404)")
 
 
 if __name__ == "__main__":
