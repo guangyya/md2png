@@ -32,6 +32,28 @@ final class FeatureTests: XCTestCase {
         }
     }
 
+    func testAboutChangelogDoesNotFallBackToFullProjectChangelog() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MD2PNGAboutChangelogTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("## [1.0.0]\n\n- Full project details".utf8).write(
+            to: root.appendingPathComponent("CHANGELOG.md")
+        )
+
+        XCTAssertNil(
+            AppResources.aboutChangelogURL(resourcesURL: nil, currentDirectoryURL: root)
+        )
+
+        let conciseURL = root.appendingPathComponent("ABOUT_CHANGELOG.md")
+        try Data("## [1.0.0]\n\n- Concise highlight".utf8).write(to: conciseURL)
+
+        XCTAssertEqual(
+            AppResources.aboutChangelogURL(resourcesURL: nil, currentDirectoryURL: root),
+            conciseURL
+        )
+    }
+
     func testChangelogParserReturnsOnlyRequestedVersion() {
         let english = L10n.localizedBundle(for: "en")
         let changelog = """

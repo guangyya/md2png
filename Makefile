@@ -109,7 +109,8 @@ app: build icon
 	fi
 	cp "$(APP_ICON)" "$(CONTENTS)/Resources/AppIcon.icns"
 	cp -R "$(ARM64_BUILD_DIR)/$(RESOURCE_BUNDLE_NAME)" "$(CONTENTS)/Resources/"
-	cp CHANGELOG.md "$(CONTENTS)/Resources/CHANGELOG.md"
+	./scripts/release-notes.sh "$(VERSION)" ABOUT_CHANGELOG.md >/dev/null
+	cp ABOUT_CHANGELOG.md "$(CONTENTS)/Resources/ABOUT_CHANGELOG.md"
 	cp -R Examples "$(CONTENTS)/Resources/Examples"
 	codesign $(SIGN_FLAGS) "$(APP_DIR)"
 

@@ -133,7 +133,7 @@ enum AppResources {
         return try String(contentsOf: url, encoding: .utf8)
     }
 
-    static func changelogURL(
+    static func aboutChangelogURL(
         resourcesURL: URL?,
         currentDirectoryURL: URL = URL(
             fileURLWithPath: FileManager.default.currentDirectoryPath,
@@ -141,8 +141,8 @@ enum AppResources {
         )
     ) -> URL? {
         let candidates = [
-            resourcesURL?.appendingPathComponent("CHANGELOG.md"),
-            currentDirectoryURL.appendingPathComponent("CHANGELOG.md")
+            resourcesURL?.appendingPathComponent("ABOUT_CHANGELOG.md"),
+            currentDirectoryURL.appendingPathComponent("ABOUT_CHANGELOG.md")
         ]
 
         return candidates.compactMap { $0 }.first {
