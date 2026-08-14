@@ -160,6 +160,7 @@ final class ClipboardTests: XCTestCase {
     func testUserFacingErrorsHaveDescriptions() {
         XCTAssertNotNil(AppError.emptyClipboard.errorDescription)
         XCTAssertNotNil(AppError.rendererUnavailable.errorDescription)
+        XCTAssertNotNil(AppError.rendererRecoveryFailed.errorDescription)
         XCTAssertNotNil(AppError.invalidRendererResponse.errorDescription)
         XCTAssertNotNil(AppError.contentTooLarge(width: 1, height: 2).errorDescription)
         XCTAssertNotNil(AppError.pngEncodingFailed.errorDescription)

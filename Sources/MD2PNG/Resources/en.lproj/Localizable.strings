@@ -37,6 +37,7 @@
 
 "error.empty_clipboard" = "The clipboard does not contain Markdown text. Copy some Markdown and try again.";
 "error.renderer_unavailable" = "The local renderer could not be loaded.";
+"error.renderer_recovery_failed" = "The local renderer stopped and could not recover. Quit and reopen md2png, then try again.";
 "error.invalid_renderer_response" = "The renderer returned an invalid image size.";
 "error.content_too_large" = "The rendered content is too large (%ld × %ld). Try a shorter selection.";
 "error.png_encoding_failed" = "The rendered image could not be encoded as PNG.";

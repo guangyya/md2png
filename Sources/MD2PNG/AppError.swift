@@ -3,6 +3,7 @@ import Foundation
 enum AppError: LocalizedError {
     case emptyClipboard
     case rendererUnavailable
+    case rendererRecoveryFailed
     case invalidRendererResponse
     case contentTooLarge(width: Int, height: Int)
     case pngEncodingFailed
@@ -20,6 +21,11 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.renderer_unavailable",
                 defaultValue: "The local renderer could not be loaded."
+            )
+        case .rendererRecoveryFailed:
+            return L10n.text(
+                "error.renderer_recovery_failed",
+                defaultValue: "The local renderer stopped and could not recover. Quit and reopen md2png, then try again."
             )
         case .invalidRendererResponse:
             return L10n.text(
