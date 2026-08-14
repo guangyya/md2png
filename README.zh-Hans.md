@@ -156,8 +156,8 @@ Markdown、GFM 表格、高亮 Swift 代码和 Mermaid 图执行离线渲染自�
 欢迎聚焦的 Bug 报告和改进。新功能请使用
 [Feature Request 模板](../../issues/new?template=feature_request.yml)，
 已筛选的方向记录在
-[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1)；
-进入 Backlog 不代表承诺版本或时间。
+[公开 GitHub Issues](https://github.com/guangyya/md2png/issues)；带 `backlog`
+标签不代表承诺版本或时间。
 提交 PR 前请阅读 [Contributing](CONTRIBUTING.md)；安全问题请按
 [Security policy](SECURITY.md) 处理。
 

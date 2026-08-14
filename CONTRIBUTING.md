@@ -28,13 +28,13 @@ not be committed.
 ## Feature requests
 
 Use the repository's Feature Request issue form and start with the user problem,
-not only a proposed implementation. Search existing issues and the
-[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1)
-first.
+not only a proposed implementation. Search the repository's
+[public GitHub Issues](https://github.com/guangyya/md2png/issues) first.
 
-The project contains ideas that have passed an initial product-fit review. It is
-not a committed roadmap. Each accepted product or technical-debt item uses its
-GitHub issue as the single source for scope, constraints, and validation.
+Issues labeled `backlog` contain ideas that have passed an initial product-fit
+review. They are not a committed roadmap. Each accepted product or
+technical-debt item uses its GitHub issue as the single source for scope,
+constraints, and validation.
 
 ## Verification
 

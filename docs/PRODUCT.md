@@ -81,7 +81,7 @@ sending it.
 ## Backlog
 
 Candidate features, technical debt, and deliberately deferred ideas are
-maintained in the
-[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1).
-Each linked issue is the source for scope, constraints, and validation. Backlog
-placement confirms product fit, not a release date or implementation commitment.
+maintained as [public GitHub Issues](https://github.com/guangyya/md2png/issues).
+Each issue labeled `backlog` is the source for its scope, constraints, and
+validation. Backlog placement confirms product fit, not a release date or
+implementation commitment.
