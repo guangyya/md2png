@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-14
+
 ### Added
 
 - Add silent update discovery in About using public GitHub latest-release
