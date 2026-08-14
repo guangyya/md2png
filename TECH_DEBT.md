@@ -1,7 +1,10 @@
 # Technical debt
 
-This file tracks internal architecture and maintenance work that does not by
-itself add a product capability. Product candidates remain in
+This file records the rationale and constraints for internal architecture and
+maintenance work that does not by itself add a product capability. Live
+workflow state, priority, and effort are maintained in the
+[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1),
+with one linked issue per item. Product candidates remain in
 [`BACKLOG.md`](BACKLOG.md).
 
 Technical-debt placement is not a promise of a release or date. A migration
@@ -31,6 +34,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 - **Effort:** L
 - **Dependencies / coordination:** BL-004, BL-008, BL-010, and later changes to
   About or Last Render provide migration opportunities.
+- **Tracking issue:** [#13](https://github.com/guangyya/md2png/issues/13)
 - **Problem:** Several presentation-only controllers use substantial hand-built
   AppKit layout, especially About. Repeating that approach for Settings,
   onboarding, and diagnostics would increase UI maintenance cost.
@@ -95,6 +99,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 
 - **Priority:** P1
 - **Effort:** M
+- **Tracking issue:** [#14](https://github.com/guangyya/md2png/issues/14)
 - **Problem:** Release automation verifies architecture, signatures,
   notarization, stapling, and DMG integrity, but it does not prove that the
   executable inside `dist/md2png.app` can find its packaged resources and
@@ -121,6 +126,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 
 - **Priority:** P2
 - **Effort:** M
+- **Tracking issue:** [#15](https://github.com/guangyya/md2png/issues/15)
 - **Problem:** The renderer handles navigation failures but does not recover
   when the WebKit content process terminates after initialization, which can
   leave later renders unavailable until the app restarts.
@@ -142,6 +148,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 
 - **Priority:** P2
 - **Effort:** M
+- **Tracking issue:** [#16](https://github.com/guangyya/md2png/issues/16)
 - **Problem:** Existing controls have partial accessibility coverage, while new
   onboarding, Settings, diagnostics, preview actions, zoom controls, and custom
   SwiftUI/AppKit bridges increase the risk of missing names, focus behavior,
@@ -165,6 +172,7 @@ work, and **P3** is opportunistic cleanup that should accompany related work.
 
 - **Priority:** P2
 - **Effort:** M
+- **Tracking issue:** [#17](https://github.com/guangyya/md2png/issues/17)
 - **Problem:** Transient HUD errors and copied version information do not leave
   enough evidence to diagnose intermittent renderer initialization, WebKit
   recovery, shortcut registration, clipboard-write, packaging, or resource
