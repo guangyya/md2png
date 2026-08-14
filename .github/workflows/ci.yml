@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: CI / ${{ matrix.check_name }}
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check_name: macOS 15 / Xcode 26.2
+            runner: macos-15
+            macos_major: "15"
+            developer_dir: /Applications/Xcode_26.2.app/Contents/Developer
+            xcode_version: "26.2"
+            experimental: false
+          - check_name: macOS 26 / Xcode 26.6
+            runner: macos-26
+            macos_major: "26"
+            developer_dir: /Applications/Xcode_26.6.app/Contents/Developer
+            xcode_version: "26.6"
+            experimental: false
+          - check_name: Xcode 27 preview
+            runner: xcode-27
+            macos_major: "26"
+            developer_dir: /Applications/Xcode.app/Contents/Developer
+            xcode_version: "27.0"
+            experimental: true
+    env:
+      DEVELOPER_DIR: ${{ matrix.developer_dir }}
+      EXPECTED_MACOS_MAJOR: ${{ matrix.macos_major }}
+      EXPECTED_XCODE_VERSION: ${{ matrix.xcode_version }}
+      NODE_VERSION: "24.18.0"
+      PNPM_VERSION: "11.19.0"
+      PROJECT_URL: https://github.com/guangyya/md2png
+      BUNDLE_IDENTIFIER: io.github.guangyya.md2png
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify pinned Apple toolchain
+        shell: bash
+        run: |
+          test -d "$DEVELOPER_DIR"
+          sw_vers
+          test "$(sw_vers -productVersion | cut -d. -f1)" = "$EXPECTED_MACOS_MAJOR"
+          test "$(xcodebuild -version | sed -n '1s/^Xcode //p')" = "$EXPECTED_XCODE_VERSION"
+          xcodebuild -version
+          swift --version
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          architecture: arm64
+          package-manager-cache: false
+
+      - name: Install pinned renderer dependencies
+        shell: bash
+        run: |
+          npm install --global "pnpm@$PNPM_VERSION"
+          test "$(pnpm --version)" = "$PNPM_VERSION"
+          pnpm --dir WebRenderer install --frozen-lockfile
+
+      - name: Run tests
+        run: make test
+
+      - name: Build release app
+        run: >-
+          make app
+          CONFIGURATION=release
+          PROJECT_URL="$PROJECT_URL"
+          BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
+
+      - name: Verify generated renderer is committed
+        run: git diff --exit-code -- Sources/MD2PNG/Resources/renderer.bundle.js
+
+      - name: Verify packaged app
+        shell: bash
+        run: |
+          app="dist/md2png.app"
+          executable="$app/Contents/MacOS/md2png"
+          resources="$app/Contents/Resources"
+          swift_resources="$resources/md2png_MD2PNG.bundle"
+
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Signature=adhoc"
+          actual_architectures="$(lipo -archs "$executable")"
+          printf 'Executable architectures: %s\n' "$actual_architectures"
+          test "$actual_architectures" = "arm64"
+          actual_bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+          actual_project_url="$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$app/Contents/Info.plist")"
+          test "$actual_bundle_identifier" = "$BUNDLE_IDENTIFIER"
+          test "$actual_project_url" = "$PROJECT_URL"
+
+          renderer_script="$(find "$swift_resources" -type f -name renderer.bundle.js -print -quit)"
+          renderer_page="$(find "$swift_resources" -type f -name renderer.html -print -quit)"
+          printf 'Renderer script: %s\nRenderer page: %s\n' "$renderer_script" "$renderer_page"
+          test -n "$renderer_script"
+          test -n "$renderer_page"
+          test -s "$renderer_script"
+          test -s "$renderer_page"
+          test -s "$resources/CHANGELOG.md"
+          test -s "$resources/Examples/formatting.md"
