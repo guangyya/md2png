@@ -17,6 +17,9 @@ disclosure.
 
 Markdown is sanitized before display, rendering uses a non-persistent local
 `WKWebView`, raw Markdown HTML is disabled, and external Markdown images are
-blocked. The application has no backend service, embedded updater, analytics,
-or automatic chat action. See [Privacy](docs/PRIVACY.md) for the clipboard and
-network behavior.
+blocked. The application has no backend service, privileged updater helper,
+analytics, or automatic chat action. Its About-only update discovery sends no
+user content, and the user-initiated download accepts only the expected
+versioned HTTPS DMG, verifies its GitHub-provided size and SHA-256,
+then relies on Developer ID signing, notarization, stapling, and macOS Gatekeeper
+when opening it. See [Privacy](docs/PRIVACY.md) for clipboard and network behavior.

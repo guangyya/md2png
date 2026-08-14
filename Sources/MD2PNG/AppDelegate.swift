@@ -5,7 +5,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let renderer = MarkdownRenderer()
     private let hud = HUDController()
     private let previewController = PreviewController()
-    private lazy var aboutController = AboutController()
+    private let updateController = UpdateController()
+    private lazy var aboutController = AboutController(updateController: updateController)
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
     private var lastImage: NSImage?
@@ -14,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var previewMenuItem: NSMenuItem!
     private var examplesMenuItem: NSMenuItem!
     private var renderActivity = RenderActivityState()
+    private var currentUpdateStatus = UpdateStatus()
+    private var updateStatusObserverID: UUID?
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -107,6 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         quitItem.target = self
         statusItem.menu = menu
+
+        updateStatusObserverID = updateController.observeStatus { [weak self] status in
+            self?.applyUpdateStatus(status)
+        }
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -185,9 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ? L10n.text("menu.rendering", defaultValue: "Rendering…")
             : L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
         examplesMenuItem.isEnabled = !isRendering
-        if !isRendering {
-            statusItem.button?.image = brandStatusImage
-        }
+        updateStatusItemAppearance()
     }
 
     @objc private func showAbout() {
@@ -200,6 +205,170 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func show(_ error: Error) {
         hud.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", isError: true)
+    }
+
+    private func applyUpdateStatus(_ status: UpdateStatus) {
+        let previousStatus = currentUpdateStatus
+        currentUpdateStatus = status
+        updateStatusItemAppearance()
+        guard previousStatus.phase != status.phase else { return }
+        presentUpdateTransition(from: previousStatus.phase, to: status.phase)
+    }
+
+    private func presentUpdateTransition(from previousPhase: UpdatePhase, to phase: UpdatePhase) {
+        switch phase {
+        case .unknown:
+            break
+        case let .upToDate(version):
+            announceUpdate(L10n.format(
+                "update.accessibility.up_to_date",
+                defaultValue: "md2png %@ is up to date.",
+                version.description
+            ))
+        case let .updateAvailable(update):
+            if previousPhase.isDownloadActive {
+                let message = L10n.text(
+                    "update.accessibility.cancelled",
+                    defaultValue: "Update cancelled"
+                )
+                if aboutController.window?.isVisible != true {
+                    hud.show(message, symbol: "xmark.circle.fill")
+                }
+                announceUpdate(message)
+            } else {
+                announceUpdate(L10n.format(
+                    "update.accessibility.available",
+                    defaultValue: "md2png %@ is available.",
+                    update.version.description
+                ))
+            }
+        case let .downloading(update, _):
+            if case .downloading = previousPhase { return }
+            announceUpdate(L10n.format(
+                "update.accessibility.downloading",
+                defaultValue: "Downloading md2png %@.",
+                update.version.description
+            ))
+        case let .verifying(update):
+            announceUpdate(L10n.format(
+                "update.accessibility.verifying",
+                defaultValue: "Verifying md2png %@.",
+                update.version.description
+            ))
+        case let .opening(update):
+            announceUpdate(L10n.format(
+                "update.accessibility.opening",
+                defaultValue: "Opening md2png %@.",
+                update.version.description
+            ))
+        case let .readyToInstall(update, _):
+            let message = L10n.format(
+                "update.accessibility.ready",
+                defaultValue: "md2png %@ DMG opened — drag it into Applications",
+                update.version.description
+            )
+            if aboutController.window?.isVisible != true {
+                hud.show(message, symbol: "arrow.down.app.fill")
+            }
+            announceUpdate(message)
+        case let .failed(message, _, _, _):
+            if previousPhase.isDownloadActive,
+               aboutController.window?.isVisible != true {
+                let recoveryMessage = L10n.format(
+                    "update.hud.failed",
+                    defaultValue: "%@ Open About md2png to retry.",
+                    message
+                )
+                hud.show(
+                    recoveryMessage,
+                    symbol: "exclamationmark.triangle.fill",
+                    isError: true
+                )
+            }
+            announceUpdate(message)
+        }
+    }
+
+    private func updateStatusItemAppearance() {
+        guard let button = statusItem.button else { return }
+        if renderActivity.isRendering {
+            button.image = NSImage(
+                systemSymbolName: "hourglass",
+                accessibilityDescription: nil
+            )
+            button.setAccessibilityLabel(L10n.text(
+                "accessibility.rendering",
+                defaultValue: "Rendering"
+            ))
+            return
+        }
+
+        let symbolName: String?
+        switch currentUpdateStatus.phase {
+        case .downloading:
+            symbolName = "arrow.down.circle"
+        case .verifying:
+            symbolName = "checkmark.shield"
+        case .opening:
+            symbolName = "opticaldiscdrive"
+        case .unknown, .upToDate, .updateAvailable, .readyToInstall, .failed:
+            symbolName = nil
+        }
+
+        if let symbolName,
+           let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+            image.isTemplate = true
+            button.image = image
+            button.setAccessibilityLabel(L10n.format(
+                "accessibility.update_status",
+                defaultValue: "md2png — %@",
+                updateAccessibilityStatus
+            ))
+        } else {
+            button.image = brandStatusImage
+            button.setAccessibilityLabel(L10n.text(
+                "accessibility.app",
+                defaultValue: "md2png"
+            ))
+        }
+    }
+
+    private var updateAccessibilityStatus: String {
+        switch currentUpdateStatus.phase {
+        case let .downloading(update, progressPercent):
+            return L10n.format(
+                "about.update_downloading_progress",
+                defaultValue: "Downloading md2png %@ — %ld%%",
+                update.version.description,
+                progressPercent
+            )
+        case let .verifying(update):
+            return L10n.format(
+                "about.update_verifying_version",
+                defaultValue: "Verifying md2png %@…",
+                update.version.description
+            )
+        case let .opening(update):
+            return L10n.format(
+                "about.update_opening_version",
+                defaultValue: "Opening md2png %@…",
+                update.version.description
+            )
+        case .unknown, .upToDate, .updateAvailable, .readyToInstall, .failed:
+            return L10n.text("accessibility.app", defaultValue: "md2png")
+        }
+    }
+
+    private func announceUpdate(_ message: String) {
+        guard let button = statusItem.button else { return }
+        NSAccessibility.post(
+            element: button,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: message,
+                .priority: NSAccessibilityPriorityLevel.medium.rawValue
+            ]
+        )
     }
 }
 

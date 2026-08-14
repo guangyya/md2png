@@ -159,7 +159,6 @@ the menu as quick actions, with Settings reflecting the same stored values.
   ──────────────────
   Settings…
   Show Welcome…
-  Check for Updates…
   About md2png
   ──────────────────
   Quit md2png
@@ -194,36 +193,69 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Priority:** P2
 - **Problem:** Once md2png is installed, users have no direct way to discover
   and retrieve a newer signed release without manually navigating GitHub.
-- **Candidate scope:** Add **Check for Updates…** to the app menu and About
-  window. Only after the user invokes it, asynchronously request the public
-  GitHub latest-release JSON and compare its stable tag with the installed
-  `CFBundleShortVersionString`. If the installed version is current, report
-  **You’re Up to Date**. If a newer version exists, show **Updating to md2png
-  x.y.z…**, download the matching versioned Apple-silicon DMG in the background
-  with visible progress, verify it, and open the DMG with `NSWorkspace` when
-  complete. Keep GitHub pages out of the successful flow.
+- **Candidate scope:** Put update discovery in About instead of adding another
+  menu command. When About opens, silently request the public GitHub latest-
+  release JSON when the cached successful result is stale, then compare its
+  stable tag with the installed `CFBundleShortVersionString`. Keep automatic
+  checking silent. Once resolved, show an icon and either **Up to
+  Date** with **Check Again**, or **Version x.y.z is available** with **Download
+  Update**. Download only after that explicit click, show compact progress in
+  the same row and the status item, verify the versioned Apple-silicon DMG, and
+  open it with `NSWorkspace` when complete. Do not show a checking or download
+  dialog, and keep GitHub pages out of the successful flow. When the user clicks
+  **Check Again**, change that inline action to **Checking…**, then **Checked
+  just now** through the local cooldown so the request has durable feedback.
+- **Implementation flow:** Use
+  `GET https://api.github.com/repos/{owner}/{repo}/releases/latest` as the update
+  manifest. Separate silent discovery from the user-triggered download flow:
+  unknown/cached result → up to date or update available, then download with
+  progress and cancellation → verifying → opening DMG → prompting the user to
+  drag md2png into Applications. Keep one shared coordinator so only one check
+  or download can run at a time. Preserve a displayed cached result while a
+  silent refresh runs, update the menu bar icon only for download milestones,
+  and announce resolved results and phase changes to VoiceOver without
+  announcing checking or every percentage update.
+- **Caching and rate limits:** Persist a successful release response for 24
+  hours. Opening About within that interval must resolve the cached response
+  without a network request. **Check Again** bypasses the 24-hour cache but
+  permits at most one actual request per 60 seconds. If GitHub responds with
+  HTTP 403 or 429, honor `Retry-After`, or `X-RateLimit-Reset` when the remaining
+  quota is zero, persist the retry time across launches, and disable retry until
+  then. Keep a single request in flight and do not rely on unauthenticated ETag
+  requests to avoid GitHub's shared-IP rate limit.
+- **Version and publishing contract:** Keep `Info.plist` as the single version
+  source. Compare the installed `CFBundleShortVersionString` with the optional-
+  `v` release tag using numeric semantic-version components; use
+  `CFBundleVersion` only as the monotonically increasing build number. The
+  release tag must be `v{version}`, the changelog section must match `{version}`,
+  and the downloadable asset must be
+  `md2png-{version}-macOS-arm64-developer-id.dmg`. The existing release script
+  should derive these values and verify the published asset metadata.
 - **Release asset contract:** From the latest non-draft, non-prerelease release,
   select exactly one asset named
   `md2png-{version}-macOS-arm64-developer-id.dmg` with the expected disk-image
   content type, positive size, HTTPS download URL, and SHA-256 digest. Download
-  into an app-owned update cache through a temporary file, require the received
-  size and digest to match the release metadata, remove partial or invalid
-  files, and rely on the existing Developer ID signature, notarization,
-  stapling, and macOS Gatekeeper when opening the verified DMG.
+  into `~/Library/Caches/io.github.guangyya.md2png/Updates/` through a temporary
+  file, require the received size and digest to match the release metadata,
+  remove partial or invalid files, and rely on the existing Developer ID
+  signature, notarization, stapling, and macOS Gatekeeper when opening the
+  verified DMG. Keep the verified DMG available for **Open** and **Show in
+  Finder**, so users can locate or remove the cached download themselves.
 - **Installation boundary:** Opening the DMG is the final automated step. Do not
   replace the running app, copy into Applications, request elevated privileges,
   relaunch, or claim installation has completed. After the DMG opens, clearly
   tell the user to drag md2png to Applications to finish the update.
 - **Failure fallback:** Check, metadata, version, download, integrity, file, or
   open failures must preserve the installed app, remove unusable temporary
-  files, and offer **View Releases…** as an explicit browser fallback. Never
-  open GitHub automatically after a failure.
-- **Privacy and network constraints:** Never check at launch, on a timer, or
-  without the explicit command. Do not add Sparkle, an updater helper,
-  credentials, telemetry, or automatic retries. Send no Markdown, clipboard
-  data, device identifier, or account data; make at most one check/download
-  active at a time; use bounded timeouts; support cancellation; and keep
-  rendering fully available offline.
+  files, and expose inline **Try Again** or **Retry Download** plus **View
+  Releases** in About. A download failure may also use the non-activating HUD
+  when About is closed. Never open GitHub automatically after a failure.
+- **Privacy and network constraints:** Never check at launch, during rendering,
+  on a background timer, or anywhere other than About. Do not add Sparkle, an
+  updater helper, credentials, telemetry, or automatic retries. Send no
+  Markdown, clipboard data, device identifier, or account data; make at most
+  one check/download active at a time; use bounded timeouts; support download
+  cancellation; and keep rendering fully available offline.
 - **Version rules:** Compare normalized numeric release versions rather than
   strings, accept an optional leading `v`, and treat malformed or unsupported
   tags as a failure rather than claiming the app is current.
@@ -231,9 +263,12 @@ the menu as quick actions, with Settings reflecting the same stored values.
   `1.9.0`; optional `v` prefixes; missing, duplicate, wrong-architecture,
   wrong-type, wrong-size, or wrong-digest assets; no published release;
   malformed JSON; offline, timeout, redirect, HTTP, and rate-limit failures;
-  cancellation and repeated clicks; cache cleanup; DMG open success/failure;
-  missing or non-GitHub project URLs; English and Simplified Chinese copy; and
-  proof that launch and normal rendering make no network request.
+  cancellation and repeated clicks; 24-hour cached checks; the 60-second manual
+  cooldown; persisted `Retry-After` and rate-limit reset handling; cache cleanup;
+  DMG open success/failure; no visible Checking state; milestone-only VoiceOver
+  announcements; missing or non-GitHub project URLs; English and Simplified
+  Chinese copy; and proof that launch and normal rendering make no network
+  request.
 - **Tracking issue:** [#18](https://github.com/guangyya/md2png/issues/18)
 
 </details>
@@ -412,8 +447,8 @@ should not be added to the backlog without an explicit product decision:
 - Monitor the clipboard and render automatically in the background.
 - Keep a persistent render history by default.
 - Turn the menu bar companion into a full Markdown editor.
-- Add scheduled or launch-time update checks, silently replace the installed
-  app, or add a repository credential.
+- Add scheduled background or launch-time update checks, silently replace the
+  installed app, or add a repository credential.
 - Add Intel (`x86_64`) distribution without demonstrated user demand.
 
 ## Maintenance rules

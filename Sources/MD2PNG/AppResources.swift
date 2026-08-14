@@ -73,6 +73,10 @@ enum ProjectLinks {
         project.map(releasesURL(for:))
     }
 
+    static var githubRepository: GitHubRepository? {
+        project.flatMap(GitHubRepository.init(projectURL:))
+    }
+
     static func projectURL(bundle: Bundle) -> URL? {
         projectURL(from: bundle.object(forInfoDictionaryKey: infoDictionaryKey))
     }

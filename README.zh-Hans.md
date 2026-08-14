@@ -5,7 +5,7 @@
 <h1 align="center">md2png for Mac</h1>
 
 <p align="center">
-  在 Mac 上将剪贴板中的 Markdown 本地渲染为精美 PNG，不上传，也绝不自动发送。
+  在 Mac 上将剪贴板中的 Markdown 转为精美 PNG——全程本地，保护隐私。
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ flowchart LR
 | 将剪贴板渲染为图片 | `Control-Command-X`（全局） | 成功后用 PNG/TIFF 替换剪贴板 |
 | 显示上次渲染 | `Control-Command-Z`（全局） | 打开最近结果，可用 `Command-W` 关闭 |
 | 示例 | — | 复制并立即渲染选中的内置 Sample |
-| 关于 md2png | — | 显示版本、Debug/Release、发布说明、项目与 Releases 链接和可复制的诊断信息 |
+| 关于 md2png | — | 显示版本、发布说明、项目链接、更新状态与操作，以及可复制的诊断信息 |
 
 菜单顶部会显示紧凑的剪贴板预览。正在渲染时，新的渲染命令和 Sample
 会暂时禁用，避免重复渲染。
@@ -88,6 +88,9 @@ Gantt 时间线。源文件位于 [Examples](Examples)，完整效果可查看
 - Markdown 和生成的图片永远不会上传。
 - 外部 Markdown 图片会被替换为文本占位符，不会发起网络请求。
 - 不包含分析、遥测、广告、账号集成、Bot 或特定服务 API。
+- 打开“关于 md2png”时，仅当上次成功结果已超过 24 小时才静默刷新公开的
+  GitHub Release 元数据；仍可手动“再次检查”。请求中不包含 Markdown、
+  剪贴板数据或 GitHub 凭据。
 - 基础的复制/渲染/粘贴流程不需要 Accessibility 权限。
 - 绝不自动粘贴或发送。
 
@@ -108,7 +111,32 @@ make run CONFIGURATION=debug \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 ```
 
-`PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与 Releases 链接。
+如需测试真实更新而不修改源码版本，可只覆盖测试 App 中的版本：
+
+```sh
+make run CONFIGURATION=debug \
+  PROJECT_URL=https://github.com/guangyya/md2png \
+  TEST_UPDATE_VERSION=0.0.0
+```
+
+`publish-release` 会拒绝 `TEST_UPDATE_VERSION`；公开发布始终使用
+`Info.plist` 中的 `CFBundleShortVersionString`。
+
+Debug 构建还可以在不发送请求的情况下 mock About 更新状态：
+
+```sh
+make run CONFIGURATION=debug \
+  PROJECT_URL=https://github.com/guangyya/md2png \
+  TEST_UPDATE_VERSION=0.0.0 \
+  TEST_UPDATE_STATE=up-to-date       # 也可使用 check-failed / download-failed / ready-to-install
+```
+
+`TEST_UPDATE_STATE` 仅允许用于本地 Debug app/run 构建，发布流程会拒绝它。
+下载相关 mock 使用已发布且不可变的 v0.1.0 DMG 元数据，因此重试会走真实校验流程。
+如果缓存 DMG 已被删除，`ready-to-install` 会先显示可恢复的下载失败状态，
+而不会提供一个指向缺失文件的“打开”操作。
+
+`PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与更新控件。
 源码不包含固定仓库地址。`BUNDLE_IDENTIFIER`
 默认读取 `Info.plist` 中的个人标识，也可在构建时覆盖。
 
