@@ -18,6 +18,8 @@ release_zip="dist/${artifact_base}.zip"
 release_dmg="dist/${artifact_base}.dmg"
 latest_dmg="dist/md2png-latest.dmg"
 notes_file=".build/release-notes-${version}.md"
+coverage_json=".build/coverage/md2png-${version}-coverage.json"
+coverage_markdown=".build/coverage/md2png-${version}-coverage.md"
 
 if [[ -n "${TEST_UPDATE_VERSION:-}" || -n "${TEST_UPDATE_STATE:-}" ]]; then
   echo "TEST_UPDATE_VERSION and TEST_UPDATE_STATE are only for local app/run builds." >&2
@@ -106,6 +108,20 @@ if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null \
   exit 1
 fi
 
+coverage_xcode_version="$(xcodebuild -version | sed -n '1s/^Xcode //p')"
+if [[ "$coverage_xcode_version" != "26.2" ]]; then
+  echo "Release coverage requires Xcode 26.2; selected Xcode is ${coverage_xcode_version:-unknown}." >&2
+  exit 1
+fi
+
+make coverage
+make coverage-validate
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "Coverage generation changed the clean release worktree." >&2
+  git status --short >&2
+  exit 1
+fi
+
 make notarize \
   SIGN_IDENTITY="$sign_identity" \
   NOTARY_PROFILE="$notary_profile" \
@@ -113,7 +129,7 @@ make notarize \
   BUNDLE_IDENTIFIER="$bundle_identifier" \
   RELEASE_SUFFIX=developer-id
 
-for artifact in "$release_zip" "$release_dmg"; do
+for artifact in "$release_zip" "$release_dmg" "$coverage_json" "$coverage_markdown"; do
   if [[ ! -s "$artifact" ]]; then
     echo "Expected release artifact is missing or empty: ${artifact}" >&2
     exit 1
@@ -135,6 +151,8 @@ gh release create "$tag" \
   "${release_zip}#md2png ${version} — macOS app archive (Apple silicon)" \
   "${release_dmg}#md2png ${version} — macOS installer (Apple silicon)" \
   "${latest_dmg}#md2png — latest macOS installer (Apple silicon)" \
+  "${coverage_json}#md2png ${version} — normalized source-line coverage (JSON)" \
+  "${coverage_markdown}#md2png ${version} — source-line coverage summary (Markdown)" \
   --repo "$repo_ref" \
   --title "md2png ${version}" \
   --notes-file "$notes_file" \
@@ -149,6 +167,8 @@ expected_assets=(
   "$(basename "$release_zip")"
   "$(basename "$release_dmg")"
   "$(basename "$latest_dmg")"
+  "$(basename "$coverage_json")"
+  "$(basename "$coverage_markdown")"
 )
 for expected_asset in "${expected_assets[@]}"; do
   if ! grep -Fxq "$expected_asset" <<< "$uploaded_assets"; then

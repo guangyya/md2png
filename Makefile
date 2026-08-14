@@ -1,4 +1,5 @@
 PNPM ?= pnpm
+NODE ?= node
 CONFIGURATION ?= release
 SIGN_IDENTITY ?= -
 NOTARY_PROFILE ?= MDPNGNotary
@@ -22,6 +23,9 @@ APP_ICON := .build/AppIcon.icns
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
+COVERAGE_DIR ?= .build/coverage
+COVERAGE_JSON := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.json
+COVERAGE_MARKDOWN := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.md
 RELEASE_QUALIFIER := $(if $(strip $(RELEASE_SUFFIX)),-$(strip $(RELEASE_SUFFIX)),)
 ARTIFACT_BASENAME := md2png-$(VERSION)-macOS-arm64$(RELEASE_QUALIFIER)
 RELEASE_ZIP := dist/$(ARTIFACT_BASENAME).zip
@@ -33,7 +37,7 @@ ifneq ($(SIGN_IDENTITY),-)
 SIGN_FLAGS += --options runtime --timestamp
 endif
 
-.PHONY: bootstrap renderer icon test build app verify-dist release package-dmg dmg notarize publish-release run clean
+.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate test build app verify-dist release package-dmg dmg notarize publish-release run clean
 
 bootstrap:
 	cd WebRenderer && $(PNPM) install --frozen-lockfile=false
@@ -57,7 +61,32 @@ icon:
 	sips -z 1024 1024 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_512x512@2x.png"
 	iconutil -c icns "$(ICONSET_DIR)" -o "$(APP_ICON)"
 
-test: renderer
+coverage-tool-test:
+	$(NODE) --test scripts/tests/*.test.mjs
+
+coverage: renderer coverage-tool-test
+	swift test --enable-code-coverage
+	@coverage_source="$$(swift test --show-codecov-path | tail -n 1)"; \
+		test -s "$$coverage_source" || { echo "SwiftPM coverage JSON is missing or empty: $$coverage_source"; exit 1; }; \
+		swift_version="$$(swift --version | sed -n '1p')"; \
+		xcode_version="$$(xcodebuild -version | paste -s -d ' ' -)"; \
+		$(NODE) scripts/coverage-report.mjs generate \
+			--input "$$coverage_source" \
+			--json "$(COVERAGE_JSON)" \
+			--markdown "$(COVERAGE_MARKDOWN)" \
+			--repo-root "$(CURDIR)" \
+			--app-version "$(VERSION)" \
+			--commit "$(SOURCE_COMMIT)" \
+			--swift-version "$$swift_version" \
+			--xcode-version "$$xcode_version"
+
+coverage-validate:
+	$(NODE) scripts/coverage-report.mjs validate \
+		--report "$(COVERAGE_JSON)" \
+		--app-version "$(VERSION)" \
+		--commit "$(SOURCE_COMMIT)"
+
+test: renderer coverage-tool-test
 	swift test
 
 build: renderer

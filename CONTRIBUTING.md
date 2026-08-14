@@ -81,6 +81,35 @@ consume or publish caches, artifacts, release credentials, tags, or Releases.
 When updating the toolchain, keep versions explicit and update each referenced
 action to a reviewed immutable commit SHA.
 
+### Test coverage
+
+Run the same source-line coverage measurement used by CI with:
+
+```sh
+make coverage
+```
+
+The command runs SwiftPM tests with coverage enabled, then writes deterministic
+JSON and Markdown summaries to `.build/coverage/`. The metric includes every
+Swift file under `Sources/MD2PNG/`; test files, dependencies, generated package
+accessors, renderer JavaScript, and other build output are outside that source
+set. The summaries contain counts and repository-relative paths only. Raw
+profiles, absolute paths, source text, fixtures, and rendered content must not
+be uploaded.
+
+Pull requests and pushes to `main` do not collect coverage. They continue to run
+the normal compatibility test matrix, including the focused report-generator
+tests, without repeating the full Swift test suite in a separate coverage job.
+The guarded official Release publisher alone collects coverage on the canonical
+Xcode 26.2 toolchain, validates it before publication, and uploads the normalized
+JSON and Markdown summaries with the Release.
+
+Stable Release JSON assets provide the durable version history. Pinned issue
+[#42](https://github.com/guangyya/md2png/issues/42) is the fixed dashboard
+target, independent of its title or open/closed state. It contains a derived
+chart and accessible table; missing or malformed release snapshots are reported
+there rather than silently omitted.
+
 ## Pull requests
 
 - Keep each pull request focused on one behavior or bug.
