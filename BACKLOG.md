@@ -1,8 +1,9 @@
 # Product backlog
 
-This file records product ideas that fit md2png and their completion state. It
-is the single source of truth for candidate product work; feature requests and
-issues provide discussion, not a second roadmap.
+This file records the product rationale and constraints for ideas that fit
+md2png. The live workflow state, priority, and effort are maintained in the
+[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1);
+each candidate has one linked issue as its execution record.
 
 Backlog placement is not a promise of a release, date, or final design. Priority
 can change after user feedback, technical investigation, or privacy review.
@@ -26,26 +27,26 @@ Effort is relative rather than a time commitment: **S** is an isolated change,
 **M** spans multiple components or test surfaces, and **L** affects the renderer,
 packaging, broad UI behavior, or contains meaningful design uncertainty.
 
-The planning index is the single source of truth for completion. Change an
-item's **Done** checkbox from ☐ to ☑ only after the complete candidate scope has
-shipped; partial work and technical prerequisites remain unchecked.
+Use the Project rather than this file as the single source of truth for current
+workflow state. This index keeps stable IDs, issue links, dependencies, and
+coordination notes close to the repository.
 
 ## Planning index
 
-| Done | ID | Effort | Dependencies / coordination |
-|:---:|---|:---:|---|
-| ☐ | BL-001 | L | Coordinate preview commands with BL-012 and accessibility with TD-004 |
-| ☐ | BL-002 | L | Prefer BL-001 Save/export foundations before designing split output |
-| ☐ | BL-003 | M | Settings delivery plan and BL-012 menu state |
-| ☐ | BL-004 | L | Settings delivery plan, TD-001 SwiftUI path, and TD-004 |
-| ☐ | BL-005 | L | Requires packaging, signing, and cross-application investigation |
-| ☐ | BL-006 | L | Settings delivery plan, BL-012 menu state, and per-theme renderer tests |
-| ☐ | BL-007 | M | Settings delivery plan and BL-012 copy/menu placement |
-| ☐ | BL-008 | M | TD-001 SwiftUI path, TD-004, and BL-012 terminology |
-| ☐ | BL-009 | M | BL-012 menu placement and clipboard ownership handling |
-| ☐ | BL-010 | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
-| ☐ | BL-011 | M | BL-012 menu placement and file-access validation |
-| ☐ | BL-012 | M | Cross-cutting coordination for every item that adds UI or messages |
+| ID | Issue | Effort | Dependencies / coordination |
+|---|:---:|:---:|---|
+| BL-001 | [#1](https://github.com/guangyya/md2png/issues/1) | L | Coordinate preview commands with BL-012 and accessibility with TD-004 |
+| BL-002 | [#2](https://github.com/guangyya/md2png/issues/2) | L | Prefer BL-001 Save/export foundations before designing split output |
+| BL-003 | [#3](https://github.com/guangyya/md2png/issues/3) | M | Settings delivery plan and BL-012 menu state |
+| BL-004 | [#4](https://github.com/guangyya/md2png/issues/4) | L | Settings delivery plan, TD-001 SwiftUI path, and TD-004 |
+| BL-005 | [#5](https://github.com/guangyya/md2png/issues/5) | L | Requires packaging, signing, and cross-application investigation |
+| BL-006 | [#6](https://github.com/guangyya/md2png/issues/6) | L | Settings delivery plan, BL-012 menu state, and per-theme renderer tests |
+| BL-007 | [#7](https://github.com/guangyya/md2png/issues/7) | M | Settings delivery plan and BL-012 copy/menu placement |
+| BL-008 | [#8](https://github.com/guangyya/md2png/issues/8) | M | TD-001 SwiftUI path, TD-004, and BL-012 terminology |
+| BL-009 | [#9](https://github.com/guangyya/md2png/issues/9) | M | BL-012 menu placement and clipboard ownership handling |
+| BL-010 | [#10](https://github.com/guangyya/md2png/issues/10) | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
+| BL-011 | [#11](https://github.com/guangyya/md2png/issues/11) | M | BL-012 menu placement and file-access validation |
+| BL-012 | [#12](https://github.com/guangyya/md2png/issues/12) | M | Cross-cutting coordination for every item that adds UI or messages |
 
 ## Settings delivery plan
 
@@ -81,7 +82,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Validation:** Cover toolbar keyboard access, fit and actual-size geometry,
   zoom limits, tall and wide images, window resizing, scrolling, and the
   existing Command-W behavior.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#1](https://github.com/guangyya/md2png/issues/1)
 
 </details>
 
@@ -104,7 +105,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Validation:** Cover first and subsequent launches, reopening from the menu,
   shortcut-conflict presentation, the sample action, keyboard navigation, and
   English and Simplified Chinese layouts.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#8](https://github.com/guangyya/md2png/issues/8)
 
 </details>
 
@@ -125,7 +126,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Validation:** Cover successful, failed, and Example renders; unchanged and
   externally changed clipboards; theme and width changes; repeated actions; and
   confirmation that no source survives an app restart.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#9](https://github.com/guangyya/md2png/issues/9)
 
 </details>
 
@@ -181,7 +182,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
   empty, text, image, rendering, success, failure, and shortcut-conflict states.
   Check keyboard access, VoiceOver names, truncation, multiline wrapping,
   terminology consistency, and localization key parity.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#12](https://github.com/guangyya/md2png/issues/12)
 
 </details>
 
@@ -198,7 +199,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
   or Mermaid diagrams.
 - **Open questions:** Whether clipboard paste can represent multiple images
   consistently across chat clients, and whether splitting should be Save-only.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#2](https://github.com/guangyya/md2png/issues/2)
 
 </details>
 
@@ -212,7 +213,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
   remember the last explicit selection locally.
 - **Constraints:** Avoid a general CSS/theme editor and keep Standard identical
   to today's output unless intentionally changed in a release.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#3](https://github.com/guangyya/md2png/issues/3)
 
 </details>
 
@@ -226,7 +227,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
   Render, conflict detection, and Restore Defaults.
 - **Constraints:** Keep menu commands usable when registration fails and do not
   require Accessibility permission.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#4](https://github.com/guangyya/md2png/issues/4)
 
 </details>
 
@@ -257,7 +258,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Validation:** Exercise prose, tables, code highlighting, flowcharts,
   sequence diagrams, and Gantt diagrams in every theme; verify consecutive
   theme switches do not leak styles and do not unexpectedly change layout.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#6](https://github.com/guangyya/md2png/issues/6)
 
 </details>
 
@@ -277,7 +278,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Validation:** Verify enable, disable, restart, user-denied, and externally
   changed Login Items states with an installed signed build. A login launch must
   remain an accessory/menu bar launch without showing a Dock icon or window.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#7](https://github.com/guangyya/md2png/issues/7)
 
 </details>
 
@@ -303,7 +304,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
   renderer responses, size limits, a terminated WebKit content process,
   localization, clipboard preservation, and a self-test that leaves clipboard
   contents unchanged.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#10](https://github.com/guangyya/md2png/issues/10)
 
 </details>
 
@@ -320,7 +321,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Why deferred:** Packaging, discovery, signing, and cross-application
   behavior need investigation; the existing permission-free global shortcut is
   already reliable.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#5](https://github.com/guangyya/md2png/issues/5)
 
 </details>
 
@@ -341,7 +342,7 @@ the menu as quick actions, with Settings reflecting the same stored values.
 - **Why deferred:** The clipboard workflow already covers the primary use case,
   while file encoding, access errors, and another menu command add complexity
   for an unvalidated lower-frequency path.
-- **Tracking issue:** Not created
+- **Tracking issue:** [#11](https://github.com/guangyya/md2png/issues/11)
 
 </details>
 
@@ -365,11 +366,11 @@ should not be added to the backlog without an explicit product decision:
 ## Maintenance rules
 
 - Use a stable `BL-###` identifier in related issues, commits, and release notes.
-- Link the tracking issue when one is created; keep design discussion in that
-  issue rather than expanding this file indefinitely.
-- When an item ships, change its **Done** checkbox to ☑, move it to the
-  **Completed** section, and record the shipped behavior and version in
-  `CHANGELOG.md`.
+- Keep design and implementation discussion in the linked issue rather than
+  expanding this file indefinitely.
+- When an item ships, move its Project status to **Done**, close the linked
+  issue, move its product summary to the **Completed** section, and record the
+  shipped behavior and version in `CHANGELOG.md`.
 - Track internal refactors and architecture work separately in
   [`TECH_DEBT.md`](TECH_DEBT.md); do not present them as product features.
 - Reject or defer ideas that weaken local rendering, manual sending, or the
