@@ -25,6 +25,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   retry the interrupted render once, and fail queued work deterministically if
   recovery cannot complete. A later user-initiated render starts a fresh local
   renderer load instead of requiring an app restart.
+- Bound renderer page loads and render attempts with a watchdog so a missing
+  WebKit callback cannot leave the app permanently stuck in Rendering. Timed
+  out work fails once, while a later render starts a fresh local load.
 
 ## [0.3.0] - 2026-08-14
 

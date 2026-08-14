@@ -43,6 +43,7 @@
 "error.empty_clipboard" = "剪贴板中没有 Markdown 文本。请复制一些 Markdown 后重试。";
 "error.renderer_unavailable" = "无法加载本地渲染器。";
 "error.renderer_recovery_failed" = "本地渲染器已停止且无法恢复。请重新渲染。";
+"error.renderer_timed_out" = "本地渲染器响应超时。请重新渲染。";
 "error.invalid_renderer_response" = "渲染器返回了无效的图片尺寸。";
 "error.content_too_large" = "渲染内容过大（%ld × %ld）。请尝试缩短内容。";
 "error.png_encoding_failed" = "无法将渲染结果编码为 PNG。";
