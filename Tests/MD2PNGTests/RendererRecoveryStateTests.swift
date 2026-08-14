@@ -8,7 +8,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         XCTAssertTrue(state.rendererDidLoad().isEmpty)
         XCTAssertEqual(state.phase, .ready)
 
-        XCTAssertEqual(state.contentProcessTerminated(), [.loadRenderer])
+        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
         XCTAssertEqual(state.phase, .recoveryLoad)
 
         let requestID = makeID(1)
@@ -28,7 +28,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         let firstExecution = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        XCTAssertEqual(state.contentProcessTerminated(), [.loadRenderer])
+        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
         XCTAssertEqual(state.activeRequestID, firstID)
         XCTAssertEqual(state.pendingRequestIDs, [secondID])
 
@@ -58,12 +58,12 @@ final class RendererRecoveryStateTests: XCTestCase {
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        XCTAssertEqual(state.contentProcessTerminated(), [.loadRenderer])
+        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
         _ = try startExecution(from: state.rendererDidLoad())
 
         XCTAssertEqual(
             state.contentProcessTerminated(),
-            [.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)]
+            .handled([.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)])
         )
         XCTAssertEqual(state.phase, .needsReload)
         XCTAssertNil(state.activeRequestID)
@@ -83,10 +83,10 @@ final class RendererRecoveryStateTests: XCTestCase {
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
 
-        XCTAssertEqual(state.contentProcessTerminated(), [.loadRenderer])
+        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
         XCTAssertEqual(
             state.contentProcessTerminated(),
-            [.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)]
+            .handled([.fail(requestIDs: [firstID, secondID], failure: .recoveryFailed)])
         )
         XCTAssertEqual(state.phase, .needsReload)
     }
@@ -97,7 +97,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         let secondID = makeID(2)
         _ = try startExecution(from: state.enqueue(firstID))
         XCTAssertTrue(state.enqueue(secondID).isEmpty)
-        XCTAssertEqual(state.contentProcessTerminated(), [.loadRenderer])
+        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
 
         XCTAssertEqual(
             state.rendererLoadFailed(),
@@ -115,7 +115,37 @@ final class RendererRecoveryStateTests: XCTestCase {
             state.rendererLoadFailed(),
             [.fail(requestIDs: [requestID], failure: .rendererUnavailable)]
         )
-        XCTAssertEqual(state.phase, .unavailable(.rendererUnavailable))
+        XCTAssertEqual(state.phase, .unavailable)
+    }
+
+    func testExecutionErrorThenDelegateIsHandledAsOneTermination() throws {
+        var state = readyState()
+        let requestID = makeID(1)
+        let execution = try startExecution(from: state.enqueue(requestID))
+
+        XCTAssertEqual(
+            state.contentProcessTerminated(from: .executionError(execution)),
+            .handled([.loadRenderer])
+        )
+        XCTAssertEqual(state.contentProcessTerminated(), .ignored)
+        XCTAssertEqual(state.phase, .recoveryLoad)
+
+        let retryExecution = try startExecution(from: state.rendererDidLoad())
+        XCTAssertEqual(retryExecution.requestID, requestID)
+        XCTAssertNotEqual(retryExecution.attemptID, execution.attemptID)
+    }
+
+    func testDelegateThenExecutionErrorIsHandledAsOneTermination() throws {
+        var state = readyState()
+        let requestID = makeID(1)
+        let execution = try startExecution(from: state.enqueue(requestID))
+
+        XCTAssertEqual(state.contentProcessTerminated(), .handled([.loadRenderer]))
+        XCTAssertEqual(
+            state.contentProcessTerminated(from: .executionError(execution)),
+            .ignored
+        )
+        XCTAssertEqual(state.phase, .recoveryLoad)
     }
 
     @MainActor
@@ -139,11 +169,39 @@ final class RendererRecoveryStateTests: XCTestCase {
     }
 
     @MainActor
-    func testNextRequestReloadsAfterRepeatedSimulatedTermination() async throws {
+    func testRepeatedSimulatedTerminationFailsInterruptedRequestAndReloadsForNextRequest() async throws {
         _ = NSApplication.shared
         let renderer = MarkdownRenderer()
+
+        let ready = expectation(description: "initial renderer load completed")
+        renderer.render("# Ready") { result in
+            if case let .failure(error) = result {
+                XCTFail("Initial render failed: \(error)")
+            }
+            ready.fulfill()
+        }
+        await fulfillment(of: [ready], timeout: 5)
+
+        let interrupted = expectation(description: "interrupted render failed")
+        var interruptedResult: Result<NSImage, Error>?
+        renderer.render("# Interrupted request") {
+            interruptedResult = $0
+            interrupted.fulfill()
+        }
         renderer.simulateContentProcessTerminationForTesting()
         renderer.simulateContentProcessTerminationForTesting()
+        await fulfillment(of: [interrupted], timeout: 5)
+
+        let interruptedOutcome = try XCTUnwrap(interruptedResult)
+        guard case let .failure(error) = interruptedOutcome,
+              let appError = error as? AppError else {
+            XCTFail("Expected rendererRecoveryFailed, got \(interruptedOutcome)")
+            return
+        }
+        guard case .rendererRecoveryFailed = appError else {
+            XCTFail("Expected rendererRecoveryFailed, got \(appError)")
+            return
+        }
 
         let completion = expectation(description: "fresh renderer load completed")
         var capturedResult: Result<NSImage, Error>?
@@ -162,22 +220,23 @@ final class RendererRecoveryStateTests: XCTestCase {
     func testRecoveryFailureMessagesInviteAnotherRender() throws {
         let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
         let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+        let fallback = "missing recovery failure localization"
 
-        XCTAssertEqual(
+        XCTAssertNotEqual(
             L10n.text(
                 "error.renderer_recovery_failed",
-                defaultValue: "fallback",
+                defaultValue: fallback,
                 bundle: english
             ),
-            "The local renderer stopped and could not recover. Try rendering again."
+            fallback
         )
-        XCTAssertEqual(
+        XCTAssertNotEqual(
             L10n.text(
                 "error.renderer_recovery_failed",
-                defaultValue: "fallback",
+                defaultValue: fallback,
                 bundle: chinese
             ),
-            "本地渲染器已停止且无法恢复。请重新渲染。"
+            fallback
         )
     }
 

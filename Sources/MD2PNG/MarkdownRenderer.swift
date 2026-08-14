@@ -67,8 +67,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        currentNavigation = nil
-        perform(recoveryState.contentProcessTerminated())
+        handleContentProcessTermination(from: .delegate)
     }
 
 #if DEBUG
@@ -116,7 +115,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     self?.takeSnapshot(for: execution, width: width, height: height)
                 }
             } catch {
-                self.finish(execution, with: .failure(error))
+                self.handle(error, for: execution)
             }
         }
     }
@@ -134,7 +133,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             guard let self else { return }
             MainActor.assumeIsolated {
                 if let error {
-                    self.finish(execution, with: .failure(error))
+                    self.handle(error, for: execution)
                 } else if let image {
                     self.finish(execution, with: .success(image))
                 } else {
@@ -152,6 +151,30 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         guard let requestID = transition.completedRequestID else { return }
         requests.removeValue(forKey: requestID)?.completion(result)
         perform(transition.actions)
+    }
+
+    private func handle(
+        _ error: Error,
+        for execution: RendererRecoveryState.Execution
+    ) {
+        guard recoveryState.isCurrent(execution) else { return }
+        if (error as? WKError)?.code == .webContentProcessTerminated {
+            handleContentProcessTermination(from: .executionError(execution))
+        } else {
+            finish(execution, with: .failure(error))
+        }
+    }
+
+    private func handleContentProcessTermination(
+        from signal: RendererRecoveryState.TerminationSignal
+    ) {
+        switch recoveryState.contentProcessTerminated(from: signal) {
+        case .ignored:
+            return
+        case let .handled(actions):
+            currentNavigation = nil
+            perform(actions)
+        }
     }
 
     private func loadRendererPage() {

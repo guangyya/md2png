@@ -17,13 +17,23 @@ struct RendererRecoveryState {
         case fail(requestIDs: [UUID], failure: Failure)
     }
 
+    enum TerminationSignal: Equatable {
+        case delegate
+        case executionError(Execution)
+    }
+
+    enum TerminationTransition: Equatable {
+        case ignored
+        case handled([Action])
+    }
+
     enum Phase: Equatable {
         case initialLoad
         case recoveryLoad
         case ready
         case rendering(Execution)
         case needsReload
-        case unavailable(Failure)
+        case unavailable
     }
 
     struct FinishTransition {
@@ -39,11 +49,12 @@ struct RendererRecoveryState {
     private(set) var phase: Phase
     private var activeRequest: ActiveRequest?
     private var queuedRequestIDs: [UUID] = []
+    private var pendingTerminationDelegateCount = 0
 
     init(hasRendererPage: Bool = true) {
         phase = hasRendererPage
             ? .initialLoad
-            : .unavailable(.rendererUnavailable)
+            : .unavailable
     }
 
     // Internal observability for the pure state-machine tests.
@@ -61,17 +72,16 @@ struct RendererRecoveryState {
     }
 
     mutating func enqueue(_ requestID: UUID) -> [Action] {
-        if case let .unavailable(failure) = phase {
-            return [.fail(requestIDs: [requestID], failure: failure)]
+        if phase == .unavailable {
+            return [.fail(requestIDs: [requestID], failure: .rendererUnavailable)]
         }
 
+        queuedRequestIDs.append(requestID)
         if phase == .needsReload {
-            queuedRequestIDs.append(requestID)
             phase = .recoveryLoad
             return [.loadRenderer]
         }
 
-        queuedRequestIDs.append(requestID)
         return startNextIfPossible()
     }
 
@@ -82,44 +92,62 @@ struct RendererRecoveryState {
     }
 
     mutating func rendererLoadFailed() -> [Action] {
-        let failure: Failure
         switch phase {
         case .initialLoad:
-            failure = .rendererUnavailable
+            return failAllRequests(
+                with: .rendererUnavailable,
+                nextPhase: .unavailable
+            )
         case .recoveryLoad:
-            failure = .recoveryFailed
+            return failAllRequests(
+                with: .recoveryFailed,
+                nextPhase: .needsReload
+            )
         case .ready, .rendering, .needsReload, .unavailable:
             return []
         }
-        return failAllRequests(
-            with: failure,
-            nextPhase: failure == .recoveryFailed
-                ? .needsReload
-                : .unavailable(failure)
-        )
     }
 
-    mutating func contentProcessTerminated() -> [Action] {
+    mutating func contentProcessTerminated(
+        from signal: TerminationSignal = .delegate
+    ) -> TerminationTransition {
+        switch signal {
+        case .delegate where pendingTerminationDelegateCount > 0:
+            pendingTerminationDelegateCount -= 1
+            return .ignored
+        case .delegate:
+            break
+        case let .executionError(execution):
+            guard isCurrent(execution) else { return .ignored }
+            pendingTerminationDelegateCount += 1
+        }
+
+        let actions: [Action]
         switch phase {
         case .initialLoad, .ready:
             phase = .recoveryLoad
-            return [.loadRenderer]
+            actions = [.loadRenderer]
         case .recoveryLoad:
-            return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
+            actions = failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
         case .rendering:
             guard var activeRequest else {
-                return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
+                return .handled(
+                    failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
+                )
             }
             guard activeRequest.recoveryAttempts == 0 else {
-                return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
+                return .handled(
+                    failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
+                )
             }
             activeRequest.recoveryAttempts += 1
             self.activeRequest = activeRequest
             phase = .recoveryLoad
-            return [.loadRenderer]
+            actions = [.loadRenderer]
         case .needsReload, .unavailable:
-            return []
+            actions = []
         }
+        return .handled(actions)
     }
 
     mutating func finish(_ execution: Execution) -> FinishTransition {
