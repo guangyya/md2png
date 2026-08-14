@@ -12,7 +12,8 @@ MINIMUM_MACOS_VERSION := 14.0
 TARGET_NAME := md2png
 RESOURCE_BUNDLE_NAME := md2png_MD2PNG.bundle
 APP_NAME := md2png
-ARM64_BUILD_DIR := .build/arm64-apple-macosx/$(CONFIGURATION)
+ARM64_TRIPLE := arm64-apple-macosx$(MINIMUM_MACOS_VERSION)
+ARM64_BUILD_DIR = $(shell swift build -c $(CONFIGURATION) --triple $(ARM64_TRIPLE) --show-bin-path)
 APP_DIR := dist/$(APP_NAME).app
 CONTENTS := $(APP_DIR)/Contents
 ICON_SOURCE := Assets/AppIcon/AppIcon.png
@@ -60,7 +61,7 @@ test: renderer
 	swift test
 
 build: renderer
-	swift build -c $(CONFIGURATION) --triple arm64-apple-macosx$(MINIMUM_MACOS_VERSION)
+	swift build -c $(CONFIGURATION) --triple $(ARM64_TRIPLE)
 
 app: build icon
 	rm -rf "$(APP_DIR)"
