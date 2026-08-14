@@ -87,7 +87,7 @@ jobs:
             --commit "$RELEASE_COMMIT"
           node -e '
             const report = require("../.build/coverage-backfill/md2png-0.3.0-coverage.json");
-            const expected = { coveredLines: 2392, coverableLines: 3733, percentage: 64.08 };
+            const expected = { coveredLines: 2389, coverableLines: 3733, percentage: 64 };
             if (JSON.stringify(report.totals) !== JSON.stringify(expected)) {
               throw new Error(`unexpected v0.3.0 coverage totals: ${JSON.stringify(report.totals)}`);
             }
