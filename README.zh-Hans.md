@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://guangyya.github.io/md2png/"><strong>官方网站</strong></a>
+  <a href="https://md2png.wbxsh.com/zh/"><strong>官方网站</strong></a>
   ·
   <a href="#从源码构建"><strong>从源码构建</strong></a>
   ·

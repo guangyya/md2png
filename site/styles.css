@@ -139,19 +139,19 @@ a {
   color: #9a958c;
 }
 
-.locale-switch button {
+.locale-switch a {
   padding: 4px;
   border: 0;
   background: transparent;
   color: #88847d;
-  cursor: pointer;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  text-decoration: none;
 }
 
-.locale-switch button[aria-pressed="true"] {
+.locale-switch a[aria-current="page"] {
   color: var(--ink);
 }
 
@@ -675,6 +675,191 @@ kbd {
   justify-self: center;
 }
 
+.install-section {
+  border-top: 1px solid var(--line);
+  background: rgba(255, 253, 249, 0.45);
+}
+
+.install-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: start;
+  gap: 85px;
+}
+
+.install-copy > p:not(.section-kicker) {
+  max-width: 600px;
+  margin: 28px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.install-steps {
+  margin: 38px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.install-steps li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: start;
+  gap: 15px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.install-steps li > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: white;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.install-steps p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.install-steps strong {
+  color: var(--ink);
+}
+
+.install-steps kbd {
+  min-width: auto;
+  height: 24px;
+  padding-inline: 6px;
+  font-size: 11px;
+}
+
+.release-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 30px;
+}
+
+.faq-panel {
+  padding: 48px;
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  background: var(--white);
+  box-shadow: 0 24px 70px rgba(67, 52, 38, 0.08);
+}
+
+.faq-panel h2 {
+  font-size: clamp(34px, 4vw, 48px);
+}
+
+.faq-list {
+  margin-top: 35px;
+  border-top: 1px solid var(--ink);
+}
+
+.faq-list details {
+  border-bottom: 1px solid var(--line);
+}
+
+.faq-list summary {
+  position: relative;
+  padding: 19px 34px 19px 0;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 690;
+  letter-spacing: -0.01em;
+  list-style: none;
+}
+
+.faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-list summary::after {
+  position: absolute;
+  top: 17px;
+  right: 2px;
+  color: var(--accent);
+  content: "+";
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.faq-list details[open] summary::after {
+  content: "−";
+}
+
+.faq-list details p {
+  margin: -3px 30px 20px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.error-body {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 30px;
+}
+
+.error-page {
+  width: min(680px, 100%);
+  padding: 64px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.error-page img {
+  width: 84px;
+  margin: 0 auto 30px;
+  border-radius: 20px;
+  box-shadow: 0 12px 28px rgba(23, 25, 28, 0.14);
+}
+
+.error-code {
+  margin: 0 0 14px;
+  color: var(--accent);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.error-page h1 {
+  margin: 0;
+  font-size: clamp(44px, 8vw, 68px);
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.error-page > p:not(.error-code) {
+  max-width: 520px;
+  margin: 24px auto 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.error-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 34px;
+}
+
 .signal-orbit,
 .signal-core,
 .signal-label {
@@ -809,6 +994,7 @@ footer {
 
 .footer-links {
   display: flex;
+  flex-wrap: wrap;
   justify-self: end;
   gap: 22px;
 }
@@ -849,6 +1035,11 @@ footer {
 
   .privacy-card {
     padding: 60px;
+  }
+
+  .install-grid {
+    grid-template-columns: 1fr;
+    gap: 60px;
   }
 
   .cta-card {
@@ -983,6 +1174,21 @@ footer {
 
   .privacy-signal {
     width: min(330px, 100%);
+  }
+
+  .faq-panel,
+  .error-page {
+    padding: 38px 26px;
+  }
+
+  .release-actions,
+  .error-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .error-actions {
+    align-items: center;
   }
 
   .cta-card {
