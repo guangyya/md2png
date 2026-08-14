@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://guangyya.github.io/md2png/sitemap.xml
+Sitemap: https://md2png.wbxsh.com/sitemap.xml

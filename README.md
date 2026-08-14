@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://guangyya.github.io/md2png/"><strong>Website</strong></a>
+  <a href="https://md2png.wbxsh.com/"><strong>Website</strong></a>
   ·
   <a href="#build-from-source"><strong>Build from source</strong></a>
   ·
