@@ -5,6 +5,13 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-14
+
+### Added
+
+- Restore or copy the Markdown behind the latest successful render.
+- Show the source commit in About and copied version diagnostics.
+
 ### Changed
 
 - Keep in-app release notes brief and easy to scan.
