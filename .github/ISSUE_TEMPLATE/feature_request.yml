@@ -1,0 +1,88 @@
+name: Feature request
+description: Suggest a focused improvement to md2png's local Markdown-to-image workflow.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve md2png. Please describe the user problem before the implementation idea.
+
+        md2png stays local-first, never uploads rendered content, and never pastes or sends a chat message automatically. Check `BACKLOG.md` and existing issues before submitting a duplicate.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What is difficult today, who encounters it, and how often does it happen?
+      placeholder: When I render a very long project update, I need to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the workflow or result you want, independent of a specific implementation.
+      placeholder: I want to finish the task without leaving the local copy/render/paste workflow...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Suggested approach
+      description: Optional. Share a UI or technical idea if you already have one.
+      placeholder: The Last Render window could offer...
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Example or reference
+      description: Optional. Add sanitized Markdown, screenshots, or links that clarify the request. Do not include confidential message content.
+
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network behavior
+      description: Would the feature require md2png itself to access the network?
+      options:
+        - No; it can remain fully local
+        - Only after an explicit user action
+        - Yes
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: permissions
+    attributes:
+      label: Additional macOS permission
+      description: Would the basic workflow need Accessibility, Automation, Files and Folders, or another permission?
+      options:
+        - No additional permission
+        - Optional permission for an advanced workflow
+        - Required permission
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: md2png version
+      description: Optional. Copy this from the icon beside Version in About md2png.
+      placeholder: md2png 0.1.0 (1) · RELEASE · macOS 15.x · arm64
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the backlog and existing issues for the same request.
+          required: true
+        - label: This request preserves manual review and sending; it does not require md2png to send a chat message automatically.
+          required: true
+        - label: I removed confidential Markdown, message content, and credentials from the issue.
+          required: true

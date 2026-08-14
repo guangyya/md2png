@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+WebRenderer/node_modules/
+Sources/MDPNG/Resources/renderer.bundle.js
+dist/
+tmp/
+*.dmg
+*.zip
+.DS_Store

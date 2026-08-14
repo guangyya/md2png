@@ -1,0 +1,67 @@
+"accessibility.app" = "md2png";
+"accessibility.clipboard_preview" = "Clipboard preview";
+"accessibility.rendering" = "Rendering";
+
+"menu.clipboard" = "Clipboard";
+"menu.render" = "Render Clipboard as Image";
+"menu.rendering" = "Rendering…";
+"menu.show_last_render" = "Show Last Render";
+"menu.examples" = "Examples";
+"menu.about" = "About md2png";
+"menu.quit" = "Quit md2png";
+
+"clipboard.labeled" = "Clipboard: %@";
+"clipboard.png_image" = "PNG image";
+"clipboard.no_text" = "No text";
+
+"example.short" = "Short Sample";
+"example.long" = "Long Sample";
+"example.formatting" = "Formatting";
+"example.code" = "Code Blocks";
+"example.checklist" = "Checklist";
+"example.table" = "GFM Table";
+"example.flowchart" = "Flowchart";
+"example.sequence" = "Sequence Diagram";
+"example.gantt" = "Gantt Timeline";
+
+"hotkey.render" = "Render (Control-Command-X)";
+"hotkey.show_last_render" = "Show Last Render (Control-Command-Z)";
+"hud.shortcut_conflict" = "A global shortcut is already in use — menu commands still work";
+"hud.png_copied" = "PNG copied — paste with Command-V";
+
+"error.empty_clipboard" = "The clipboard does not contain Markdown text. Copy some Markdown and try again.";
+"error.renderer_unavailable" = "The local renderer could not be loaded.";
+"error.invalid_renderer_response" = "The renderer returned an invalid image size.";
+"error.content_too_large" = "The rendered content is too large (%ld × %ld). Try a shorter selection.";
+"error.png_encoding_failed" = "The rendered image could not be encoded as PNG.";
+"error.example_unavailable" = "The %@ Markdown file could not be loaded.";
+
+"preview.window_title" = "Last Markdown Render";
+
+"about.window_title" = "About md2png";
+"about.development" = "Development";
+"about.build_debug" = "DEBUG";
+"about.build_release" = "RELEASE";
+"about.release_notes_unavailable" = "Release notes are not available in this build.";
+"about.version_build" = "Version %@  •  Build %@";
+"about.whats_new" = "What’s new in %@";
+"about.description" = "Turn clipboard Markdown into a polished PNG — locally, privately, and without automatic sending.";
+"about.project" = "Project";
+"about.open_project" = "Open Project";
+"about.view_all_releases" = "View All Releases…";
+"about.copy_version_info" = "Copy Version Info";
+"about.version_info_copied" = "Copied";
+"about.version_info" = "md2png %@ (%@) · %@ · macOS %@ · %@";
+"about.done" = "Done";
+"release_section.added" = "Added";
+"release_section.changed" = "Changed";
+"release_section.fixed" = "Fixed";
+"release_section.removed" = "Removed";
+"release_section.deprecated" = "Deprecated";
+"release_section.security" = "Security";
+
+"releases.development" = "Development";
+"releases.title" = "md2png Releases";
+"releases.body" = "You’re using version %@.\n\nNew versions are published on the project’s Releases page. md2png does not check in the background, contact an update server, or download anything automatically.";
+"releases.open" = "Open Releases";
+"common.cancel" = "Cancel";

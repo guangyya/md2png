@@ -1,0 +1,67 @@
+"accessibility.app" = "MD 转 PNG";
+"accessibility.clipboard_preview" = "剪贴板预览";
+"accessibility.rendering" = "正在渲染";
+
+"menu.clipboard" = "剪贴板";
+"menu.render" = "将剪贴板渲染为图片";
+"menu.rendering" = "正在渲染…";
+"menu.show_last_render" = "显示上次渲染";
+"menu.examples" = "示例";
+"menu.about" = "关于 md2png";
+"menu.quit" = "退出 md2png";
+
+"clipboard.labeled" = "剪贴板：%@";
+"clipboard.png_image" = "PNG 图片";
+"clipboard.no_text" = "无文本";
+
+"example.short" = "简短示例";
+"example.long" = "完整示例";
+"example.formatting" = "文本格式";
+"example.code" = "代码块";
+"example.checklist" = "检查清单";
+"example.table" = "GFM 表格";
+"example.flowchart" = "流程图";
+"example.sequence" = "时序图";
+"example.gantt" = "甘特时间线";
+
+"hotkey.render" = "渲染（Control-Command-X）";
+"hotkey.show_last_render" = "显示上次渲染（Control-Command-Z）";
+"hud.shortcut_conflict" = "全局快捷键已被占用，但菜单命令仍可使用";
+"hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
+
+"error.empty_clipboard" = "剪贴板中没有 Markdown 文本。请复制一些 Markdown 后重试。";
+"error.renderer_unavailable" = "无法加载本地渲染器。";
+"error.invalid_renderer_response" = "渲染器返回了无效的图片尺寸。";
+"error.content_too_large" = "渲染内容过大（%ld × %ld）。请尝试缩短内容。";
+"error.png_encoding_failed" = "无法将渲染结果编码为 PNG。";
+"error.example_unavailable" = "无法加载“%@”Markdown 文件。";
+
+"preview.window_title" = "上次 Markdown 渲染";
+
+"about.window_title" = "关于 md2png";
+"about.development" = "开发版本";
+"about.build_debug" = "调试版";
+"about.build_release" = "正式版";
+"about.release_notes_unavailable" = "此版本没有可用的发布说明。";
+"about.version_build" = "版本 %@  •  构建 %@";
+"about.whats_new" = "%@ 的新内容";
+"about.description" = "将剪贴板中的 Markdown 转为精美 PNG——全程本地、保护隐私，且绝不自动发送。";
+"about.project" = "项目";
+"about.open_project" = "打开项目";
+"about.view_all_releases" = "查看所有 Releases…";
+"about.copy_version_info" = "复制版本信息";
+"about.version_info_copied" = "已复制";
+"about.version_info" = "md2png %@ (%@) · %@ · macOS %@ · %@";
+"about.done" = "完成";
+"release_section.added" = "新增";
+"release_section.changed" = "变更";
+"release_section.fixed" = "修复";
+"release_section.removed" = "移除";
+"release_section.deprecated" = "弃用";
+"release_section.security" = "安全";
+
+"releases.development" = "开发版本";
+"releases.title" = "md2png Releases";
+"releases.body" = "当前版本：%@。\n\n新版本会发布在项目的 Releases 页面。md2png 不会在后台检查更新、连接更新服务器或自动下载任何内容。";
+"releases.open" = "打开 Releases";
+"common.cancel" = "取消";

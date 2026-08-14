@@ -1,0 +1,236 @@
+# Releasing md2png
+
+The repository supports local builds, Apple silicon ZIPs, installable DMGs, and
+properly signed and notarized releases.
+
+The user-visible app is `md2png.app`. Technical identifiers and artifact names
+use ASCII (`MD2PNG` and `md2png`) so shell commands and automation remain
+predictable.
+
+Set the public repository and app identity for the packaging session. No
+repository owner or path is embedded in source:
+
+```sh
+export GH_HOST=github.com
+export GH_REPO=OWNER/REPOSITORY
+export PROJECT_URL="https://${GH_HOST}/${GH_REPO}"
+export BUNDLE_IDENTIFIER=io.github.OWNER.md2png
+```
+
+`GH_HOST` defaults to `github.com`, but `GH_REPO` is deliberately required for
+publishing. `PROJECT_URL` is written to the packaged app only; if it is omitted
+from a local build, About hides the project and Releases links.
+`BUNDLE_IDENTIFIER` defaults to the personal value in `Info.plist`
+and may be overridden for any build.
+
+## 1. Prepare the version
+
+`Info.plist` is the source of truth for the About window, artifact names, tag,
+and GitHub Release title. Update both version keys:
+
+- `CFBundleShortVersionString`: user-facing semantic version, such as `0.2.0`.
+- `CFBundleVersion`: monotonically increasing build number, such as `2`.
+
+Move the relevant entries from `Unreleased` into a dated section with exactly
+the same semantic version in `CHANGELOG.md`, then run:
+
+```sh
+make test
+make app CONFIGURATION=release \
+  PROJECT_URL="$PROJECT_URL" \
+  BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
+```
+
+Commit the release preparation and push `main` before invoking the guarded
+publisher. The publisher requires clean local `main` to exactly match
+`origin/main`.
+
+## 2. Create an ad-hoc arm64 build
+
+```sh
+make release PROJECT_URL="$PROJECT_URL" BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
+make dmg PROJECT_URL="$PROJECT_URL" BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
+```
+
+The outputs are:
+
+```text
+dist/md2png-<version>-macOS-arm64.zip
+dist/md2png-<version>-macOS-arm64.dmg
+```
+
+Both run on Apple silicon Macs only. Because the app is ad-hoc signed, another
+Mac may warn that it cannot verify the developer. Do not present this as a
+polished public release.
+
+## 3. Create a personal Apple Development build
+
+An `Apple Development` certificate is suitable for your own Mac and limited
+development testing. It is not a substitute for Developer ID distribution and
+cannot produce a broadly trusted notarized release.
+
+Confirm the exact installed identity:
+
+```sh
+security find-identity -v -p codesigning
+```
+
+Then create clearly labeled artifacts:
+
+```sh
+make dmg \
+  PROJECT_URL="$PROJECT_URL" \
+  BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
+  SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" \
+  RELEASE_SUFFIX=apple-development
+```
+
+The outputs end in `-apple-development.zip` and
+`-apple-development.dmg`, which avoids confusing them with a public release.
+
+## 4. Create a Developer ID build
+
+Join the Apple Developer Program and install a `Developer ID Application`
+certificate in the login keychain. Then build with hardened runtime and a
+trusted timestamp:
+
+```sh
+make dmg \
+  PROJECT_URL="$PROJECT_URL" \
+  BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
+  SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+  RELEASE_SUFFIX=developer-id
+```
+
+Verify the signature and architectures:
+
+```sh
+codesign --verify --deep --strict --verbose=2 "dist/md2png.app"
+lipo -archs "dist/md2png.app/Contents/MacOS/md2png"
+```
+
+## 5. Notarize and staple
+
+Store notarization credentials once. Use an app-specific password, not your
+Apple ID password:
+
+```sh
+xcrun notarytool store-credentials md2pngNotary \
+  --apple-id "you@example.com" \
+  --team-id "TEAMID" \
+  --password "APP-SPECIFIC-PASSWORD"
+```
+
+Then build, submit, staple, and recreate the ZIP and DMG. The workflow submits
+the app archive first, staples the app, then signs, submits, and staples the
+final DMG as its own distributable artifact:
+
+```sh
+make notarize \
+  PROJECT_URL="$PROJECT_URL" \
+  BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
+  SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+  NOTARY_PROFILE=md2pngNotary \
+  RELEASE_SUFFIX=developer-id
+```
+
+Final checks:
+
+```sh
+xcrun stapler validate "dist/md2png.app"
+xcrun stapler validate "dist/md2png-<version>-macOS-arm64-developer-id.dmg"
+spctl --assess --type execute --verbose=2 "dist/md2png.app"
+spctl --assess --type open --context context:primary-signature --verbose=2 \
+  "dist/md2png-<version>-macOS-arm64-developer-id.dmg"
+```
+
+## 6. Publish the GitHub release
+
+The guarded path is:
+
+```sh
+make publish-release \
+  GH_HOST="$GH_HOST" \
+  GH_REPO="$GH_REPO" \
+  BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
+  SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+  NOTARY_PROFILE=md2pngNotary
+```
+
+This command refuses to continue unless:
+
+- the signing identity is a locally installed `Developer ID Application`;
+- the current branch is a clean `main` matching `origin/main`;
+- `CHANGELOG.md` contains a non-empty section matching the version in
+  `Info.plist`;
+- `GH_REPO` is supplied in `OWNER/REPOSITORY` form and the selected GitHub host
+  is authenticated;
+- the version does not already have a GitHub Release.
+
+It then builds and notarizes the arm64 ZIP and DMG, creates and pushes the
+annotated version tag, and publishes three assets using the matching changelog
+section as the Release Notes:
+
+- the versioned ZIP archive, labeled `md2png <version> — macOS app archive
+  (Apple silicon)`;
+- the versioned DMG, labeled `md2png <version> — macOS installer (Apple
+  silicon)`;
+- an identical `md2png-latest.dmg`, labeled `md2png — latest macOS
+  installer (Apple silicon)`.
+
+The release is explicitly marked as the latest release, making this a stable
+download URL across versions:
+
+```text
+${PROJECT_URL}/releases/latest/download/md2png-latest.dmg
+```
+
+The script verifies all three asset names after publishing. The GitHub CLI uses
+the account authenticated for `GH_HOST`; no token is stored in the application.
+
+The equivalent manual fallback is below. Prefer `make publish-release`; the
+manual path is useful only for diagnosing or recovering a partial publication.
+
+Extract only the notes for the version being published:
+
+```sh
+version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
+mkdir -p .build
+./scripts/release-notes.sh "$version" CHANGELOG.md \
+  > ".build/release-notes-${version}.md"
+```
+
+Commit the version and changelog, then tag the exact release commit:
+
+```sh
+git tag -a "v${version}" -m "md2png ${version}"
+git push origin main --follow-tags
+```
+
+Create a release and upload the notarized artifacts:
+
+```sh
+cp -f \
+  "dist/md2png-${version}-macOS-arm64-developer-id.dmg" \
+  "dist/md2png-latest.dmg"
+gh release create "v${version}" \
+  "dist/md2png-${version}-macOS-arm64-developer-id.zip#md2png ${version} — macOS app archive (Apple silicon)" \
+  "dist/md2png-${version}-macOS-arm64-developer-id.dmg#md2png ${version} — macOS installer (Apple silicon)" \
+  "dist/md2png-latest.dmg#md2png — latest macOS installer (Apple silicon)" \
+  --title "md2png ${version}" \
+  --notes-file ".build/release-notes-${version}.md" \
+  --repo "${GH_HOST}/${GH_REPO}" \
+  --verify-tag \
+  --latest
+```
+
+Before announcing it, download the DMG on a second Mac and verify installation,
+clipboard rendering, Mermaid, a GFM table, and manual paste into the target chat
+application.
+
+## In-app Releases action
+
+md2png does not implement an updater or call the Releases API. **View All Releases…**
+in About shows the installed version and asks the user whether to open this repository's
+Releases page. Release assets therefore remain a normal manual DMG installation,
+with no embedded GitHub credentials or additional deployment service.

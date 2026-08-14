@@ -1,0 +1,18 @@
+{
+  "name": "md2png-renderer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild renderer.js --bundle --format=iife --platform=browser --target=safari17 --minify --outfile=../Sources/MD2PNG/Resources/renderer.bundle.js"
+  },
+  "dependencies": {
+    "dompurify": "3.2.6",
+    "highlight.js": "11.12.0",
+    "markdown-it": "14.1.0",
+    "mermaid": "11.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
