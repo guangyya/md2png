@@ -28,12 +28,13 @@ not be committed.
 ## Feature requests
 
 Use the repository's Feature Request issue form and start with the user problem,
-not only a proposed implementation. Search existing issues and
-[`BACKLOG.md`](BACKLOG.md) first.
+not only a proposed implementation. Search existing issues and the
+[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1)
+first.
 
-The backlog contains ideas that have passed an initial product-fit review. It is
-not a committed roadmap. Maintainers assign stable `BL-###` identifiers and link
-tracking issues when a candidate is ready for deeper design.
+The project contains ideas that have passed an initial product-fit review. It is
+not a committed roadmap. Each accepted product or technical-debt item uses its
+GitHub issue as the single source for scope, constraints, and validation.
 
 ## Verification
 
@@ -85,6 +86,7 @@ action to a reviewed immutable commit SHA.
 - Update README or release documentation when the user workflow changes.
 - Keep `README.md` and `README.zh-Hans.md` aligned for installation and core
   workflow changes.
-- Update `BACKLOG.md` when a candidate is accepted, deferred, implemented, or
-  rejected; avoid duplicating the backlog in another roadmap file.
+- Update the issue and GitHub Project fields when a candidate is accepted,
+  deferred, implemented, or rejected; avoid duplicating the backlog in another
+  roadmap file.
 - Do not commit generated build directories, app bundles, ZIP files, or secrets.
