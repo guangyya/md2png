@@ -61,6 +61,23 @@ sending it.
 - Compact, Standard, and Wide output-width presets, with the last explicit
   selection remembered locally and Standard preserving the original sizing.
 
+## Width presets
+
+Compact wraps prose sooner, Standard preserves the original output sizing, and
+Wide gives dense tables and diagrams more room. The Last Render window reflects
+the selected output width within the current screen and identifies the preset
+and actual dimensions in its title.
+
+These are real Retina outputs from the same
+[width comparison source](../Examples/width-presets.md). They live here instead
+of the README so the repository front page does not download the full-size
+reference images. Click a preview to inspect its PNG.
+
+| Compact | Standard | Wide |
+|:--:|:--:|:--:|
+| 720 × 1,120 pt<br>1,440 × 2,240 px | 1,120 × 928 pt<br>2,240 × 1,856 px | 1,520 × 880 pt<br>3,040 × 1,760 px |
+| [![Compact width preset render](images/width-preset-compact.png)](images/width-preset-compact.png) | [![Standard width preset render](images/width-preset-standard.png)](images/width-preset-standard.png) | [![Wide width preset render](images/width-preset-wide.png)](images/width-preset-wide.png) |
+
 ## Safety and privacy constraints
 
 - Never send, paste, or upload message content automatically.

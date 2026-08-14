@@ -80,16 +80,7 @@ flowchart LR
 Sample 会暂时禁用，避免重复渲染。只有成功渲染后才会启用“恢复上次的 Markdown”；
 如果其他应用已经修改剪贴板，覆盖前会要求确认。“上次渲染”窗口会在当前屏幕范围内
 按输出宽度打开，并在标题中标明所用预设和实际尺寸。
-
-### 输出宽度对比
-
-以下图片均由同一份[宽度对比 Sample](Examples/width-presets.md)真实渲染而成。
-点击预览可查看完整尺寸的 Retina PNG。
-
-| 紧凑 | 标准 | 宽幅 |
-|:--:|:--:|:--:|
-| 720 × 1,120 pt<br>1,440 × 2,240 px | 1,120 × 928 pt<br>2,240 × 1,856 px | 1,520 × 880 pt<br>3,040 × 1,760 px |
-| [![紧凑宽度渲染效果](docs/images/width-preset-compact.png)](docs/images/width-preset-compact.png) | [![标准宽度渲染效果](docs/images/width-preset-standard.png)](docs/images/width-preset-standard.png) | [![宽幅渲染效果](docs/images/width-preset-wide.png)](docs/images/width-preset-wide.png) |
+实际尺寸和同源渲染对比见[宽度预设功能说明](docs/PRODUCT.md#width-presets)。
 
 ## Sample
 

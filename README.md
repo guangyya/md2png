@@ -97,17 +97,8 @@ disabled. Restore Last Markdown becomes available only after a successful render
 and asks before replacing clipboard content changed by another application. The
 Last Render window opens at a width that reflects the output, within the current
 screen, and identifies the preset and actual dimensions in its title.
-
-### Width preset comparison
-
-These are real Retina outputs from the same
-[width comparison source](Examples/width-presets.md). Click a preview to inspect
-the full-size PNG.
-
-| Compact | Standard | Wide |
-|:--:|:--:|:--:|
-| 720 × 1,120 pt<br>1,440 × 2,240 px | 1,120 × 928 pt<br>2,240 × 1,856 px | 1,520 × 880 pt<br>3,040 × 1,760 px |
-| [![Compact width preset render](docs/images/width-preset-compact.png)](docs/images/width-preset-compact.png) | [![Standard width preset render](docs/images/width-preset-standard.png)](docs/images/width-preset-standard.png) | [![Wide width preset render](docs/images/width-preset-wide.png)](docs/images/width-preset-wide.png) |
+See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
+dimensions and same-source reference renders.
 
 ## Samples
 
