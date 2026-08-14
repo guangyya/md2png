@@ -25,10 +25,10 @@
 
     if (nextLocale === "zh") {
       document.title = "md2png — 复制 Markdown，粘贴漂亮 PNG";
-      document.querySelector('meta[name="description"]').content = "在 Mac 上把剪贴板 Markdown 本地渲染为精美 PNG，不上传，也绝不自动发送。";
+      document.querySelector('meta[name="description"]').content = "在 Mac 上把剪贴板 Markdown 转为精美 PNG——全程本地，保护隐私。";
     } else {
       document.title = "md2png — Markdown in. Polished PNG out.";
-      document.querySelector('meta[name="description"]').content = "Turn clipboard Markdown into a polished PNG on your Mac—locally, privately, and without automatic sending.";
+      document.querySelector('meta[name="description"]').content = "Turn clipboard Markdown into a polished PNG on your Mac—locally and privately.";
     }
 
     if (remember) {
