@@ -1,8 +1,8 @@
 # Product backlog
 
-This file records product ideas that fit md2png but are not implemented yet.
-It is the single source of truth for candidate product work; feature requests
-and issues provide discussion, not a second roadmap.
+This file records product ideas that fit md2png and their completion state. It
+is the single source of truth for candidate product work; feature requests and
+issues provide discussion, not a second roadmap.
 
 Backlog placement is not a promise of a release, date, or final design. Priority
 can change after user feedback, technical investigation, or privacy review.
@@ -14,6 +14,7 @@ can change after user feedback, technical investigation, or privacy review.
 | Ready for design | The problem fits the product and is the next candidate for detailed design |
 | Proposed | Worth keeping, but needs validation or a clearer design before implementation |
 | Deferred | Valid idea whose complexity or scope is not justified yet |
+| Completed | Shipped behavior retained here as a concise product-work record |
 
 | Priority | Meaning |
 |---|---|
@@ -25,22 +26,26 @@ Effort is relative rather than a time commitment: **S** is an isolated change,
 **M** spans multiple components or test surfaces, and **L** affects the renderer,
 packaging, broad UI behavior, or contains meaningful design uncertainty.
 
+The planning index is the single source of truth for completion. Change an
+item's **Done** checkbox from ☐ to ☑ only after the complete candidate scope has
+shipped; partial work and technical prerequisites remain unchecked.
+
 ## Planning index
 
-| ID | Effort | Dependencies / coordination |
-|---|:---:|---|
-| BL-001 | L | Coordinate preview commands with BL-012 and accessibility with TD-004 |
-| BL-002 | L | Prefer BL-001 Save/export foundations before designing split output |
-| BL-003 | M | Settings delivery plan and BL-012 menu state |
-| BL-004 | L | Settings delivery plan, TD-001 SwiftUI path, and TD-004 |
-| BL-005 | L | Requires packaging, signing, and cross-application investigation |
-| BL-006 | L | Settings delivery plan, BL-012 menu state, and per-theme renderer tests |
-| BL-007 | M | Settings delivery plan and BL-012 copy/menu placement |
-| BL-008 | M | TD-001 SwiftUI path, TD-004, and BL-012 terminology |
-| BL-009 | M | BL-012 menu placement and clipboard ownership handling |
-| BL-010 | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
-| BL-011 | M | BL-012 menu placement and file-access validation |
-| BL-012 | M | Cross-cutting coordination for every item that adds UI or messages |
+| Done | ID | Effort | Dependencies / coordination |
+|:---:|---|:---:|---|
+| ☐ | BL-001 | L | Coordinate preview commands with BL-012 and accessibility with TD-004 |
+| ☐ | BL-002 | L | Prefer BL-001 Save/export foundations before designing split output |
+| ☐ | BL-003 | M | Settings delivery plan and BL-012 menu state |
+| ☐ | BL-004 | L | Settings delivery plan, TD-001 SwiftUI path, and TD-004 |
+| ☐ | BL-005 | L | Requires packaging, signing, and cross-application investigation |
+| ☐ | BL-006 | L | Settings delivery plan, BL-012 menu state, and per-theme renderer tests |
+| ☐ | BL-007 | M | Settings delivery plan and BL-012 copy/menu placement |
+| ☐ | BL-008 | M | TD-001 SwiftUI path, TD-004, and BL-012 terminology |
+| ☐ | BL-009 | M | BL-012 menu placement and clipboard ownership handling |
+| ☐ | BL-010 | L | Coordinate with TD-002, TD-003, TD-004, and TD-005 |
+| ☐ | BL-011 | M | BL-012 menu placement and file-access validation |
+| ☐ | BL-012 | M | Cross-cutting coordination for every item that adds UI or messages |
 
 ## Settings delivery plan
 
@@ -56,7 +61,8 @@ the menu as quick actions, with Settings reflecting the same stored values.
 
 ## Ready for design
 
-### BL-001: Last Render preview actions
+<details>
+<summary><strong>BL-001: Last Render preview actions</strong></summary>
 
 - **Priority:** P1
 - **Problem:** The preview confirms the output, but saving or reusing it requires
@@ -77,7 +83,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   existing Command-W behavior.
 - **Tracking issue:** Not created
 
-### BL-008: First-launch guide
+</details>
+
+<details>
+<summary><strong>BL-008: First-launch guide</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A menu bar-only app can appear to do nothing after launch, and a
@@ -97,7 +106,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   English and Simplified Chinese layouts.
 - **Tracking issue:** Not created
 
-### BL-009: Last Source actions
+</details>
+
+<details>
+<summary><strong>BL-009: Last Source actions</strong></summary>
 
 - **Priority:** P1
 - **Problem:** A successful render replaces the clipboard Markdown with an
@@ -115,7 +127,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   confirmation that no source survives an app restart.
 - **Tracking issue:** Not created
 
-### BL-012: Menu, message, and localization polish
+</details>
+
+<details>
+<summary><strong>BL-012: Menu, message, and localization polish</strong></summary>
 
 - **Priority:** P2
 - **Problem:** Accepted features will add commands, states, and errors to a
@@ -168,9 +183,12 @@ the menu as quick actions, with Settings reflecting the same stored values.
   terminology consistency, and localization key parity.
 - **Tracking issue:** Not created
 
+</details>
+
 ## Proposed
 
-### BL-002: Split very tall renders
+<details>
+<summary><strong>BL-002: Split very tall renders</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A single tall image can be hard to review or paste, and content
@@ -182,7 +200,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   consistently across chat clients, and whether splitting should be Save-only.
 - **Tracking issue:** Not created
 
-### BL-003: Render width presets
+</details>
+
+<details>
+<summary><strong>BL-003: Render width presets</strong></summary>
 
 - **Priority:** P2
 - **Problem:** Chat-sized prose, wide tables, and large diagrams benefit from
@@ -193,7 +214,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   to today's output unless intentionally changed in a release.
 - **Tracking issue:** Not created
 
-### BL-004: Configurable global shortcuts
+</details>
+
+<details>
+<summary><strong>BL-004: Configurable global shortcuts</strong></summary>
 
 - **Priority:** P2
 - **Problem:** System-wide shortcuts can conflict with browsers, developer
@@ -204,7 +228,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   require Accessibility permission.
 - **Tracking issue:** Not created
 
-### BL-006: Built-in render themes
+</details>
+
+<details>
+<summary><strong>BL-006: Built-in render themes</strong></summary>
 
 - **Priority:** P2
 - **Problem:** The current light rendering style works well for general content,
@@ -232,7 +259,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   theme switches do not leak styles and do not unexpectedly change layout.
 - **Tracking issue:** Not created
 
-### BL-007: Launch at login
+</details>
+
+<details>
+<summary><strong>BL-007: Launch at login</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A menu bar companion is most useful when it is already available
@@ -249,7 +279,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   remain an accessory/menu bar launch without showing a Dock icon or window.
 - **Tracking issue:** Not created
 
-### BL-010: Renderer diagnostics
+</details>
+
+<details>
+<summary><strong>BL-010: Renderer diagnostics</strong></summary>
 
 - **Priority:** P2
 - **Problem:** A transient error HUD confirms that rendering failed but may not
@@ -272,9 +305,12 @@ the menu as quick actions, with Settings reflecting the same stored values.
   contents unchanged.
 - **Tracking issue:** Not created
 
+</details>
+
 ## Deferred
 
-### BL-005: macOS Services action
+<details>
+<summary><strong>BL-005: macOS Services action</strong></summary>
 
 - **Priority:** P3
 - **Problem:** Rendering selected Markdown currently requires an explicit copy
@@ -286,7 +322,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
   already reliable.
 - **Tracking issue:** Not created
 
-### BL-011: Render a Markdown file
+</details>
+
+<details>
+<summary><strong>BL-011: Render a Markdown file</strong></summary>
 
 - **Priority:** P3
 - **Problem:** Rendering an existing long Markdown file requires opening it,
@@ -303,6 +342,12 @@ the menu as quick actions, with Settings reflecting the same stored values.
   while file encoding, access errors, and another menu command add complexity
   for an unvalidated lower-frequency path.
 - **Tracking issue:** Not created
+
+</details>
+
+## Completed
+
+No backlog items have been completed yet.
 
 ## Not planned
 
@@ -322,8 +367,9 @@ should not be added to the backlog without an explicit product decision:
 - Use a stable `BL-###` identifier in related issues, commits, and release notes.
 - Link the tracking issue when one is created; keep design discussion in that
   issue rather than expanding this file indefinitely.
-- Move an item out of the backlog when it ships, and record the shipped behavior
-  in `CHANGELOG.md`.
+- When an item ships, change its **Done** checkbox to ☑, move it to the
+  **Completed** section, and record the shipped behavior and version in
+  `CHANGELOG.md`.
 - Track internal refactors and architecture work separately in
   [`TECH_DEBT.md`](TECH_DEBT.md); do not present them as product features.
 - Reject or defer ideas that weaken local rendering, manual sending, or the
