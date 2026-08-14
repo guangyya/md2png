@@ -13,7 +13,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastSource = LastSourceState()
     private let clipboardPreviewView = ClipboardPreviewView()
     private var renderMenuItem: NSMenuItem!
-    private var renderLastMarkdownMenuItem: NSMenuItem!
     private var restoreLastMarkdownMenuItem: NSMenuItem!
     private var previewMenuItem: NSMenuItem!
     private var examplesMenuItem: NSMenuItem!
@@ -53,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         let menu = NSMenu()
+        menu.autoenablesItems = false
         menu.delegate = self
 
         clipboardPreviewView.update(Clipboard.menuPreview(includeLabel: false))
@@ -71,17 +71,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         renderMenuItem.keyEquivalentModifierMask = [.command, .control]
         renderMenuItem.target = self
-
-        renderLastMarkdownMenuItem = menu.addItem(
-            withTitle: L10n.text(
-                "menu.render_last_markdown_again",
-                defaultValue: "Render Last Markdown Again"
-            ),
-            action: #selector(renderLastMarkdownAgain),
-            keyEquivalent: ""
-        )
-        renderLastMarkdownMenuItem.target = self
-        renderLastMarkdownMenuItem.isEnabled = false
 
         restoreLastMarkdownMenuItem = menu.addItem(
             withTitle: L10n.text(
@@ -162,18 +151,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         previewController.show(image: lastImage)
     }
 
-    @objc private func renderLastMarkdownAgain() {
-        guard !renderActivity.isRendering,
-              !isPresentingClipboardConfirmation,
-              let markdown = lastSource.markdown else { return }
-        render(markdown, confirmationAction: .rerender)
-    }
-
     @objc private func restoreLastMarkdown() {
         guard !renderActivity.isRendering,
               !isPresentingClipboardConfirmation,
               let markdown = lastSource.markdown,
-              confirmClipboardOverwriteIfNeeded(for: .restore) else { return }
+              confirmClipboardOverwriteIfNeeded() else { return }
         do {
             let changeCount = try Clipboard.write(markdown: markdown)
             lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
@@ -203,10 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func render(
-        _ markdown: String,
-        confirmationAction: LastSourceOverwriteAction? = nil
-    ) {
+    private func render(_ markdown: String) {
         guard renderActivity.begin() else { return }
         updateRenderingUI(isRendering: true)
         statusItem.button?.image = NSImage(
@@ -226,10 +205,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             switch result {
             case let .success(image):
-                if let confirmationAction,
-                   !self.confirmClipboardOverwriteIfNeeded(for: confirmationAction) {
-                    return
-                }
                 do {
                     let changeCount = try Clipboard.write(image: image)
                     self.lastImage = image
@@ -266,13 +241,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateLastSourceActionAvailability() {
         let isEnabled = lastSource.isAvailable && !renderActivity.isRendering
-        renderLastMarkdownMenuItem.isEnabled = isEnabled
         restoreLastMarkdownMenuItem.isEnabled = isEnabled
     }
 
-    private func confirmClipboardOverwriteIfNeeded(
-        for action: LastSourceOverwriteAction
-    ) -> Bool {
+    private func confirmClipboardOverwriteIfNeeded() -> Bool {
         guard lastSource.requiresConfirmation(
             currentClipboardChangeCount: Clipboard.changeCount
         ) else {
@@ -288,7 +260,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             "confirmation.clipboard_changed.title",
             defaultValue: "Clipboard Changed"
         )
-        alert.informativeText = action.confirmationMessage()
+        alert.informativeText = L10n.text(
+            "confirmation.clipboard_changed.restore",
+            defaultValue: "Another app changed the clipboard. Replace it with the last Markdown?"
+        )
         alert.addButton(withTitle: L10n.text(
             "common.replace",
             defaultValue: "Replace"

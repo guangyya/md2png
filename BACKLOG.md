@@ -128,7 +128,6 @@ the menu as quick actions, with Settings reflecting the same stored values.
   ──────────────────
   Render Clipboard as Image
   Render Markdown File…
-  Render Last Markdown Again
   Restore Last Markdown
   Show Last Render
   ──────────────────
@@ -418,11 +417,10 @@ the menu as quick actions, with Settings reflecting the same stored values.
 <summary><strong>FEAT-009: Last Source actions</strong></summary>
 
 - **Shipped behavior:** Keep only the latest successfully rendered Markdown in
-  memory and provide **Render Last Markdown Again** and **Restore Last
-  Markdown**. Both actions are disabled until a render succeeds and the source
-  is discarded when md2png quits.
+  memory and provide **Restore Last Markdown**. The action is disabled until a
+  render succeeds and the source is discarded when md2png quits.
 - **Clipboard safety:** Track md2png's latest clipboard write and require
-  confirmation before a Last Markdown action replaces content changed by
+  confirmation before Restore Last Markdown replaces content changed by
   another application. Cancelling preserves the newer clipboard content.
 - **Tracking issue:** [#9](https://github.com/guangyya/md2png/issues/9)
 

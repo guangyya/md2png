@@ -77,16 +77,24 @@ final class LastSourceTests: XCTestCase {
         XCTAssertNil(relaunchedProcessState.ownedClipboardChangeCount)
     }
 
-    func testConfirmationMessagesAreLocalizedForEachAction() throws {
+    func testRestoreConfirmationMessageIsLocalized() throws {
         let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
         let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
 
         XCTAssertEqual(
-            LastSourceOverwriteAction.rerender.confirmationMessage(bundle: english),
-            "Another app changed the clipboard. Replace it with a newly rendered image from the last Markdown?"
+            L10n.text(
+                "confirmation.clipboard_changed.restore",
+                defaultValue: "fallback",
+                bundle: english
+            ),
+            "Another app changed the clipboard. Replace it with the last Markdown?"
         )
         XCTAssertEqual(
-            LastSourceOverwriteAction.restore.confirmationMessage(bundle: chinese),
+            L10n.text(
+                "confirmation.clipboard_changed.restore",
+                defaultValue: "fallback",
+                bundle: chinese
+            ),
             "其他应用已更改剪贴板。是否用上次的 Markdown 替换当前内容？"
         )
     }

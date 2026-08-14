@@ -6,7 +6,6 @@
 "menu.clipboard" = "Clipboard";
 "menu.render" = "Render Clipboard as Image";
 "menu.rendering" = "Rendering…";
-"menu.render_last_markdown_again" = "Render Last Markdown Again";
 "menu.restore_last_markdown" = "Restore Last Markdown";
 "menu.show_last_render" = "Show Last Render";
 "menu.examples" = "Examples";
@@ -34,7 +33,6 @@
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
 
 "confirmation.clipboard_changed.title" = "Clipboard Changed";
-"confirmation.clipboard_changed.rerender" = "Another app changed the clipboard. Replace it with a newly rendered image from the last Markdown?";
 "confirmation.clipboard_changed.restore" = "Another app changed the clipboard. Replace it with the last Markdown?";
 
 "error.empty_clipboard" = "The clipboard does not contain Markdown text. Copy some Markdown and try again.";

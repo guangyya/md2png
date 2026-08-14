@@ -6,7 +6,6 @@
 "menu.clipboard" = "剪贴板";
 "menu.render" = "将剪贴板渲染为图片";
 "menu.rendering" = "正在渲染…";
-"menu.render_last_markdown_again" = "再次渲染上次的 Markdown";
 "menu.restore_last_markdown" = "恢复上次的 Markdown";
 "menu.show_last_render" = "显示上次渲染";
 "menu.examples" = "示例";
@@ -34,7 +33,6 @@
 "hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
 
 "confirmation.clipboard_changed.title" = "剪贴板已更改";
-"confirmation.clipboard_changed.rerender" = "其他应用已更改剪贴板。是否用上次的 Markdown 重新渲染图片并替换当前内容？";
 "confirmation.clipboard_changed.restore" = "其他应用已更改剪贴板。是否用上次的 Markdown 替换当前内容？";
 
 "error.empty_clipboard" = "剪贴板中没有 Markdown 文本。请复制一些 Markdown 后重试。";

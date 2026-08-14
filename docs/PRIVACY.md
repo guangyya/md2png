@@ -11,7 +11,6 @@ The app accesses the clipboard only in response to visible user actions:
 |---|---|
 | Open the menu | Reads a short plain-text preview in memory |
 | Render Clipboard as Image | Reads non-empty plain text; writes PNG and TIFF only after a successful render |
-| Render Last Markdown Again | Reads the latest successful source from app memory; writes PNG/TIFF only after rendering and any required clipboard confirmation |
 | Restore Last Markdown | Writes the latest successful source after any required clipboard confirmation |
 | Choose an Example | Writes the selected bundled Markdown, then renders it and writes PNG/TIFF on success |
 | Copy Version Info | Writes app version, source commit, build type, macOS version, and architecture as plain text |
@@ -22,11 +21,11 @@ on the clipboard instead. Clipboard contents are managed by macOS and can still
 be read by other applications according to macOS clipboard behavior.
 
 The most recent successful image and its source Markdown are retained only in
-app memory for **Show Last Render**, **Render Last Markdown Again**, and
-**Restore Last Markdown**. Both are discarded when the app quits. md2png does
+app memory for **Show Last Render** and **Restore Last Markdown**. Both are
+discarded when the app quits. md2png does
 not create a render history or silently save Markdown and images to files.
 When another application changes the clipboard after md2png writes it, the Last
-Markdown actions require confirmation before replacing that newer content.
+Markdown action requires confirmation before replacing that newer content.
 
 ## Local rendering
 

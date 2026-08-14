@@ -71,10 +71,10 @@ only becomes available after a successful render in the current app session.
 Close the preview with `Command-W`, render again, and reopen it. Small images are
 shown without upscaling; tall images fit the window width and begin at the top.
 
-## Last Markdown actions are unavailable or ask for confirmation
+## Restore Last Markdown is unavailable or asks for confirmation
 
-**Render Last Markdown Again** and **Restore Last Markdown** become available
-only after a successful render in the current app session. The source is kept
+**Restore Last Markdown** becomes available only after a successful render in
+the current app session. The source is kept
 in memory and is intentionally discarded when md2png quits.
 
 If another application or copy action changed the clipboard after md2png last
