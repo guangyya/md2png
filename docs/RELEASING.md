@@ -34,7 +34,8 @@ and GitHub Release title. Update both version keys:
 - `CFBundleVersion`: monotonically increasing build number, such as `2`.
 
 Move the relevant entries from `Unreleased` into a dated section with exactly
-the same semantic version in `CHANGELOG.md`, then run:
+the same semantic version in `CHANGELOG.md`. Add the matching version to
+`ABOUT_CHANGELOG.md` using only short, one-line highlights, then run:
 
 ```sh
 make test
@@ -171,6 +172,8 @@ This command refuses to continue unless:
 - the current branch is a clean `main` matching `origin/main`;
 - `CHANGELOG.md` contains a non-empty section matching the version in
   `Info.plist`;
+- `ABOUT_CHANGELOG.md` contains concise highlights for that version so the app
+  build can package them;
 - `GH_REPO` is supplied in `OWNER/REPOSITORY` form and the selected GitHub host
   is authenticated;
 - the version does not already have a GitHub Release.

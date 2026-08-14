@@ -55,6 +55,8 @@ GitHub issue as the single source for scope, constraints, and validation.
 - Documentation changes: verify relative links, command names, shortcuts,
   release filenames, and checked-in render screenshots.
 - User-visible behavior: add an entry under `Unreleased` in `CHANGELOG.md`.
+- Keep `ABOUT_CHANGELOG.md` to short, one-line release highlights, and add the
+  matching version section before a release.
 
 ## Continuous integration
 

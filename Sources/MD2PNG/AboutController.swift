@@ -57,7 +57,7 @@ struct AppMetadata {
         ) as? String
         let notes: String
 
-        if let changelogURL = AppResources.changelogURL(resourcesURL: bundle.resourceURL),
+        if let changelogURL = AppResources.aboutChangelogURL(resourcesURL: bundle.resourceURL),
            let changelog = try? String(contentsOf: changelogURL, encoding: .utf8),
            let parsedNotes = ChangelogParser.releaseNotes(for: version, in: changelog) {
             notes = parsedNotes

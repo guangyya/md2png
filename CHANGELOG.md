@@ -16,6 +16,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   restored to the clipboard. External clipboard changes require confirmation
   before the action replaces them.
 
+### Changed
+
+- Keep the complete release history in the repository changelog while About
+  uses a separate, concise set of release highlights.
+
 ## [0.2.0] - 2026-08-14
 
 ### Added
