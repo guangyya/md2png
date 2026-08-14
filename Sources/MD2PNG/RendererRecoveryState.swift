@@ -19,6 +19,7 @@ struct RendererRecoveryState {
     struct Execution: Equatable {
         let requestID: UUID
         let attemptID: UUID
+        let rendererGenerationID: UUID
     }
 
     enum Attempt: Equatable {
@@ -44,7 +45,7 @@ struct RendererRecoveryState {
     }
 
     enum TerminationSignal: Equatable {
-        case delegate
+        case delegate(rendererGenerationID: UUID)
         case executionError(Execution)
     }
 
@@ -75,12 +76,17 @@ struct RendererRecoveryState {
     private(set) var phase: Phase
     private var activeRequest: ActiveRequest?
     private var queuedRequestIDs: [UUID] = []
-    private var pendingTerminationDelegateCount = 0
+    private(set) var currentRendererGenerationID: UUID?
 
     init(hasRendererPage: Bool = true) {
-        phase = hasRendererPage
-            ? .initialLoad(LoadAttempt(kind: .initial))
-            : .unavailable
+        if hasRendererPage {
+            let attempt = LoadAttempt(kind: .initial)
+            phase = .initialLoad(attempt)
+            currentRendererGenerationID = attempt.id
+        } else {
+            phase = .unavailable
+            currentRendererGenerationID = nil
+        }
     }
 
     var initialActions: [Action] {
@@ -136,6 +142,7 @@ struct RendererRecoveryState {
 
     mutating func rendererDidLoad(_ attempt: LoadAttempt) -> [Action] {
         guard currentLoadAttempt == attempt else { return [] }
+        currentRendererGenerationID = attempt.id
         phase = .ready
         return startNextIfPossible()
     }
@@ -168,17 +175,18 @@ struct RendererRecoveryState {
     }
 
     mutating func contentProcessTerminated(
-        from signal: TerminationSignal = .delegate
+        from signal: TerminationSignal
     ) -> TerminationTransition {
+        let terminatedGenerationID: UUID
         switch signal {
-        case .delegate where pendingTerminationDelegateCount > 0:
-            pendingTerminationDelegateCount -= 1
-            return .ignored
-        case .delegate:
-            break
+        case let .delegate(rendererGenerationID):
+            terminatedGenerationID = rendererGenerationID
         case let .executionError(execution):
             guard isCurrent(execution) else { return .ignored }
-            pendingTerminationDelegateCount += 1
+            terminatedGenerationID = execution.rendererGenerationID
+        }
+        guard terminatedGenerationID == currentRendererGenerationID else {
+            return .ignored
         }
 
         let actions: [Action]
@@ -225,6 +233,7 @@ struct RendererRecoveryState {
 
     private mutating func beginRecoveryLoad() -> [Action] {
         let attempt = LoadAttempt(kind: .recovery)
+        currentRendererGenerationID = attempt.id
         phase = .recoveryLoad(attempt)
         return [.loadRenderer(attempt)]
     }
@@ -239,10 +248,14 @@ struct RendererRecoveryState {
             )
         }
         guard let activeRequest else { return [] }
+        guard let currentRendererGenerationID else {
+            return failAllRequests(with: .recoveryFailed, nextPhase: .needsReload)
+        }
 
         let execution = Execution(
             requestID: activeRequest.id,
-            attemptID: UUID()
+            attemptID: UUID(),
+            rendererGenerationID: currentRendererGenerationID
         )
         phase = .rendering(execution, stage: .javaScript)
         return [.start(execution)]
@@ -260,6 +273,7 @@ struct RendererRecoveryState {
 
         activeRequest = nil
         queuedRequestIDs.removeAll()
+        currentRendererGenerationID = nil
         phase = nextPhase
         guard !requestIDs.isEmpty else { return [] }
         return [.fail(requestIDs: requestIDs, failure: failure)]

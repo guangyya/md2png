@@ -28,6 +28,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Bound renderer page loads and render attempts with a watchdog so a missing
   WebKit callback cannot leave the app permanently stuck in Rendering. Timed
   out work fails once, while a later render starts a fresh local load.
+- Isolate each renderer recovery in a new WebKit generation so missing or late
+  process-termination callbacks cannot hide a later genuine termination.
 
 ## [0.3.0] - 2026-08-14
 
