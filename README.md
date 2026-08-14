@@ -225,8 +225,8 @@ docs/                       Product, privacy, troubleshooting, and release docum
 Focused bug reports and improvements are welcome. Use the
 [Feature request template](../../issues/new?template=feature_request.yml)
 for new ideas. Accepted and candidate directions are tracked in the
-[`md2png Backlog` GitHub Project](https://github.com/users/guangyya/projects/1);
-inclusion does not promise a version or date.
+[public GitHub Issues](https://github.com/guangyya/md2png/issues); issues labeled
+`backlog` do not promise a version or date.
 Read [Contributing](CONTRIBUTING.md) before opening a pull request and use the
 [Security policy](SECURITY.md) for vulnerabilities.
 
