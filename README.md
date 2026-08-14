@@ -85,7 +85,7 @@ A GFM table needs a separator row:
 | Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
 | Examples | — | Copies and immediately renders the selected bundled sample |
-| About md2png | — | Shows version, release notes, project link, update status/action, and copyable diagnostics |
+| About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current
 clipboard. While a render is running, additional render commands and examples

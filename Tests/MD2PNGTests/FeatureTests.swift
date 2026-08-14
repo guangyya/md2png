@@ -162,6 +162,7 @@ final class FeatureTests: XCTestCase {
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
             build: "1",
+            sourceCommit: "A1B2C3D4E5F6789012345678901234567890ABCD",
             buildConfiguration: .debug,
             releaseNotes: """
             Added
@@ -206,6 +207,8 @@ final class FeatureTests: XCTestCase {
             L10n.text("about.copy_version_info", defaultValue: "Copy Version Info")
         )
         XCTAssertTrue(controller.displayedVersionInfo.contains("0.1.0 (1)"))
+        XCTAssertTrue(controller.displayedVersionBuild.contains("Commit a1b2c3d"))
+        XCTAssertTrue(controller.displayedVersionInfo.contains("commit a1b2c3d"))
 
         if let outputPath = ProcessInfo.processInfo.environment["MD2PNG_ABOUT_SNAPSHOT_PATH"],
            let bitmap = contentView.bitmapImageRepForCachingDisplay(in: contentView.bounds) {
@@ -504,6 +507,7 @@ final class FeatureTests: XCTestCase {
         let metadata = AppMetadata(
             version: "0.1.0",
             build: "1",
+            sourceCommit: "A1B2C3D4E5F6789012345678901234567890ABCD",
             buildConfiguration: .release,
             releaseNotes: "",
             projectURL: testProjectURL
@@ -515,7 +519,7 @@ final class FeatureTests: XCTestCase {
                 architecture: "arm64",
                 localizationBundle: L10n.localizedBundle(for: "en")
             ),
-            "md2png 0.1.0 (1) · RELEASE · macOS 15.6.0 · arm64"
+            "md2png 0.1.0 (1) · commit a1b2c3d · RELEASE · macOS 15.6.0 · arm64"
         )
         XCTAssertTrue(
             metadata.versionInfo(
@@ -523,6 +527,29 @@ final class FeatureTests: XCTestCase {
                 architecture: "arm64",
                 localizationBundle: L10n.localizedBundle(for: "zh-Hans")
             ).contains("正式版")
+        )
+    }
+
+    func testSourceCommitIsShortenedAndInvalidValuesAreOmitted() {
+        XCTAssertEqual(
+            AppMetadata.shortSourceCommit(
+                from: " A1B2C3D4E5F6789012345678901234567890ABCD\n"
+            ),
+            "a1b2c3d"
+        )
+        XCTAssertNil(AppMetadata.shortSourceCommit(from: "abc123"))
+        XCTAssertNil(AppMetadata.shortSourceCommit(from: "not-a-commit"))
+
+        let metadata = AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            sourceCommit: "not-a-commit",
+            releaseNotes: "",
+            projectURL: nil
+        )
+        XCTAssertEqual(
+            metadata.versionBuildText(localizationBundle: L10n.localizedBundle(for: "en")),
+            "Version 0.1.0  •  Build 1"
         )
     }
 

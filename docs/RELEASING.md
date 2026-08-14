@@ -22,6 +22,8 @@ publishing. `PROJECT_URL` is written to the packaged app only; if it is omitted
 from a local build, About hides the project and Releases links.
 `BUNDLE_IDENTIFIER` defaults to the personal value in `Info.plist`
 and may be overridden for any build.
+The build embeds the current Git commit in the packaged app automatically;
+`SOURCE_COMMIT` may be supplied explicitly when building outside a Git checkout.
 
 ## 1. Prepare the version
 

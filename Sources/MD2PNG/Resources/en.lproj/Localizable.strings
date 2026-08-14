@@ -45,6 +45,7 @@
 "about.build_release" = "RELEASE";
 "about.release_notes_unavailable" = "Release notes are not available in this build.";
 "about.version_build" = "Version %@  •  Build %@";
+"about.version_build_commit" = "Version %@  •  Build %@  •  Commit %@";
 "about.whats_new" = "What’s new in %@";
 "about.description" = "Turn clipboard Markdown into a polished PNG — locally and privately.";
 "about.project" = "Project";
@@ -74,6 +75,7 @@
 "about.copy_version_info" = "Copy Version Info";
 "about.version_info_copied" = "Copied";
 "about.version_info" = "md2png %@ (%@) · %@ · macOS %@ · %@";
+"about.version_info_commit" = "md2png %@ (%@) · commit %@ · %@ · macOS %@ · %@";
 "about.done" = "Done";
 "release_section.added" = "Added";
 "release_section.changed" = "Changed";
