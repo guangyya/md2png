@@ -111,27 +111,6 @@ the menu as quick actions, with Settings reflecting the same stored values.
 </details>
 
 <details>
-<summary><strong>FEAT-009: Last Source actions</strong></summary>
-
-- **Priority:** P1
-- **Problem:** A successful render replaces the clipboard Markdown with an
-  image, so recovering the source or trying another theme or width requires
-  finding and copying the original text again.
-- **Candidate scope:** Keep the Markdown paired with the latest successful
-  render in memory and add **Render Last Markdown Again** and **Restore Last
-  Markdown**. Re-rendering uses the currently selected theme and width.
-- **Constraints:** Never persist the source, embed it in the PNG, or create a
-  history. Clear it when the app quits, enable actions only after a successful
-  render, and require confirmation before overwriting clipboard content that
-  changed after md2png last wrote its image.
-- **Validation:** Cover successful, failed, and Example renders; unchanged and
-  externally changed clipboards; theme and width changes; repeated actions; and
-  confirmation that no source survives an app restart.
-- **Tracking issue:** [#9](https://github.com/guangyya/md2png/issues/9)
-
-</details>
-
-<details>
 <summary><strong>FEAT-012: Menu, message, and localization polish</strong></summary>
 
 - **Priority:** P2
@@ -435,7 +414,19 @@ the menu as quick actions, with Settings reflecting the same stored values.
 
 ## Completed
 
-No backlog items have been completed yet.
+<details>
+<summary><strong>FEAT-009: Last Source actions</strong></summary>
+
+- **Shipped behavior:** Keep only the latest successfully rendered Markdown in
+  memory and provide **Render Last Markdown Again** and **Restore Last
+  Markdown**. Both actions are disabled until a render succeeds and the source
+  is discarded when md2png quits.
+- **Clipboard safety:** Track md2png's latest clipboard write and require
+  confirmation before a Last Markdown action replaces content changed by
+  another application. Cancelling preserves the newer clipboard content.
+- **Tracking issue:** [#9](https://github.com/guangyya/md2png/issues/9)
+
+</details>
 
 ## Not planned
 

@@ -6,6 +6,8 @@
 "menu.clipboard" = "剪贴板";
 "menu.render" = "将剪贴板渲染为图片";
 "menu.rendering" = "正在渲染…";
+"menu.render_last_markdown_again" = "再次渲染上次的 Markdown";
+"menu.restore_last_markdown" = "恢复上次的 Markdown";
 "menu.show_last_render" = "显示上次渲染";
 "menu.examples" = "示例";
 "menu.about" = "关于 md2png";
@@ -29,12 +31,18 @@
 "hotkey.show_last_render" = "显示上次渲染（Control-Command-Z）";
 "hud.shortcut_conflict" = "全局快捷键已被占用，但菜单命令仍可使用";
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
+"hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
+
+"confirmation.clipboard_changed.title" = "剪贴板已更改";
+"confirmation.clipboard_changed.rerender" = "其他应用已更改剪贴板。是否用上次的 Markdown 重新渲染图片并替换当前内容？";
+"confirmation.clipboard_changed.restore" = "其他应用已更改剪贴板。是否用上次的 Markdown 替换当前内容？";
 
 "error.empty_clipboard" = "剪贴板中没有 Markdown 文本。请复制一些 Markdown 后重试。";
 "error.renderer_unavailable" = "无法加载本地渲染器。";
 "error.invalid_renderer_response" = "渲染器返回了无效的图片尺寸。";
 "error.content_too_large" = "渲染内容过大（%ld × %ld）。请尝试缩短内容。";
 "error.png_encoding_failed" = "无法将渲染结果编码为 PNG。";
+"error.clipboard_write_failed" = "无法更新剪贴板。";
 "error.example_unavailable" = "无法加载“%@”Markdown 文件。";
 
 "preview.window_title" = "上次 Markdown 渲染";
@@ -107,4 +115,5 @@
 "update.error.open" = "无法打开下载的 DMG。";
 "update.error.reveal" = "下载的 DMG 已不在 App 缓存中，请重新下载。";
 "common.ok" = "好";
+"common.replace" = "替换";
 "common.cancel" = "取消";

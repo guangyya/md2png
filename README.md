@@ -83,13 +83,17 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
+| Render Last Markdown Again | — | Renders the latest successful source again using the current renderer settings |
+| Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
 | Examples | — | Copies and immediately renders the selected bundled sample |
 | About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current
 clipboard. While a render is running, additional render commands and examples
-are temporarily disabled.
+are temporarily disabled. Last Markdown actions become available only after a
+successful render and ask before replacing clipboard content changed by another
+application.
 
 ## Samples
 
@@ -112,6 +116,8 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 
 - Rendering happens in a non-persistent local `WKWebView` using bundled assets.
 - Markdown and generated images are never uploaded.
+- The latest successful Markdown source is retained only in memory for the Last
+  Markdown actions and is discarded when md2png quits.
 - External Markdown images are replaced with a text placeholder instead of
   being fetched.
 - No analytics, telemetry, advertising, account integration, bot, or

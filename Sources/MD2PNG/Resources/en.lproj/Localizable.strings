@@ -6,6 +6,8 @@
 "menu.clipboard" = "Clipboard";
 "menu.render" = "Render Clipboard as Image";
 "menu.rendering" = "Rendering…";
+"menu.render_last_markdown_again" = "Render Last Markdown Again";
+"menu.restore_last_markdown" = "Restore Last Markdown";
 "menu.show_last_render" = "Show Last Render";
 "menu.examples" = "Examples";
 "menu.about" = "About md2png";
@@ -29,12 +31,18 @@
 "hotkey.show_last_render" = "Show Last Render (Control-Command-Z)";
 "hud.shortcut_conflict" = "A global shortcut is already in use — menu commands still work";
 "hud.png_copied" = "PNG copied — paste with Command-V";
+"hud.markdown_restored" = "Markdown restored — paste with Command-V";
+
+"confirmation.clipboard_changed.title" = "Clipboard Changed";
+"confirmation.clipboard_changed.rerender" = "Another app changed the clipboard. Replace it with a newly rendered image from the last Markdown?";
+"confirmation.clipboard_changed.restore" = "Another app changed the clipboard. Replace it with the last Markdown?";
 
 "error.empty_clipboard" = "The clipboard does not contain Markdown text. Copy some Markdown and try again.";
 "error.renderer_unavailable" = "The local renderer could not be loaded.";
 "error.invalid_renderer_response" = "The renderer returned an invalid image size.";
 "error.content_too_large" = "The rendered content is too large (%ld × %ld). Try a shorter selection.";
 "error.png_encoding_failed" = "The rendered image could not be encoded as PNG.";
+"error.clipboard_write_failed" = "The clipboard could not be updated.";
 "error.example_unavailable" = "The %@ Markdown file could not be loaded.";
 
 "preview.window_title" = "Last Markdown Render";
@@ -107,4 +115,5 @@
 "update.error.open" = "The downloaded DMG could not be opened.";
 "update.error.reveal" = "The downloaded DMG is no longer in the app cache. Download it again.";
 "common.ok" = "OK";
+"common.replace" = "Replace";
 "common.cancel" = "Cancel";

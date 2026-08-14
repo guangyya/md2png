@@ -10,11 +10,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
     private var lastImage: NSImage?
+    private var lastSource = LastSourceState()
     private let clipboardPreviewView = ClipboardPreviewView()
     private var renderMenuItem: NSMenuItem!
+    private var renderLastMarkdownMenuItem: NSMenuItem!
+    private var restoreLastMarkdownMenuItem: NSMenuItem!
     private var previewMenuItem: NSMenuItem!
     private var examplesMenuItem: NSMenuItem!
     private var renderActivity = RenderActivityState()
+    private var isPresentingClipboardConfirmation = false
     private var currentUpdateStatus = UpdateStatus()
     private var updateStatusObserverID: UUID?
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
@@ -67,6 +71,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         renderMenuItem.keyEquivalentModifierMask = [.command, .control]
         renderMenuItem.target = self
+
+        renderLastMarkdownMenuItem = menu.addItem(
+            withTitle: L10n.text(
+                "menu.render_last_markdown_again",
+                defaultValue: "Render Last Markdown Again"
+            ),
+            action: #selector(renderLastMarkdownAgain),
+            keyEquivalent: ""
+        )
+        renderLastMarkdownMenuItem.target = self
+        renderLastMarkdownMenuItem.isEnabled = false
+
+        restoreLastMarkdownMenuItem = menu.addItem(
+            withTitle: L10n.text(
+                "menu.restore_last_markdown",
+                defaultValue: "Restore Last Markdown"
+            ),
+            action: #selector(restoreLastMarkdown),
+            keyEquivalent: ""
+        )
+        restoreLastMarkdownMenuItem.target = self
+        restoreLastMarkdownMenuItem.isEnabled = false
 
         previewMenuItem = menu.addItem(
             withTitle: L10n.text("menu.show_last_render", defaultValue: "Show Last Render"),
@@ -121,7 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func renderClipboard() {
-        guard !renderActivity.isRendering else { return }
+        guard !renderActivity.isRendering,
+              !isPresentingClipboardConfirmation else { return }
         do {
             let markdown = try Clipboard.markdownText()
             render(markdown)
@@ -135,20 +162,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         previewController.show(image: lastImage)
     }
 
+    @objc private func renderLastMarkdownAgain() {
+        guard !renderActivity.isRendering,
+              !isPresentingClipboardConfirmation,
+              let markdown = lastSource.markdown else { return }
+        render(markdown, confirmationAction: .rerender)
+    }
+
+    @objc private func restoreLastMarkdown() {
+        guard !renderActivity.isRendering,
+              !isPresentingClipboardConfirmation,
+              let markdown = lastSource.markdown,
+              confirmClipboardOverwriteIfNeeded(for: .restore) else { return }
+        do {
+            let changeCount = try Clipboard.write(markdown: markdown)
+            lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
+            hud.show(
+                L10n.text(
+                    "hud.markdown_restored",
+                    defaultValue: "Markdown restored — paste with Command-V"
+                ),
+                symbol: "doc.on.clipboard.fill"
+            )
+        } catch {
+            show(error)
+        }
+    }
+
     @objc private func renderExample(_ sender: NSMenuItem) {
-        guard !renderActivity.isRendering else { return }
+        guard !renderActivity.isRendering,
+              !isPresentingClipboardConfirmation else { return }
         guard let kind = ExampleKind(rawValue: sender.tag) else { return }
         do {
             let example = try AppResources.exampleMarkdown(for: kind)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(example, forType: .string)
+            let changeCount = try Clipboard.write(markdown: example)
+            lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
             render(example)
         } catch {
             show(error)
         }
     }
 
-    private func render(_ markdown: String) {
+    private func render(
+        _ markdown: String,
+        confirmationAction: LastSourceOverwriteAction? = nil
+    ) {
         guard renderActivity.begin() else { return }
         updateRenderingUI(isRendering: true)
         statusItem.button?.image = NSImage(
@@ -161,14 +219,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         renderer.render(markdown) { [weak self] result in
             guard let self else { return }
-            self.renderActivity.finish()
-            self.updateRenderingUI(isRendering: false)
+            defer {
+                self.renderActivity.finish()
+                self.updateRenderingUI(isRendering: false)
+            }
 
             switch result {
             case let .success(image):
+                if let confirmationAction,
+                   !self.confirmClipboardOverwriteIfNeeded(for: confirmationAction) {
+                    return
+                }
                 do {
-                    try Clipboard.write(image: image)
+                    let changeCount = try Clipboard.write(image: image)
                     self.lastImage = image
+                    self.lastSource.recordSuccessfulRender(
+                        markdown: markdown,
+                        clipboardChangeCount: changeCount
+                    )
                     self.previewMenuItem.isEnabled = true
                     self.hud.show(
                         L10n.text(
@@ -192,7 +260,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ? L10n.text("menu.rendering", defaultValue: "Rendering…")
             : L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
         examplesMenuItem.isEnabled = !isRendering
+        updateLastSourceActionAvailability()
         updateStatusItemAppearance()
+    }
+
+    private func updateLastSourceActionAvailability() {
+        let isEnabled = lastSource.isAvailable && !renderActivity.isRendering
+        renderLastMarkdownMenuItem.isEnabled = isEnabled
+        restoreLastMarkdownMenuItem.isEnabled = isEnabled
+    }
+
+    private func confirmClipboardOverwriteIfNeeded(
+        for action: LastSourceOverwriteAction
+    ) -> Bool {
+        guard lastSource.requiresConfirmation(
+            currentClipboardChangeCount: Clipboard.changeCount
+        ) else {
+            return true
+        }
+        guard !isPresentingClipboardConfirmation else { return false }
+        isPresentingClipboardConfirmation = true
+        defer { isPresentingClipboardConfirmation = false }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = L10n.text(
+            "confirmation.clipboard_changed.title",
+            defaultValue: "Clipboard Changed"
+        )
+        alert.informativeText = action.confirmationMessage()
+        alert.addButton(withTitle: L10n.text(
+            "common.replace",
+            defaultValue: "Replace"
+        ))
+        let cancelButton = alert.addButton(withTitle: L10n.text(
+            "common.cancel",
+            defaultValue: "Cancel"
+        ))
+        cancelButton.keyEquivalent = "\u{1b}"
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     @objc private func showAbout() {

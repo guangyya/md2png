@@ -1,6 +1,10 @@
 import AppKit
 
 enum Clipboard {
+    static var changeCount: Int {
+        NSPasteboard.general.changeCount
+    }
+
     static func menuPreview(includeLabel: Bool = true) -> String {
         let pasteboard = NSPasteboard.general
         let text = pasteboard.string(forType: .string)
@@ -69,15 +73,19 @@ enum Clipboard {
     }
 
     static func markdownText() throws -> String {
-        guard let text = NSPasteboard.general.string(forType: .string)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              !text.isEmpty else {
-            throw AppError.emptyClipboard
-        }
-        return text
+        try markdownText(from: NSPasteboard.general.string(forType: .string))
     }
 
-    static func write(image: NSImage) throws {
+    static func markdownText(from clipboardText: String?) throws -> String {
+        guard let clipboardText,
+              !clipboardText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AppError.emptyClipboard
+        }
+        return clipboardText
+    }
+
+    @discardableResult
+    static func write(image: NSImage) throws -> Int {
         guard let tiff = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),
               let png = bitmap.representation(using: .png, properties: [:]) else {
@@ -85,11 +93,26 @@ enum Clipboard {
         }
 
         let item = NSPasteboardItem()
-        item.setData(png, forType: .png)
-        item.setData(tiff, forType: .tiff)
+        guard item.setData(png, forType: .png),
+              item.setData(tiff, forType: .tiff) else {
+            throw AppError.clipboardWriteFailed
+        }
 
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.writeObjects([item])
+        guard pasteboard.writeObjects([item]) else {
+            throw AppError.clipboardWriteFailed
+        }
+        return pasteboard.changeCount
+    }
+
+    @discardableResult
+    static func write(markdown: String) throws -> Int {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard pasteboard.setString(markdown, forType: .string) else {
+            throw AppError.clipboardWriteFailed
+        }
+        return pasteboard.changeCount
     }
 }

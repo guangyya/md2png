@@ -71,6 +71,17 @@ only becomes available after a successful render in the current app session.
 Close the preview with `Command-W`, render again, and reopen it. Small images are
 shown without upscaling; tall images fit the window width and begin at the top.
 
+## Last Markdown actions are unavailable or ask for confirmation
+
+**Render Last Markdown Again** and **Restore Last Markdown** become available
+only after a successful render in the current app session. The source is kept
+in memory and is intentionally discarded when md2png quits.
+
+If another application or copy action changed the clipboard after md2png last
+wrote it, md2png asks before replacing that newer content. Choose **Cancel** to
+preserve the current clipboard, or **Replace** to continue with the latest
+successful Markdown source.
+
 ## macOS says the app cannot be opened or verified
 
 Use a notarized DMG from the project Releases page when a public binary release
