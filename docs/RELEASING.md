@@ -38,10 +38,16 @@ the same semantic version in `CHANGELOG.md`, then run:
 
 ```sh
 make test
-make app CONFIGURATION=release \
+make verify-dist CONFIGURATION=release \
   PROJECT_URL="$PROJECT_URL" \
   BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
 ```
+
+`verify-dist` verifies the app signature and arm64 executable, then invokes the
+packaged executable's offline `--self-test` entry point. That test resolves only
+resources inside `md2png.app`, renders Markdown, a GFM table, highlighted code,
+and Mermaid through the production WebKit renderer, validates the in-memory PNG,
+and leaves the clipboard and filesystem unchanged.
 
 Commit the release preparation and push `main` before invoking the guarded
 publisher. The publisher requires clean local `main` to exactly match
@@ -168,6 +174,8 @@ This command refuses to continue unless:
 - `GH_REPO` is supplied in `OWNER/REPOSITORY` form and the selected GitHub host
   is authenticated;
 - the version does not already have a GitHub Release.
+- the packaged app passes signature, architecture, bundled-resource, and
+  renderer self-tests.
 
 It then builds and notarizes the arm64 ZIP and DMG, creates and pushes the
 annotated version tag, and publishes three assets using the matching changelog

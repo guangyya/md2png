@@ -85,9 +85,9 @@ jobs:
       - name: Run tests
         run: make test
 
-      - name: Build release app
+      - name: Build and self-test release app
         run: >-
-          make app
+          make verify-dist
           CONFIGURATION=release
           PROJECT_URL="$PROJECT_URL"
           BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
@@ -122,3 +122,4 @@ jobs:
           test -s "$renderer_page"
           test -s "$resources/CHANGELOG.md"
           test -s "$resources/Examples/formatting.md"
+          test -s "$resources/Examples/renderer-self-test.md"
