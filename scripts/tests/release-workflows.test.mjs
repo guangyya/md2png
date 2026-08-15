@@ -239,8 +239,14 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.match(verifyJob, /run: \.\/scripts\/verify-published-release\.sh/);
   assert.match(verifyJob, /EXPECTED_CERTIFICATE_SHA256: [0-9A-F]{64}/);
   assert.equal(releaseJobs["verify-published"].if, "needs.detect.outputs.is_release == 'true' && needs.detect.outputs.already_published == 'true'");
+  assert.equal(releaseJobs["verify-published"].needs, "detect");
   assert.deepEqual(releaseJobs["verify-published"].permissions, { contents: "read", issues: "read" });
   assert.equal(Object.hasOwn(releaseJobs["verify-published"], "environment"), false);
+  const verifyCheckout = releaseJobs["verify-published"].steps.find((step) => step.name === "Check out trusted verification implementation");
+  assert.equal(verifyCheckout.uses, "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
+  assert.equal(verifyCheckout.with.ref, "${{ github.sha }}");
+  assert.equal(verifyCheckout.with["fetch-depth"], 0);
+  assert.equal(verifyCheckout.with["persist-credentials"], false);
   const mutationGuard = "needs.detect.outputs.is_release == 'true' && needs.detect.outputs.already_published != 'true'";
   for (const jobName of ["validate", "sign", "publish"]) {
     assert.equal(releaseJobs[jobName].if, mutationGuard, `${jobName} must be excluded from published no-op reruns`);
@@ -254,6 +260,9 @@ test("published reruns use a protected-main read-only verifier", () => {
     contents: "write",
     issues: "write",
   });
+  assert.equal(releaseJobs.validate.needs, "detect");
+  assert.deepEqual(releaseJobs.sign.needs, ["detect", "validate"]);
+  assert.deepEqual(releaseJobs.publish.needs, ["detect", "sign"]);
 
   assert.match(verifier, /gh release download/);
   assert.match(verifier, /remote_digest/);
@@ -262,7 +271,7 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.match(verifier, /openssl x509[\s\S]*?-fingerprint[\s\S]*?-sha256/);
   assert.match(verifier, /actual_certificate_sha256" = "\$expected_certificate_sha256/);
   assert.match(verifier, /verify_signer "\$\{assets_dir\}\/\$\{release_dmg_name\}" dmg-container/);
-  assert.match(verifier, /unset GH_TOKEN GITHUB_TOKEN[\s\S]*?--self-test/);
+  assert.match(verifier, /\/usr\/bin\/env -u GH_TOKEN -u GITHUB_TOKEN "\$candidate_executable" --self-test/);
   assert.match(verifier, /test "\$dmg_entries" = \$'Applications\\nmd2png\.app'/);
   assert.match(verifier, /xcrun stapler validate/);
   assert.match(verifier, /spctl --assess --type execute/);

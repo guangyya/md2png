@@ -218,10 +218,7 @@ verify_app() {
   xcrun stapler validate "$candidate"
   spctl --assess --type execute --verbose=2 "$candidate" 2>&1 |
     sed -E 's/origin=.*/origin=<redacted>/'
-  (
-    unset GH_TOKEN GITHUB_TOKEN
-    "$candidate_executable" --self-test
-  )
+  /usr/bin/env -u GH_TOKEN -u GITHUB_TOKEN "$candidate_executable" --self-test
 }
 
 verify_app "$app_path" zip
