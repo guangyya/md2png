@@ -87,6 +87,7 @@ A GFM table needs a separator row:
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and immediately renders the selected bundled sample |
+| Show Welcome… | — | Reopens the copy, render, and paste guide with current shortcut status |
 | About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current
@@ -97,6 +98,8 @@ disabled. Restore Last Markdown becomes available only after a successful render
 and asks before replacing clipboard content changed by another application. The
 Last Render window opens at a width that reflects the output, within the current
 screen, and identifies the preset and actual dimensions in its title.
+The welcome guide opens once on first launch and can be reopened from the menu;
+trying its bundled sample always requires an explicit click.
 See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
 dimensions and same-source reference renders.
 

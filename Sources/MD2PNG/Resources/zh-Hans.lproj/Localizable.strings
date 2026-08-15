@@ -10,6 +10,7 @@
 "menu.show_last_render" = "显示上次渲染";
 "menu.render_width" = "输出宽度";
 "menu.examples" = "示例";
+"menu.show_welcome" = "显示欢迎指南…";
 "menu.about" = "关于 md2png";
 "menu.quit" = "退出 md2png";
 
@@ -33,6 +34,8 @@
 
 "hotkey.render" = "渲染（Control-Command-X）";
 "hotkey.show_last_render" = "显示上次渲染（Control-Command-Z）";
+"shortcut.control_command_x" = "Control-Command-X";
+"shortcut.control_command_z" = "Control-Command-Z";
 "hud.shortcut_conflict" = "全局快捷键已被占用，但菜单命令仍可使用";
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
 "hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
@@ -52,6 +55,24 @@
 
 "preview.window_title" = "上次 Markdown 渲染";
 "preview.window_title_with_width" = "上次 Markdown 渲染 — %@ · %ld × %ld pt";
+
+"welcome.window_title" = "欢迎使用 md2png";
+"welcome.title" = "把 Markdown 变成精美 PNG";
+"welcome.subtitle" = "三步完成，内容始终在本机处理。";
+"welcome.step.copy.title" = "复制 Markdown";
+"welcome.step.copy.detail" = "在任意应用中复制 Markdown 文本。";
+"welcome.step.render.title" = "渲染图片";
+"welcome.step.render.detail" = "使用全局快捷键，或从菜单栏选择“将剪贴板渲染为图片”。";
+"welcome.step.paste.title" = "粘贴 PNG";
+"welcome.step.paste.detail" = "按 Command-V 粘贴，检查图片后再自行发送。";
+"welcome.shortcuts" = "全局快捷键";
+"welcome.shortcut_ready" = "可用";
+"welcome.shortcut_unavailable" = "已占用";
+"welcome.shortcut_conflict_help" = "其他应用正在使用该快捷键。仍可从 md2png 菜单执行所有操作。";
+"welcome.privacy_note" = "md2png 绝不会自动粘贴、发送或上传你的内容。";
+"welcome.try_sample" = "试试简短示例";
+"welcome.try_sample_help" = "明确复制并渲染应用内置的简短示例。";
+"welcome.done" = "完成";
 
 "about.window_title" = "关于 md2png";
 "about.development" = "开发版本";

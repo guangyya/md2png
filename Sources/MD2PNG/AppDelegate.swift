@@ -8,8 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let previewController = PreviewController()
     private let updateController = UpdateController()
     private lazy var aboutController = AboutController(updateController: updateController)
+    private let welcomePreference = WelcomePreference()
+    private lazy var welcomeController = WelcomeController(
+        preference: welcomePreference,
+        onTrySample: { [weak self] in self?.renderBundledExample(.short) }
+    )
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
+    private var welcomeShortcutStatuses: [WelcomeShortcutStatus] = []
     private var lastImage: NSImage?
     private var lastRenderWidthPreset: RenderWidthPreset?
     private var lastSource = LastSourceState()
@@ -37,12 +43,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
-        let hotKey = GlobalHotKey(registrations: [
+        let registrations: [GlobalHotKey.Registration] = [
             .render { [weak self] in self?.renderClipboard() },
             .showLastRender { [weak self] in self?.showLastRender() }
-        ])
+        ]
+        let hotKey = GlobalHotKey(registrations: registrations)
         self.hotKey = hotKey
-        if !hotKey.failedRegistrations.isEmpty {
+        let failedRegistrationIDs = Set(hotKey.failedRegistrations.map(\.id))
+        welcomeShortcutStatuses = registrations.map {
+            WelcomeShortcutStatus(
+                registration: $0,
+                failedRegistrationIDs: failedRegistrationIDs
+            )
+        }
+
+        if welcomePreference.shouldShowOnLaunch {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.welcomeController.showIfNeeded(
+                    shortcuts: self.welcomeShortcutStatuses
+                )
+            }
+        } else if !hotKey.failedRegistrations.isEmpty {
             DispatchQueue.main.async { [weak self] in
                 self?.hud.show(
                     L10n.text(
@@ -146,6 +168,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(examplesMenuItem)
 
         menu.addItem(.separator())
+        let welcomeItem = menu.addItem(
+            withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome…"),
+            action: #selector(showWelcome),
+            keyEquivalent: ""
+        )
+        welcomeItem.target = self
+
         let aboutItem = menu.addItem(
             withTitle: L10n.text("menu.about", defaultValue: "About md2png"),
             action: #selector(showAbout),
@@ -211,9 +240,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func renderExample(_ sender: NSMenuItem) {
+        guard let kind = ExampleKind(rawValue: sender.tag) else { return }
+        renderBundledExample(kind)
+    }
+
+    private func renderBundledExample(_ kind: ExampleKind) {
         guard !renderActivity.isRendering,
               !isPresentingClipboardConfirmation else { return }
-        guard let kind = ExampleKind(rawValue: sender.tag) else { return }
         do {
             let example = try AppResources.exampleMarkdown(for: kind)
             let changeCount = try Clipboard.write(markdown: example)
@@ -336,6 +369,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showAbout() {
         aboutController.show()
+    }
+
+    @objc private func showWelcome() {
+        welcomeController.show(shortcuts: welcomeShortcutStatuses)
     }
 
     @objc private func terminateFromStatusMenu() {

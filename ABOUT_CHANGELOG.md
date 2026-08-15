@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Learn the copy, render, and paste workflow from a first-launch guide.
+
 ## [0.3.0] - 2026-08-14
 
 ### Added
