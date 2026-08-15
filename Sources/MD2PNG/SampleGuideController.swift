@@ -362,7 +362,11 @@ private struct SampleExampleButton: View {
         .buttonStyle(.plain)
         .disabled(!isInputEnabled)
         .allowsHitTesting(isInputEnabled)
-        .focusable(isInputEnabled)
+        .onKeyPress(.return) {
+            guard isInputEnabled else { return .ignored }
+            action()
+            return .handled
+        }
         .onHover { isHovering = $0 }
     }
 }
