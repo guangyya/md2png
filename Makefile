@@ -19,7 +19,13 @@ RESOURCE_BUNDLE_NAME := md2png_MD2PNG.bundle
 APP_NAME := md2png
 ARM64_TRIPLE := arm64-apple-macosx$(MINIMUM_MACOS_VERSION)
 ARM64_BUILD_DIR = $(shell swift build -c $(CONFIGURATION) --triple $(ARM64_TRIPLE) --show-bin-path)
+ifeq ($(CONFIGURATION),debug)
+APP_DIR := dist/debug/$(APP_NAME).app
+DEBUG_APP_PREREQUISITE := debug-stop
+else
 APP_DIR := dist/$(APP_NAME).app
+DEBUG_APP_PREREQUISITE :=
+endif
 CONTENTS := $(APP_DIR)/Contents
 ICON_SOURCE := Assets/AppIcon/AppIcon.png
 ICONSET_DIR := .build/AppIcon.iconset
@@ -27,11 +33,6 @@ APP_ICON := .build/AppIcon.icns
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
-ifeq ($(CONFIGURATION),debug)
-DEBUG_APP_PREREQUISITE := debug-stop
-else
-DEBUG_APP_PREREQUISITE :=
-endif
 COVERAGE_DIR ?= .build/coverage
 COVERAGE_JSON := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.json
 COVERAGE_MARKDOWN := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.md

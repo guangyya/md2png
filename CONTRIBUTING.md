@@ -24,7 +24,8 @@ make run CONFIGURATION=debug
 Each Debug checkout receives a stable path-derived bundle identity. Repeating
 `make run CONFIGURATION=debug` replaces only the prior Debug process launched
 from that same checkout. Installed Release builds and Debug apps from other
-worktrees are left running.
+worktrees are left running. Debug bundles are built under `dist/debug`, while
+Release bundles remain under `dist`.
 
 `make bootstrap` installs the renderer dependencies and regenerates the bundled
 renderer. Generated build output, app bundles, ZIPs, DMGs, and credentials must
