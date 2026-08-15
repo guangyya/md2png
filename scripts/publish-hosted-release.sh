@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+repo_root="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$repo_root"
 
 node_binary="${NODE:-node}"
@@ -113,7 +113,11 @@ fi
 
 repo_ref="${gh_host}/${gh_repo}"
 release_exists=false
-if gh release view "$tag" --repo "$repo_ref" >/dev/null 2>&1; then
+release_id=""
+if release_id="$(gh release view "$tag" \
+  --repo "$repo_ref" \
+  --json databaseId \
+  --jq .databaseId 2>/dev/null)"; then
   release_exists=true
 fi
 if [[ "$release_exists" = false ]]; then
@@ -123,9 +127,18 @@ if [[ "$release_exists" = false ]]; then
     --notes-file "$notes_file" \
     --verify-tag \
     --draft
+  release_id="$(gh release view "$tag" \
+    --repo "$repo_ref" \
+    --json databaseId \
+    --jq .databaseId)"
+fi
+if [[ ! "$release_id" =~ ^[0-9]+$ ]]; then
+  echo "Cannot resolve the GitHub Release ID for $tag." >&2
+  exit 1
 fi
 
-release_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}")"
+release_endpoint="repos/${gh_repo}/releases/${release_id}"
+release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
 test "$(jq -r .name <<< "$release_json")" = "md2png $version"
 release_is_draft="$(jq -r .draft <<< "$release_json")"
 case "$release_is_draft" in
@@ -172,7 +185,7 @@ for name in "${expected_names[@]}"; do
   local_path="${handoff_dir}/${name}"
   local_size="$(stat -f %z "$local_path")"
   local_digest="sha256:$(shasum -a 256 "$local_path" | awk '{print $1}')"
-  asset_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}" \
+  asset_json="$(gh api --hostname "$gh_host" "$release_endpoint" \
     --jq ".assets[] | select(.name == \"${name}\")")"
   if [[ -z "$asset_json" ]]; then
     if [[ "$release_is_draft" != "true" ]]; then
@@ -181,10 +194,10 @@ for name in "${expected_names[@]}"; do
     fi
     label="$(asset_label "$name")"
     gh release upload "$tag" "${local_path}#${label}" --repo "$repo_ref"
-    asset_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}" \
+    asset_json="$(gh api --hostname "$gh_host" "$release_endpoint" \
       --jq ".assets[] | select(.name == \"${name}\")")"
   fi
-  remote_count="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}" \
+  remote_count="$(gh api --hostname "$gh_host" "$release_endpoint" \
     --jq "[.assets[] | select(.name == \"${name}\")] | length")"
   test "$remote_count" = "1"
   remote_size="$(jq -r .size <<< "$asset_json")"
@@ -199,7 +212,7 @@ for name in "${expected_names[@]}"; do
   fi
 done
 
-published_names="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}" --jq '.assets[].name' | LC_ALL=C sort)"
+published_names="$(gh api --hostname "$gh_host" "$release_endpoint" --jq '.assets[].name' | LC_ALL=C sort)"
 expected_names_text="$(printf '%s\n' "${expected_names[@]}" | LC_ALL=C sort)"
 if [[ "$published_names" != "$expected_names_text" ]]; then
   echo "Published Release has unexpected or missing assets." >&2
@@ -212,7 +225,7 @@ if [[ "$release_is_draft" = "true" ]]; then
 else
   gh release edit "$tag" --repo "$repo_ref" --latest
 fi
-published_release_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}")"
+published_release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
 test "$(jq -r .draft <<< "$published_release_json")" = "false"
 test "$(jq -r .prerelease <<< "$published_release_json")" = "false"
 latest_tag="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/latest" --jq .tag_name)"
