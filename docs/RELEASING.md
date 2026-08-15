@@ -103,6 +103,16 @@ coverage entry. To resume a failed draft, dispatch **Trusted Release** with the
 exact 40-character commit already on `main`; it cannot calculate or introduce
 another version.
 
+This read-only rerun proves that it cannot mutate publication state and that
+the current remote snapshot remains internally valid. The pinned certificate
+fingerprint independently anchors both app copies and the signed DMG container.
+Coverage JSON is schema-validated against the exact release commit and its
+Markdown is regenerated for byte comparison. GitHub's asset digest and the
+downloaded bytes still live in the same mutable Release namespace, so this is
+not an external provenance ledger against an already-authorized actor replacing
+both metadata and content. That stronger threat model requires a separately
+signed transparency record outside GitHub Releases and is not claimed here.
+
 For a local dry run of deterministic preparation, use a disposable clean branch
 or worktree:
 

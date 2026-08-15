@@ -220,6 +220,8 @@ test("release authorization checks the PR head and accepts only successful named
 
 test("published reruns use a protected-main read-only verifier", () => {
   const release = workflows["release.yml"];
+  const releaseWorkflow = parseYaml(release);
+  const releaseJobs = releaseWorkflow.jobs;
   const verifyJob = release.slice(release.indexOf("  verify-published:"), release.indexOf("  validate:"));
   const verifier = fs.readFileSync(path.join(repoRoot, "scripts/verify-published-release.sh"), "utf8");
 
@@ -236,10 +238,22 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.match(verifyJob, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
   assert.match(verifyJob, /run: \.\/scripts\/verify-published-release\.sh/);
   assert.match(verifyJob, /EXPECTED_CERTIFICATE_SHA256: [0-9A-F]{64}/);
-  assert.equal(
-    [...release.matchAll(/if: needs\.detect\.outputs\.is_release == 'true' && needs\.detect\.outputs\.already_published != 'true'/g)].length,
-    3,
-  );
+  assert.equal(releaseJobs["verify-published"].if, "needs.detect.outputs.is_release == 'true' && needs.detect.outputs.already_published == 'true'");
+  assert.deepEqual(releaseJobs["verify-published"].permissions, { contents: "read", issues: "read" });
+  assert.equal(Object.hasOwn(releaseJobs["verify-published"], "environment"), false);
+  const mutationGuard = "needs.detect.outputs.is_release == 'true' && needs.detect.outputs.already_published != 'true'";
+  for (const jobName of ["validate", "sign", "publish"]) {
+    assert.equal(releaseJobs[jobName].if, mutationGuard, `${jobName} must be excluded from published no-op reruns`);
+  }
+  const writeJobs = Object.entries(releaseJobs)
+    .filter(([, job]) => Object.values(job.permissions ?? {}).includes("write"))
+    .map(([name]) => name);
+  assert.deepEqual(writeJobs, ["publish"]);
+  assert.deepEqual(releaseJobs.publish.permissions, {
+    actions: "read",
+    contents: "write",
+    issues: "write",
+  });
 
   assert.match(verifier, /gh release download/);
   assert.match(verifier, /remote_digest/);
@@ -247,6 +261,9 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.match(verifier, /codesign -d --extract-certificates/);
   assert.match(verifier, /openssl x509[\s\S]*?-fingerprint[\s\S]*?-sha256/);
   assert.match(verifier, /actual_certificate_sha256" = "\$expected_certificate_sha256/);
+  assert.match(verifier, /verify_signer "\$\{assets_dir\}\/\$\{release_dmg_name\}" dmg-container/);
+  assert.match(verifier, /unset GH_TOKEN GITHUB_TOKEN[\s\S]*?--self-test/);
+  assert.match(verifier, /test "\$dmg_entries" = \$'Applications\\nmd2png\.app'/);
   assert.match(verifier, /xcrun stapler validate/);
   assert.match(verifier, /spctl --assess --type execute/);
   assert.match(verifier, /issues\/42/);

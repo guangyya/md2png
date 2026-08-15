@@ -180,20 +180,11 @@ app_count="$(find "$app_dir" -maxdepth 2 -type d -name md2png.app | wc -l | tr -
 test "$app_count" = "1"
 app_path="$(find "$app_dir" -maxdepth 2 -type d -name md2png.app -print -quit)"
 
-verify_app() {
+verify_signer() {
   local candidate="$1"
   local package_name="$2"
-  local candidate_plist="${candidate}/Contents/Info.plist"
-  local candidate_executable="${candidate}/Contents/MacOS/md2png"
   local certificate_dir="$verify_dir/certificate-${package_name}"
   local actual_certificate_sha256
-  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$candidate_plist")" = "$version"
-  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$candidate_plist")" = "$build_number"
-  test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGSourceCommit' "$candidate_plist")" = "$source_commit"
-  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate_plist")" = "$bundle_identifier"
-  test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$candidate_plist")" = "$project_url"
-  test "$(lipo -archs "$candidate_executable")" = "arm64"
-  codesign --verify --deep --strict --verbose=2 "$candidate"
   mkdir -p "$certificate_dir"
   (
     cd "$certificate_dir"
@@ -209,13 +200,33 @@ verify_app() {
     tr -d ':' |
     tr '[:lower:]' '[:upper:]')"
   test "$actual_certificate_sha256" = "$expected_certificate_sha256"
+}
+
+verify_app() {
+  local candidate="$1"
+  local package_name="$2"
+  local candidate_plist="${candidate}/Contents/Info.plist"
+  local candidate_executable="${candidate}/Contents/MacOS/md2png"
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$candidate_plist")" = "$version"
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$candidate_plist")" = "$build_number"
+  test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGSourceCommit' "$candidate_plist")" = "$source_commit"
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate_plist")" = "$bundle_identifier"
+  test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$candidate_plist")" = "$project_url"
+  test "$(lipo -archs "$candidate_executable")" = "arm64"
+  codesign --verify --deep --strict --verbose=2 "$candidate"
+  verify_signer "$candidate" "$package_name"
   xcrun stapler validate "$candidate"
   spctl --assess --type execute --verbose=2 "$candidate" 2>&1 |
     sed -E 's/origin=.*/origin=<redacted>/'
-  "$candidate_executable" --self-test
+  (
+    unset GH_TOKEN GITHUB_TOKEN
+    "$candidate_executable" --self-test
+  )
 }
 
 verify_app "$app_path" zip
+codesign --verify --strict --verbose=2 "${assets_dir}/${release_dmg_name}"
+verify_signer "${assets_dir}/${release_dmg_name}" dmg-container
 xcrun stapler validate "${assets_dir}/${release_dmg_name}"
 hdiutil verify "${assets_dir}/${release_dmg_name}"
 spctl --assess --type open --context context:primary-signature --verbose=2 \
@@ -226,10 +237,14 @@ mkdir -p "$verify_dir/dmg"
 hdiutil attach -nobrowse -readonly -mountpoint "$verify_dir/dmg" \
   "${assets_dir}/${release_dmg_name}" >/dev/null
 mounted_dmg=true
+dmg_entries="$(find "$verify_dir/dmg" -mindepth 1 -maxdepth 1 -exec basename {} \; | LC_ALL=C sort)"
+test "$dmg_entries" = $'Applications\nmd2png.app'
+test -L "$verify_dir/dmg/Applications"
+test "$(readlink "$verify_dir/dmg/Applications")" = "/Applications"
 mounted_app_count="$(find "$verify_dir/dmg" -maxdepth 2 -type d -name md2png.app | wc -l | tr -d ' ')"
 test "$mounted_app_count" = "1"
 mounted_app="$(find "$verify_dir/dmg" -maxdepth 2 -type d -name md2png.app -print -quit)"
-verify_app "$mounted_app" dmg
+verify_app "$mounted_app" dmg-app
 diff -rq "$app_path" "$mounted_app"
 hdiutil detach "$verify_dir/dmg" >/dev/null
 mounted_dmg=false
