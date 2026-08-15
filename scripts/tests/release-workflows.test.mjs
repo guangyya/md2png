@@ -218,6 +218,86 @@ test("release authorization checks the PR head and accepts only successful named
   assert.doesNotMatch(release, /SUCCESS\|SKIPPED|SUCCESS\|NEUTRAL|SKIPPED\|NEUTRAL/);
 });
 
+test("published reruns use a protected-main read-only verifier", () => {
+  const release = workflows["release.yml"];
+  const releaseWorkflow = parseYaml(release);
+  const releaseJobs = releaseWorkflow.jobs;
+  const verifyJob = release.slice(release.indexOf("  verify-published:"), release.indexOf("  validate:"));
+  const verifier = fs.readFileSync(path.join(repoRoot, "scripts/verify-published-release.sh"), "utf8");
+
+  assert.match(release, /already_published: \$\{\{ steps\.release\.outputs\.already_published \}\}/);
+  assert.deepEqual(releaseWorkflow.permissions, {
+    checks: "read",
+    contents: "read",
+    "pull-requests": "read",
+  });
+  assert.match(release, /"v\$\{version\}"\)[\s\S]*?already_published=true/);
+  assert.match(release, /git cat-file -t "refs\/tags\/\$\{latest_tag\}"/);
+  assert.match(release, /git rev-parse "refs\/tags\/\$\{latest_tag\}\^\{\}"\)" = "\$source_commit"/);
+  assert.match(verifyJob, /already_published == 'true'/);
+  assert.match(verifyJob, /permissions:\n      contents: read\n      issues: read/);
+  assert.doesNotMatch(verifyJob, /contents: write|issues: write|environment: release-signing|secrets\./);
+  assert.match(verifyJob, /WORKFLOW_REF: \$\{\{ github\.ref \}\}/);
+  assert.match(verifyJob, /\[\[ "\$WORKFLOW_REF" != "refs\/heads\/main" \]\]/);
+  assert.match(verifyJob, /git merge-base --is-ancestor "\$WORKFLOW_COMMIT" refs\/remotes\/origin\/main/);
+  assert.match(verifyJob, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
+  assert.match(verifyJob, /run: \.\/scripts\/verify-published-release\.sh/);
+  assert.match(verifyJob, /EXPECTED_CERTIFICATE_SHA256: [0-9A-F]{64}/);
+  assert.equal(releaseJobs["verify-published"].if, "needs.detect.outputs.is_release == 'true' && needs.detect.outputs.already_published == 'true'");
+  assert.equal(releaseJobs["verify-published"].needs, "detect");
+  assert.deepEqual(releaseJobs["verify-published"].permissions, { contents: "read", issues: "read" });
+  assert.equal(Object.hasOwn(releaseJobs["verify-published"], "environment"), false);
+  const verifyCheckout = releaseJobs["verify-published"].steps.find((step) => step.name === "Check out trusted verification implementation");
+  assert.equal(verifyCheckout.uses, "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1");
+  assert.equal(verifyCheckout.with.ref, "${{ github.sha }}");
+  assert.equal(verifyCheckout.with["fetch-depth"], 0);
+  assert.equal(verifyCheckout.with["persist-credentials"], false);
+  const mutationGuard = "needs.detect.outputs.is_release == 'true' && needs.detect.outputs.already_published != 'true'";
+  for (const jobName of ["validate", "sign", "publish"]) {
+    assert.equal(releaseJobs[jobName].if, mutationGuard, `${jobName} must be excluded from published no-op reruns`);
+  }
+  const writeJobs = [];
+  for (const [jobName, job] of Object.entries(releaseJobs)) {
+    if (job.permissions === undefined) {
+      continue;
+    }
+    if (typeof job.permissions === "string") {
+      assert.equal(job.permissions, "read-all", `${jobName} must not use a broad permission preset`);
+      continue;
+    }
+    assert.equal(typeof job.permissions, "object", `${jobName} permissions must be a map or read-all`);
+    for (const value of Object.values(job.permissions)) {
+      assert.match(value, /^(?:read|write|none)$/, `${jobName} has an unknown permission level`);
+    }
+    if (Object.values(job.permissions).includes("write")) {
+      writeJobs.push(jobName);
+    }
+  }
+  assert.deepEqual(writeJobs, ["publish"]);
+  assert.deepEqual(releaseJobs.publish.permissions, {
+    actions: "read",
+    contents: "write",
+    issues: "write",
+  });
+  assert.equal(releaseJobs.validate.needs, "detect");
+  assert.deepEqual(releaseJobs.sign.needs, ["detect", "validate"]);
+  assert.deepEqual(releaseJobs.publish.needs, ["detect", "sign"]);
+
+  assert.match(verifier, /gh release download/);
+  assert.match(verifier, /remote_digest/);
+  assert.match(verifier, /codesign --verify --deep --strict/);
+  assert.match(verifier, /codesign -d --extract-certificates/);
+  assert.match(verifier, /openssl x509[\s\S]*?-fingerprint[\s\S]*?-sha256/);
+  assert.match(verifier, /actual_certificate_sha256" = "\$expected_certificate_sha256/);
+  assert.match(verifier, /verify_signer "\$\{assets_dir\}\/\$\{release_dmg_name\}" dmg-container/);
+  assert.match(verifier, /\/usr\/bin\/env -u GH_TOKEN -u GITHUB_TOKEN "\$candidate_executable" --self-test/);
+  assert.match(verifier, /test "\$dmg_entries" = \$'Applications\\nmd2png\.app'/);
+  assert.match(verifier, /xcrun stapler validate/);
+  assert.match(verifier, /spctl --assess --type execute/);
+  assert.match(verifier, /issues\/42/);
+  assert.doesNotMatch(verifier, /gh release (?:create|upload|edit)|--method (?:PATCH|POST|PUT|DELETE)|--clobber/);
+});
+
 test("trusted publication updates coverage history in the originating workflow", () => {
   const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");
   const release = workflows["release.yml"];

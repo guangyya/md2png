@@ -87,11 +87,31 @@ The trusted workflow isolates responsibilities:
 
 The workflow is serialized and non-canceling. A retry accepts an existing tag
 only when it resolves to the same commit. It resumes a matching draft by
-skipping byte-identical assets and uploading only missing verified assets; an
-already-published Release must already contain the exact verified asset set.
-Any mismatch is rejected. To resume a failed run, dispatch **Trusted Release**
-with the exact 40-character commit already on `main`; it cannot calculate or
-introduce another version.
+skipping byte-identical assets and uploading only missing verified assets. If
+that exact version is already the latest published Release, the workflow skips
+coverage generation, signing, and publication. A read-only macOS job instead
+downloads the existing five assets and verifies their names, labels, sizes,
+content types, SHA-256 digests, release notes, source metadata, signatures,
+the repository-pinned public leaf-certificate SHA-256 fingerprint,
+notarization tickets, architecture, packaged self-test, and issue #42 links.
+It has no environment secrets or repository write permission. The fingerprint
+contains no private key or account credential and is independently observable
+in every signed public app; update it through a reviewed infrastructure PR when
+rotating the Developer ID certificate, before publishing with the replacement.
+Any mismatch is rejected without replacing the tag, Release, assets, or
+coverage entry. To resume a failed draft, dispatch **Trusted Release** with the
+exact 40-character commit already on `main`; it cannot calculate or introduce
+another version.
+
+This read-only rerun proves that it cannot mutate publication state and that
+the current remote snapshot remains internally valid. The pinned certificate
+fingerprint independently anchors both app copies and the signed DMG container.
+Coverage JSON is schema-validated against the exact release commit and its
+Markdown is regenerated for byte comparison. GitHub's asset digest and the
+downloaded bytes still live in the same mutable Release namespace, so this is
+not an external provenance ledger against an already-authorized actor replacing
+both metadata and content. That stronger threat model requires a separately
+signed transparency record outside GitHub Releases and is not claimed here.
 
 For a local dry run of deterministic preparation, use a disposable clean branch
 or worktree:
