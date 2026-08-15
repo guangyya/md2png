@@ -1,5 +1,29 @@
 import Carbon
 
+enum GlobalShortcutCommand: UInt32 {
+    case render = 1
+    case showLastRender = 2
+}
+
+@MainActor
+struct GlobalShortcutRouter {
+    private let verify: (GlobalShortcutCommand) -> Bool
+    private let perform: (GlobalShortcutCommand) -> Void
+
+    init(
+        verify: @escaping (GlobalShortcutCommand) -> Bool,
+        perform: @escaping (GlobalShortcutCommand) -> Void
+    ) {
+        self.verify = verify
+        self.perform = perform
+    }
+
+    func handle(_ command: GlobalShortcutCommand) {
+        guard !verify(command) else { return }
+        perform(command)
+    }
+}
+
 @MainActor
 final class GlobalHotKey {
     struct Registration {
@@ -14,7 +38,7 @@ final class GlobalHotKey {
 
         static func render(action: @escaping () -> Void) -> Registration {
             Registration(
-                id: 1,
+                id: GlobalShortcutCommand.render.rawValue,
                 keyCode: UInt32(kVK_ANSI_X),
                 modifiers: UInt32(cmdKey | controlKey),
                 commandTitle: L10n.text(
@@ -36,7 +60,7 @@ final class GlobalHotKey {
 
         static func showLastRender(action: @escaping () -> Void) -> Registration {
             Registration(
-                id: 2,
+                id: GlobalShortcutCommand.showLastRender.rawValue,
                 keyCode: UInt32(kVK_ANSI_Z),
                 modifiers: UInt32(cmdKey | controlKey),
                 commandTitle: L10n.text(

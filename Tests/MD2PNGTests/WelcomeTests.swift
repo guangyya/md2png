@@ -34,6 +34,8 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(statuses.map(\.shortcutGlyphs), ["⌃⌘X", "⌃⌘Z"])
         XCTAssertTrue(statuses[0].isRegistered)
         XCTAssertFalse(statuses[1].isRegistered)
+        XCTAssertEqual(statuses.map(\.isVerified), [false, false])
+        XCTAssertEqual(statuses.map(\.verificationCount), [0, 0])
         XCTAssertEqual(
             statuses[0].title,
             L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
@@ -49,8 +51,28 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(english.windowTitle, "Welcome to md2png")
         XCTAssertEqual(english.trySample, "Try a Short Sample")
         XCTAssertTrue(english.trySampleHelp.contains("Examples"))
+        XCTAssertEqual(english.shortcutDetected, "Detected")
+        XCTAssertEqual(english.shortcutVerified, "Works")
+        XCTAssertTrue(english.shortcutVerificationHelp.contains("without running"))
+        XCTAssertEqual(
+            String(
+                format: english.shortcutVerifiedAnnouncementFormat,
+                "Render Clipboard as Image"
+            ),
+            "Render Clipboard as Image shortcut works."
+        )
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
+        XCTAssertEqual(chinese.shortcutDetected, "已检测")
+        XCTAssertEqual(chinese.shortcutVerified, "已生效")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
+        XCTAssertTrue(chinese.shortcutVerificationHelp.contains("不会执行"))
+        XCTAssertEqual(
+            String(
+                format: chinese.shortcutVerifiedAnnouncementFormat,
+                "将剪贴板渲染为图片"
+            ),
+            "“将剪贴板渲染为图片”快捷键已生效。"
+        )
         XCTAssertTrue(chinese.privacyNote.contains("绝不会"))
         XCTAssertTrue(chinese.reopenHint.contains("显示欢迎指南"))
         XCTAssertEqual(
@@ -61,6 +83,120 @@ final class WelcomeTests: XCTestCase {
             L10n.text("menu.show_welcome", defaultValue: "", bundle: chineseBundle),
             "显示欢迎指南"
         )
+    }
+
+    @MainActor
+    func testWelcomeShortcutVerificationSuppressesActionsAndResetsEveryOpening() throws {
+        _ = NSApplication.shared
+        let (defaults, suiteName) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let controller = WelcomeController(
+            preference: WelcomePreference(defaults: defaults),
+            onTrySample: {}
+        )
+        let registrations: [GlobalHotKey.Registration] = [
+            .render {},
+            .showLastRender {}
+        ]
+        let registeredShortcuts = registrations.map {
+            WelcomeShortcutStatus(registration: $0, failedRegistrationIDs: [])
+        }
+        var performedCommands: [GlobalShortcutCommand] = []
+        let router = GlobalShortcutRouter(
+            verify: { controller.verifyShortcut($0) },
+            perform: { performedCommands.append($0) }
+        )
+
+        router.handle(.render)
+        router.handle(.showLastRender)
+        XCTAssertEqual(performedCommands, [.render, .showLastRender])
+
+        controller.show(shortcuts: registeredShortcuts)
+        router.handle(.render)
+        router.handle(.render)
+
+        XCTAssertEqual(performedCommands, [.render, .showLastRender])
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.isVerified),
+            [true, false]
+        )
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.verificationCount),
+            [2, 0]
+        )
+
+        router.handle(.showLastRender)
+
+        XCTAssertEqual(performedCommands, [.render, .showLastRender])
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.isVerified),
+            [true, true]
+        )
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.verificationCount),
+            [2, 1]
+        )
+
+        controller.close()
+        router.handle(.render)
+        router.handle(.showLastRender)
+        XCTAssertEqual(
+            performedCommands,
+            [.render, .showLastRender, .render, .showLastRender]
+        )
+
+        controller.show(shortcuts: registeredShortcuts)
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.isVerified),
+            [false, false]
+        )
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.verificationCount),
+            [0, 0]
+        )
+
+        controller.window?.orderOut(nil)
+        router.handle(.render)
+        XCTAssertEqual(
+            performedCommands,
+            [.render, .showLastRender, .render, .showLastRender, .render]
+        )
+        controller.close()
+    }
+
+    @MainActor
+    func testWelcomeKeepsConflictedShortcutUnavailableAndSuppressesItsAction() throws {
+        _ = NSApplication.shared
+        let (defaults, suiteName) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let controller = WelcomeController(
+            preference: WelcomePreference(defaults: defaults),
+            onTrySample: {}
+        )
+        let registrations: [GlobalHotKey.Registration] = [
+            .render {},
+            .showLastRender {}
+        ]
+        let shortcuts = registrations.map {
+            WelcomeShortcutStatus(
+                registration: $0,
+                failedRegistrationIDs: [registrations[1].id]
+            )
+        }
+        var performedCommands: [GlobalShortcutCommand] = []
+        let router = GlobalShortcutRouter(
+            verify: { controller.verifyShortcut($0) },
+            perform: { performedCommands.append($0) }
+        )
+        controller.show(shortcuts: shortcuts)
+        defer { controller.close() }
+
+        router.handle(.showLastRender)
+
+        XCTAssertTrue(performedCommands.isEmpty)
+        XCTAssertFalse(controller.displayedShortcutStatuses[1].isRegistered)
+        XCTAssertFalse(controller.displayedShortcutStatuses[1].isVerified)
+        XCTAssertEqual(controller.displayedShortcutStatuses[1].verificationCount, 0)
     }
 
     func testWelcomeWindowPlacementCentersInsideTheActiveVisibleFrame() {

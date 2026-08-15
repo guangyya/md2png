@@ -9,6 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Verify either registered global shortcut directly from Welcome without
+  running its render or preview command.
 - Add a first-launch guide for the copy, render, and paste workflow, including
   a native animated walkthrough, live global-shortcut status, an explicit
   menu-guided sample action, automatic example previews, and Command-Tab

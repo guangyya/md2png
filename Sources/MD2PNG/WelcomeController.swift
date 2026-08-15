@@ -25,6 +25,8 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
     let shortcutGlyphs: String
     let shortcutAccessibilityName: String
     let isRegistered: Bool
+    fileprivate(set) var isVerified: Bool
+    fileprivate(set) var verificationCount: Int
 
     init(
         registration: GlobalHotKey.Registration,
@@ -35,6 +37,8 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         shortcutGlyphs = registration.shortcutGlyphs
         shortcutAccessibilityName = registration.shortcutAccessibilityName
         isRegistered = !failedRegistrationIDs.contains(registration.id)
+        isVerified = false
+        verificationCount = 0
     }
 
     init(
@@ -42,13 +46,39 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         title: String,
         shortcutGlyphs: String,
         shortcutAccessibilityName: String,
-        isRegistered: Bool
+        isRegistered: Bool,
+        isVerified: Bool = false
     ) {
         self.id = id
         self.title = title
         self.shortcutGlyphs = shortcutGlyphs
         self.shortcutAccessibilityName = shortcutAccessibilityName
         self.isRegistered = isRegistered
+        self.isVerified = isRegistered && isVerified
+        verificationCount = 0
+    }
+}
+
+@MainActor
+private final class WelcomeShortcutVerificationState: ObservableObject {
+    @Published private(set) var shortcuts: [WelcomeShortcutStatus] = []
+
+    func reset(shortcuts: [WelcomeShortcutStatus]) {
+        self.shortcuts = shortcuts.map { shortcut in
+            var shortcut = shortcut
+            shortcut.isVerified = false
+            shortcut.verificationCount = 0
+            return shortcut
+        }
+    }
+
+    @discardableResult
+    func verify(id: UInt32) -> WelcomeShortcutStatus? {
+        guard let index = shortcuts.firstIndex(where: { $0.id == id }),
+              shortcuts[index].isRegistered else { return nil }
+        shortcuts[index].isVerified = true
+        shortcuts[index].verificationCount += 1
+        return shortcuts[index]
     }
 }
 
@@ -79,9 +109,13 @@ struct WelcomeCopy {
     let pasteStepTitle: String
     let pasteStepDetail: String
     let shortcutsTitle: String
+    let shortcutVerificationHelp: String
     let shortcutReady: String
+    let shortcutDetected: String
+    let shortcutVerified: String
     let shortcutUnavailable: String
     let shortcutConflictHelp: String
+    let shortcutVerifiedAnnouncementFormat: String
     let privacyNote: String
     let reopenHint: String
     let trySample: String
@@ -139,9 +173,24 @@ struct WelcomeCopy {
             defaultValue: "Global shortcuts",
             bundle: localizationBundle
         )
+        shortcutVerificationHelp = L10n.text(
+            "welcome.shortcut_verification_help",
+            defaultValue: "Press a shortcut here to test it without running the command.",
+            bundle: localizationBundle
+        )
         shortcutReady = L10n.text(
             "welcome.shortcut_ready",
             defaultValue: "Ready",
+            bundle: localizationBundle
+        )
+        shortcutDetected = L10n.text(
+            "welcome.shortcut_detected",
+            defaultValue: "Detected",
+            bundle: localizationBundle
+        )
+        shortcutVerified = L10n.text(
+            "welcome.shortcut_verified",
+            defaultValue: "Works",
             bundle: localizationBundle
         )
         shortcutUnavailable = L10n.text(
@@ -152,6 +201,11 @@ struct WelcomeCopy {
         shortcutConflictHelp = L10n.text(
             "welcome.shortcut_conflict_help",
             defaultValue: "Another app is using a shortcut. Every action remains available from the md2png menu.",
+            bundle: localizationBundle
+        )
+        shortcutVerifiedAnnouncementFormat = L10n.text(
+            "welcome.shortcut_verified_announcement",
+            defaultValue: "%@ shortcut works.",
             bundle: localizationBundle
         )
         privacyNote = L10n.text(
@@ -188,10 +242,12 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let copy: WelcomeCopy
     private let onVisibilityChange: (Bool) -> Void
     private let onTrySample: () -> Void
-    private var shortcutStatuses: [WelcomeShortcutStatus] = []
+    private let shortcutVerificationState = WelcomeShortcutVerificationState()
 
 #if DEBUG
-    var displayedShortcutStatuses: [WelcomeShortcutStatus] { shortcutStatuses }
+    var displayedShortcutStatuses: [WelcomeShortcutStatus] {
+        shortcutVerificationState.shortcuts
+    }
     var displayedContentSize: NSSize {
         window?.contentView?.bounds.size ?? .zero
     }
@@ -222,10 +278,10 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     }
 
     func show(shortcuts: [WelcomeShortcutStatus]) {
-        shortcutStatuses = shortcuts
+        shortcutVerificationState.reset(shortcuts: shortcuts)
         let rootView = WelcomeView(
             copy: copy,
-            shortcuts: shortcuts,
+            shortcutVerificationState: shortcutVerificationState,
             onTrySample: { [weak self] in self?.trySample() },
             onDone: { [weak self] in self?.complete() }
         )
@@ -254,6 +310,14 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         window?.makeKeyAndOrderFront(nil)
     }
 
+    func verifyShortcut(_ command: GlobalShortcutCommand) -> Bool {
+        guard let window, window.isVisible, !NSApp.isHidden else { return false }
+        if let shortcut = shortcutVerificationState.verify(id: command.rawValue) {
+            announceVerification(of: shortcut, in: window)
+        }
+        return true
+    }
+
     func windowWillClose(_ notification: Notification) {
         preference.markCompleted()
         onVisibilityChange(false)
@@ -278,6 +342,24 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         close()
     }
 
+    private func announceVerification(
+        of shortcut: WelcomeShortcutStatus,
+        in window: NSWindow
+    ) {
+        guard let contentView = window.contentView else { return }
+        NSAccessibility.post(
+            element: contentView,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: String(
+                    format: copy.shortcutVerifiedAnnouncementFormat,
+                    shortcut.title
+                ),
+                .priority: NSAccessibilityPriorityLevel.medium.rawValue
+            ]
+        )
+    }
+
     private func centerOnActiveScreen() {
         guard let window else { return }
         let pointerLocation = NSEvent.mouseLocation
@@ -294,12 +376,12 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 
 private struct WelcomeView: View {
     let copy: WelcomeCopy
-    let shortcuts: [WelcomeShortcutStatus]
+    @ObservedObject var shortcutVerificationState: WelcomeShortcutVerificationState
     let onTrySample: () -> Void
     let onDone: () -> Void
 
     private var hasShortcutConflict: Bool {
-        shortcuts.contains { !$0.isRegistered }
+        shortcutVerificationState.shortcuts.contains { !$0.isRegistered }
     }
 
     var body: some View {
@@ -358,7 +440,12 @@ private struct WelcomeView: View {
                 Text(copy.shortcutsTitle)
                     .font(.headline)
 
-                ForEach(shortcuts) { shortcut in
+                Text(copy.shortcutVerificationHelp)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ForEach(shortcutVerificationState.shortcuts) { shortcut in
                     WelcomeShortcutRow(shortcut: shortcut, copy: copy)
                 }
 
@@ -435,17 +522,31 @@ private struct WelcomeBackdrop: View {
 private struct WelcomeShortcutRow: View {
     let shortcut: WelcomeShortcutStatus
     let copy: WelcomeCopy
+    @State private var isShowingVerificationFeedback = false
+    @State private var verificationFeedbackTask: Task<Void, Never>?
 
     private var statusText: String {
-        shortcut.isRegistered ? copy.shortcutReady : copy.shortcutUnavailable
+        if !shortcut.isRegistered {
+            return copy.shortcutUnavailable
+        }
+        if isShowingVerificationFeedback {
+            return copy.shortcutDetected
+        }
+        return shortcut.isVerified ? copy.shortcutVerified : copy.shortcutReady
     }
 
     private var statusSymbol: String {
-        shortcut.isRegistered ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+        if !shortcut.isRegistered {
+            return "exclamationmark.triangle.fill"
+        }
+        return shortcut.isVerified ? "checkmark.circle.fill" : "circle.dashed"
     }
 
     private var statusColor: Color {
-        shortcut.isRegistered ? .green : .orange
+        if !shortcut.isRegistered {
+            return .orange
+        }
+        return shortcut.isVerified ? .green : .secondary
     }
 
     var body: some View {
@@ -472,15 +573,20 @@ private struct WelcomeShortcutRow: View {
             Label(statusText, systemImage: statusSymbol)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
-                .frame(width: 74, alignment: .leading)
+                .frame(width: 88, alignment: .leading)
+                .symbolEffect(.bounce, value: shortcut.verificationCount)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
             LinearGradient(
                 colors: [
-                    Color(nsColor: .controlBackgroundColor).opacity(0.72),
-                    Color.accentColor.opacity(0.045)
+                    isShowingVerificationFeedback
+                        ? Color.green.opacity(0.24)
+                        : Color(nsColor: .controlBackgroundColor).opacity(0.72),
+                    isShowingVerificationFeedback
+                        ? Color.green.opacity(0.12)
+                        : Color.accentColor.opacity(0.045)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -489,8 +595,29 @@ private struct WelcomeShortcutRow: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
+                .stroke(
+                    isShowingVerificationFeedback
+                        ? Color.green.opacity(0.75)
+                        : Color.accentColor.opacity(0.1),
+                    lineWidth: isShowingVerificationFeedback ? 1.4 : 0.5
+                )
+        }
+        .scaleEffect(isShowingVerificationFeedback ? 1.012 : 1)
+        .animation(.easeOut(duration: 0.12), value: isShowingVerificationFeedback)
+        .onChange(of: shortcut.verificationCount) { _, verificationCount in
+            guard verificationCount > 0 else { return }
+            verificationFeedbackTask?.cancel()
+            isShowingVerificationFeedback = true
+            verificationFeedbackTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled else { return }
+                isShowingVerificationFeedback = false
+            }
+        }
+        .onDisappear {
+            verificationFeedbackTask?.cancel()
         }
         .accessibilityElement(children: .combine)
+        .accessibilityValue(statusText)
     }
 }

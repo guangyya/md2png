@@ -7,6 +7,7 @@ for the complete project history and release details.
 
 ### Added
 
+- Safely verify global shortcuts from Welcome.
 - Learn the copy, render, and paste workflow from a first-launch guide.
 - Choose Compact, Standard, or Wide output widths.
 
