@@ -161,6 +161,90 @@ final class WelcomeTests: XCTestCase {
     }
 
     @MainActor
+    func testSampleGuideDismissDuringAnimatedClosePreservesCommittedSelection() {
+        let popover = TestSampleGuidePopover()
+        popover.completesCloseImmediately = false
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: true,
+                canShowLastRender: true
+            )
+        )
+
+        controller.choose(.short)
+        controller.dismiss()
+
+        XCTAssertEqual(popover.closeCount, 1)
+        XCTAssertTrue(deliveredSelections.isEmpty)
+
+        popover.completeClose()
+
+        XCTAssertEqual(deliveredSelections, [.short])
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
+    func testSampleGuideRecoversWhenPopoverCannotRemainShown() {
+        let popover = TestSampleGuidePopover()
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+        popover.hideWithoutDelegate()
+
+        controller.choose(.table)
+        controller.choose(.short)
+
+        XCTAssertEqual(deliveredSelections, [.table])
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
+    func testSampleGuideShowFailureDoesNotLeaveAnInteractiveHalfOpenState() {
+        let popover = TestSampleGuidePopover()
+        popover.showsWhenRequested = false
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+        controller.choose(.short)
+
+        XCTAssertFalse(popover.isShown)
+        XCTAssertNil(popover.contentViewController)
+        XCTAssertTrue(deliveredSelections.isEmpty)
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
     func testWelcomeWindowCanTrySampleCompleteAndStayDismissed() throws {
         _ = NSApplication.shared
         let (defaults, suiteName) = try makeDefaults()
@@ -217,21 +301,40 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
     var contentSize = NSSize.zero
     var contentViewController: NSViewController?
     var isShown = false
+    var showsWhenRequested = true
+    var completesCloseImmediately = true
     private(set) var closeCount = 0
+    private var isClosing = false
 
     func show(
         relativeTo positioningRect: NSRect,
         of positioningView: NSView,
         preferredEdge: NSRectEdge
     ) {
+        guard showsWhenRequested else { return }
         isShown = true
+        isClosing = false
     }
 
     func close() {
-        guard isShown else { return }
+        guard isShown, !isClosing else { return }
         closeCount += 1
+        isClosing = true
         delegate?.popoverWillClose?(Notification(name: NSPopover.willCloseNotification))
+        if completesCloseImmediately {
+            completeClose()
+        }
+    }
+
+    func completeClose() {
+        guard isClosing else { return }
         isShown = false
+        isClosing = false
         delegate?.popoverDidClose?(Notification(name: NSPopover.didCloseNotification))
+    }
+
+    func hideWithoutDelegate() {
+        isShown = false
+        isClosing = false
     }
 }

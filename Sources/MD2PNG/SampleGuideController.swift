@@ -42,6 +42,7 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     private weak var highlightedButton: NSButton?
     private var acceptsSelection = false
     private var pendingSelection: ExampleKind?
+    private var isClosing = false
 
     convenience init(onChoose: @escaping (ExampleKind) -> Void) {
         self.init(popover: NSPopover(), onChoose: onChoose)
@@ -64,7 +65,7 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         relativeTo button: NSStatusBarButton,
         menuState: SampleGuideMenuState
     ) {
-        dismiss()
+        guard !popover.isShown, !isClosing else { return }
         acceptsSelection = true
 
         popover.contentViewController = NSHostingController(
@@ -82,40 +83,61 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
             of: button,
             preferredEdge: .minY
         )
+        guard popover.isShown else {
+            acceptsSelection = false
+            popover.contentViewController = nil
+            clearStatusButtonHighlight()
+            return
+        }
     }
 
     func dismiss() {
         acceptsSelection = false
-        pendingSelection = nil
-        if popover.isShown {
+        if popover.isShown, !isClosing {
+            isClosing = true
             popover.close()
+        } else if !popover.isShown {
+            isClosing = false
+            deliverPendingSelection()
         }
         clearStatusButtonHighlight()
     }
 
     func popoverWillClose(_ notification: Notification) {
+        acceptsSelection = false
+        isClosing = true
         clearStatusButtonHighlight()
     }
 
     func popoverDidClose(_ notification: Notification) {
         acceptsSelection = false
+        isClosing = false
         clearStatusButtonHighlight()
-
-        guard let selection = pendingSelection else { return }
-        pendingSelection = nil
-        onChoose(selection)
+        deliverPendingSelection()
     }
 
     func choose(_ kind: ExampleKind) {
         guard acceptsSelection else { return }
         acceptsSelection = false
         pendingSelection = kind
+        guard popover.isShown else {
+            deliverPendingSelection()
+            return
+        }
+        isClosing = true
         popover.close()
     }
 
     private func clearStatusButtonHighlight() {
         highlightedButton?.highlight(false)
         highlightedButton = nil
+    }
+
+    private func deliverPendingSelection() {
+        guard let selection = pendingSelection else { return }
+        pendingSelection = nil
+        clearStatusButtonHighlight()
+        onChoose(selection)
     }
 }
 
