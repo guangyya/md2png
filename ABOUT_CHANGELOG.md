@@ -8,6 +8,11 @@ for the complete project history and release details.
 ### Added
 
 - Learn the copy, render, and paste workflow from a first-launch guide.
+- Choose Compact, Standard, or Wide output widths.
+
+### Fixed
+
+- Recover from interrupted or stalled WebKit renders without restarting the app.
 
 ## [0.3.0] - 2026-08-14
 

@@ -25,7 +25,90 @@ and may be overridden for any build.
 The build embeds the current Git commit in the packaged app automatically;
 `SOURCE_COMMIT` may be supplied explicitly when building outside a Git checkout.
 
-## 1. Prepare the version
+## One-time hosted release setup
+
+The normal release path uses two separately scoped identities:
+
+- Install a dedicated GitHub App only on this repository. Grant it repository
+  metadata read, Contents write, and Pull requests write. Do not grant Actions,
+  administration, environments, secrets, or Release publication permissions.
+  Store its App ID and private key as repository secrets
+  `RELEASE_PREP_APP_ID` and `RELEASE_PREP_PRIVATE_KEY`.
+- Create the protected `release-signing` environment. Store
+  `RELEASE_CERTIFICATE_P12_BASE64`, `RELEASE_CERTIFICATE_PASSWORD`,
+  `RELEASE_SIGN_IDENTITY`, `RELEASE_CERTIFICATE_SHA256`, `APPLE_ID`,
+  `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD` only in that environment.
+  `RELEASE_SIGN_IDENTITY` is the complete Developer ID Application common name;
+  the fingerprint is the certificate's SHA-256 value with or without colons.
+  An environment reviewer is optional.
+
+Keep the `release`, `release:patch`, `release:minor`, and `release:major` labels.
+Protect `main` and require the stable CI checks plus Release preflight. The App
+token is minted only inside Prepare Release PR, is limited to this repository,
+and is revoked by the pinned token action after the job.
+
+## Normal hosted release
+
+Maintain complete release notes under `Unreleased` in `CHANGELOG.md` and concise
+in-app highlights under `Unreleased` in `ABOUT_CHANGELOG.md` as user-visible
+changes merge. The preparation workflow never invents or summarizes notes.
+
+To release:
+
+1. Open **Actions → Prepare Release PR → Run workflow** on `main`.
+2. Choose exactly `patch`, `minor`, or `major` once.
+3. Review the generated `codex/release-vX.Y.Z` PR. It changes only `Info.plist`,
+   `CHANGELOG.md`, and `ABOUT_CHANGELOG.md`, increments the build by one, and
+   moves both `Unreleased` sections to the same Asia/Shanghai release date.
+4. Wait for normal CI and Release preflight, then merge the PR through the
+   protected branch. The preparation workflow cannot approve or merge it.
+5. Watch **Trusted Release** validate, sign, notarize, publish, verify the five
+   assets, and update coverage history for that exact merge commit.
+
+Release preflight derives the bump independently, rejects stale or unrelated
+edits, runs tests, and verifies an ad-hoc release package without secrets or
+write permission. Coverage is deliberately not collected on the Release PR.
+The post-merge trusted Release build collects it once on Xcode 26.2. The two
+stable CI jobs and Release preflight are hard publication gates; the explicitly
+experimental Xcode preview job remains informational and cannot block a stable
+release.
+
+The trusted workflow isolates responsibilities:
+
+- `validate` has read-only repository access, runs the full coverage-enabled
+  test suite, and produces normalized JSON/Markdown coverage files;
+- `sign` alone enters `release-signing`, imports the certificate into a
+  temporary keychain, checks its identity, Team ID, and fingerprint, notarizes
+  the exact source, and emits a one-day handoff with a SHA-256 manifest; and
+- `publish` receives no Apple secret. It alone can create the annotated tag and
+  Release and update issue #42. It revalidates signatures, staples, metadata,
+  manifest digests, asset digests, and the source commit, creates the Release as
+  a draft, and makes it public/latest only after all five assets match.
+
+The workflow is serialized and non-canceling. A retry accepts an existing tag
+only when it resolves to the same commit. It resumes a matching draft by
+skipping byte-identical assets and uploading only missing verified assets; an
+already-published Release must already contain the exact verified asset set.
+Any mismatch is rejected. To resume a failed run, dispatch **Trusted Release**
+with the exact 40-character commit already on `main`; it cannot calculate or
+introduce another version.
+
+For a local dry run of deterministic preparation, use a disposable clean branch
+or worktree:
+
+```sh
+make prepare-release BUMP=minor RELEASE_DATE=2026-08-15
+```
+
+The command changes release files only. It never commits, pushes, opens a PR,
+signs, tags, or publishes.
+
+## Emergency local recovery path
+
+The hosted workflow is the normal publisher. The commands below remain the
+operator-controlled fallback for diagnosing or recovering a release.
+
+### 1. Prepare the version manually
 
 `Info.plist` is the source of truth for the About window, artifact names, tag,
 and GitHub Release title. Update both version keys:
@@ -55,7 +138,7 @@ Commit the release preparation and push `main` before invoking the guarded
 publisher. The publisher requires clean local `main` to exactly match
 `origin/main`.
 
-## 2. Create an ad-hoc arm64 build
+### 2. Create an ad-hoc arm64 build
 
 ```sh
 make release PROJECT_URL="$PROJECT_URL" BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
@@ -73,7 +156,7 @@ Both run on Apple silicon Macs only. Because the app is ad-hoc signed, another
 Mac may warn that it cannot verify the developer. Do not present this as a
 polished public release.
 
-## 3. Create a personal Apple Development build
+### 3. Create a personal Apple Development build
 
 An `Apple Development` certificate is suitable for your own Mac and limited
 development testing. It is not a substitute for Developer ID distribution and
@@ -98,7 +181,7 @@ make dmg \
 The outputs end in `-apple-development.zip` and
 `-apple-development.dmg`, which avoids confusing them with a public release.
 
-## 4. Create a Developer ID build
+### 4. Create a Developer ID build
 
 Join the Apple Developer Program and install a `Developer ID Application`
 certificate in the login keychain. Then build with hardened runtime and a
@@ -119,7 +202,7 @@ codesign --verify --deep --strict --verbose=2 "dist/md2png.app"
 lipo -archs "dist/md2png.app/Contents/MacOS/md2png"
 ```
 
-## 5. Notarize and staple
+### 5. Notarize and staple
 
 Store notarization credentials once. Use an app-specific password, not your
 Apple ID password:
@@ -154,9 +237,9 @@ spctl --assess --type open --context context:primary-signature --verbose=2 \
   "dist/md2png-<version>-macOS-arm64-developer-id.dmg"
 ```
 
-## 6. Publish the GitHub release
+### 6. Publish the GitHub release
 
-The guarded path is:
+The guarded emergency publisher is:
 
 ```sh
 make publish-release \
@@ -213,17 +296,18 @@ worktree clean, so rerunning a version cannot silently replace its coverage
 record or package uncommitted renderer output. The GitHub CLI uses
 the account authenticated for `GH_HOST`; no token is stored in the application.
 
-After publication, the least-privilege Coverage history workflow regenerates
+After hosted publication, the originating trusted workflow directly regenerates
 pinned issue [#42](https://github.com/guangyya/md2png/issues/42) from all stable
-Release JSON assets. The issue number is fixed; renaming or closing it does not
-stop updates, while a missing issue or damaged generated-section markers fail
-visibly. Its Markdown table is the accessibility and rendering fallback for the
-Mermaid chart. The workflow has `issues: write` only; pull-request workflows
-remain read-only and do not collect coverage. If the release event did not run
-it, dispatch `Coverage history` manually after confirming the Release assets.
+Release JSON assets. This is intentional because a Release created with the
+job's `GITHUB_TOKEN` does not start another release workflow. The issue number
+is fixed; renaming or closing it does not stop updates, while a missing issue or
+damaged generated-section markers fail visibly. Its Markdown table is the
+accessibility and rendering fallback for the Mermaid chart. A Release created
+manually can also trigger the least-privilege Coverage history workflow; if it
+does not, dispatch that workflow after verifying the Release assets.
 
-The equivalent manual fallback is below. Prefer `make publish-release`; the
-manual path is useful only for diagnosing or recovering a partial publication.
+The lower-level commands below are useful only for diagnosing or recovering a
+partial local publication. Prefer the guarded helper within this emergency path.
 
 Extract only the notes for the version being published:
 
