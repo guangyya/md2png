@@ -27,6 +27,12 @@ APP_ICON := .build/AppIcon.icns
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
+ifeq ($(CONFIGURATION),debug)
+DEBUG_CHECKOUT_ID := $(shell $(NODE) scripts/debug-run.mjs identity --repo-root "$(CURDIR)")
+EFFECTIVE_BUNDLE_IDENTIFIER := $(shell $(NODE) scripts/debug-run.mjs bundle-identifier --repo-root "$(CURDIR)" --base "$(BUNDLE_IDENTIFIER)")
+else
+EFFECTIVE_BUNDLE_IDENTIFIER := $(BUNDLE_IDENTIFIER)
+endif
 COVERAGE_DIR ?= .build/coverage
 COVERAGE_JSON := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.json
 COVERAGE_MARKDOWN := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.md
@@ -114,13 +120,17 @@ app: build icon
 	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources"
 	cp "$(ARM64_BUILD_DIR)/$(TARGET_NAME)" "$(CONTENTS)/MacOS/$(TARGET_NAME)"
 	cp Info.plist "$(CONTENTS)/Info.plist"
-	@case "$(BUNDLE_IDENTIFIER)" in \
+	@case "$(EFFECTIVE_BUNDLE_IDENTIFIER)" in \
 		""|*[!A-Za-z0-9.-]*) \
 			echo "BUNDLE_IDENTIFIER must contain only letters, numbers, dots, and hyphens"; \
 			exit 1 ;; \
 		*) ;; \
 	esac
-	/usr/bin/plutil -replace CFBundleIdentifier -string "$(BUNDLE_IDENTIFIER)" "$(CONTENTS)/Info.plist"
+	/usr/bin/plutil -replace CFBundleIdentifier -string "$(EFFECTIVE_BUNDLE_IDENTIFIER)" "$(CONTENTS)/Info.plist"
+	@if [ "$(CONFIGURATION)" = "debug" ]; then \
+		test -n "$(DEBUG_CHECKOUT_ID)" || { echo "Debug checkout identity is empty"; exit 1; }; \
+		/usr/bin/plutil -insert MD2PNGDebugCheckoutID -string "$(DEBUG_CHECKOUT_ID)" "$(CONTENTS)/Info.plist"; \
+	fi
 	@if [ -n "$(SOURCE_COMMIT)" ]; then \
 		if ! /usr/bin/printf '%s\n' "$(SOURCE_COMMIT)" | /usr/bin/grep -Eq '^[0-9a-fA-F]{7,64}$$'; then \
 			echo "SOURCE_COMMIT must contain 7 to 64 hexadecimal characters"; \
@@ -214,7 +224,14 @@ publish-release:
 	./scripts/publish-release.sh
 
 run: app
-	open "$(APP_DIR)"
+	@if [ "$(CONFIGURATION)" = "debug" ]; then \
+		$(NODE) scripts/debug-run.mjs run \
+			--repo-root "$(CURDIR)" \
+			--app "$(APP_DIR)" \
+			--executable "$(TARGET_NAME)"; \
+	else \
+		open "$(APP_DIR)"; \
+	fi
 
 clean:
 	swift package clean
