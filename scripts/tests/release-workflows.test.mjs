@@ -5,14 +5,19 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const workflowDirectory = path.join(repoRoot, ".github/workflows");
 const workflowNames = ["prepare-release-pr.yml", "release-preflight.yml", "release.yml"];
 const workflows = Object.fromEntries(workflowNames.map((name) => [
   name,
-  fs.readFileSync(path.join(repoRoot, ".github/workflows", name), "utf8"),
+  fs.readFileSync(path.join(workflowDirectory, name), "utf8"),
 ]));
+const allWorkflows = Object.fromEntries(fs.readdirSync(workflowDirectory)
+  .filter((name) => /\.ya?ml$/.test(name))
+  .sort()
+  .map((name) => [name, fs.readFileSync(path.join(workflowDirectory, name), "utf8")]));
 
-test("new release workflows pin every external action to a full commit", () => {
-  for (const [name, content] of Object.entries(workflows)) {
+test("all workflows pin every external action to a full commit", () => {
+  for (const [name, content] of Object.entries(allWorkflows)) {
     const uses = [...content.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s*#.*)?$/gm)].map((match) => match[1]);
     assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
     for (const reference of uses) {
