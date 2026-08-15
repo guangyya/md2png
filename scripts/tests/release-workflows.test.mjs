@@ -18,63 +18,70 @@ const allWorkflows = Object.fromEntries(fs.readdirSync(workflowDirectory)
   .sort()
   .map((name) => [name, fs.readFileSync(path.join(workflowDirectory, name), "utf8")]));
 
-function parseYaml(content) {
+function parseYamlDocument(content) {
   const json = execFileSync("/usr/bin/ruby", [
     "-ryaml",
     "-rjson",
     "-e",
-    "print JSON.generate(YAML.safe_load(STDIN.read))",
+    String.raw`
+content = STDIN.read
+document = Psych.parse(content)
+uses = []
+
+collect_uses = lambda do |node, location|
+  case node
+  when Psych::Nodes::Mapping
+    node.children.each_slice(2) do |key, value|
+      key_name = key.is_a?(Psych::Nodes::Scalar) ? key.value : nil
+      child_location = "#{location}.#{key_name || "?"}"
+      if key_name == "uses"
+        uses << {
+          "location" => child_location,
+          "reference" => value.is_a?(Psych::Nodes::Scalar) ? value.value : nil,
+          "line" => value.start_line,
+        }
+      end
+      collect_uses.call(value, child_location)
+    end
+  when Psych::Nodes::Sequence
+    node.children.each_with_index do |child, index|
+      collect_uses.call(child, "#{location}[#{index}]")
+    end
+  end
+end
+
+collect_uses.call(document.root, "$")
+print JSON.generate({
+  "value" => YAML.safe_load(content),
+  "uses" => uses,
+})
+`,
   ], { encoding: "utf8", input: content });
   return JSON.parse(json);
 }
 
-function collectUses(value, location = "$", result = []) {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => collectUses(item, `${location}[${index}]`, result));
-  } else if (value && typeof value === "object") {
-    for (const [key, child] of Object.entries(value)) {
-      const childLocation = `${location}.${key}`;
-      if (key === "uses") {
-        result.push({ location: childLocation, reference: child });
-      }
-      collectUses(child, childLocation, result);
-    }
-  }
-  return result;
+function parseYaml(content) {
+  return parseYamlDocument(content).value;
 }
 
-function annotationCount(content, reference) {
-  return content.split(/\r?\n/).filter((line) => {
-    const commentOffset = line.indexOf("#");
-    if (commentOffset < 0) {
-      return false;
-    }
-    const code = line.slice(0, commentOffset);
-    const comment = line.slice(commentOffset + 1).trim();
-    return code.includes(reference)
-      && /(?:^|[\s{,])["']?uses["']?\s*:/.test(code)
-      && /^v\d+(?:\.\d+){0,2}$/.test(comment);
-  }).length;
+function hasVersionAnnotation(sourceLines, line) {
+  return /\s+#\s*v\d+(?:\.\d+){0,2}\s*$/.test(sourceLines[line] ?? "");
 }
 
 function assertPinnedExternalActions(name, content) {
-  const uses = collectUses(parseYaml(content));
+  const { uses } = parseYamlDocument(content);
   assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
 
-  const requiredAnnotations = new Map();
-  for (const { location, reference } of uses) {
+  const sourceLines = content.split(/\r?\n/);
+  for (const { line, location, reference } of uses) {
     assert.equal(typeof reference, "string", `${name}: ${location} must be a string`);
     if (reference.startsWith("./")) {
       continue;
     }
     assert.match(reference, /^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[0-9a-f]{40}$/, `${name}: ${reference}`);
-    requiredAnnotations.set(reference, (requiredAnnotations.get(reference) ?? 0) + 1);
-  }
-
-  for (const [reference, count] of requiredAnnotations) {
     assert.ok(
-      annotationCount(content, reference) >= count,
-      `${name}: ${reference} needs an exact same-line Dependabot version comment`,
+      hasVersionAnnotation(sourceLines, line),
+      `${name}: ${location} (${reference}) needs an exact same-line Dependabot version comment`,
     );
   }
 }
@@ -113,6 +120,19 @@ steps:
   - { "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020" } # v7.0.0
 `;
   assertPinnedExternalActions("quoted-pinned.yml", fixture);
+});
+
+test("action version comments must be on the parsed uses source line", () => {
+  const fixture = `
+steps:
+  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  - run: 'echo "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"' # v7.0.1
+  - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+`;
+  assert.throws(
+    () => assertPinnedExternalActions("misplaced-comment.yml", fixture),
+    /checkout.*needs an exact same-line Dependabot version comment/,
+  );
 });
 
 test("Dependabot structurally configures weekly GitHub Actions updates", () => {
