@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const workflowDirectory = path.join(repoRoot, ".github/workflows");
+const dependabot = fs.readFileSync(path.join(repoRoot, ".github/dependabot.yml"), "utf8");
 const workflowNames = ["prepare-release-pr.yml", "release-preflight.yml", "release.yml"];
 const workflows = Object.fromEntries(workflowNames.map((name) => [
   name,
@@ -18,12 +19,23 @@ const allWorkflows = Object.fromEntries(fs.readdirSync(workflowDirectory)
 
 test("all workflows pin every external action to a full commit", () => {
   for (const [name, content] of Object.entries(allWorkflows)) {
-    const uses = [...content.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s*#.*)?$/gm)].map((match) => match[1]);
+    const uses = [...content.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?\s*$/gm)];
     assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
-    for (const reference of uses) {
+    for (const [, reference, version] of uses) {
       assert.match(reference, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/, `${name}: ${reference}`);
+      assert.match(version ?? "", /^v\d+(?:\.\d+){0,2}$/, `${name}: ${reference} needs a Dependabot version comment`);
     }
   }
+});
+
+test("Dependabot checks pinned GitHub Actions every week", () => {
+  assert.match(dependabot, /package-ecosystem:\s*"github-actions"/);
+  assert.match(dependabot, /directory:\s*"\/"/);
+  assert.match(dependabot, /schedule:\n\s+interval:\s*"weekly"/);
+  assert.match(dependabot, /day:\s*"monday"/);
+  assert.match(dependabot, /timezone:\s*"Asia\/Shanghai"/);
+  assert.match(dependabot, /actions-minor-patch:[\s\S]*?patterns:\n\s+- "\*"[\s\S]*?"minor"[\s\S]*?"patch"/);
+  assert.match(dependabot, /actions-major:[\s\S]*?patterns:\n\s+- "\*"[\s\S]*?"major"/);
 });
 
 test("pull request code remains read-only and never uses pull_request_target", () => {
