@@ -52,6 +52,22 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
     }
 }
 
+struct WelcomeWindowPlacement {
+    static func centeredOrigin(
+        windowSize: NSSize,
+        visibleFrame: NSRect
+    ) -> NSPoint {
+        NSPoint(
+            x: visibleFrame.midX - windowSize.width / 2,
+            y: visibleFrame.midY - windowSize.height / 2
+        )
+    }
+}
+
+private enum WelcomeLayout {
+    static let contentSize = NSSize(width: 620, height: 620)
+}
+
 struct WelcomeCopy {
     let windowTitle: String
     let title: String
@@ -162,8 +178,6 @@ struct WelcomeCopy {
 
 @MainActor
 final class WelcomeController: NSWindowController, NSWindowDelegate {
-    private static let contentSize = NSSize(width: 560, height: 530)
-
     private let preference: WelcomePreference
     private let copy: WelcomeCopy
     private let onTrySample: () -> Void
@@ -210,21 +224,22 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 
         if window == nil {
             let window = PreviewWindow(
-                contentRect: NSRect(origin: .zero, size: Self.contentSize),
+                contentRect: NSRect(origin: .zero, size: WelcomeLayout.contentSize),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
             )
             window.title = copy.windowTitle
             window.isReleasedWhenClosed = false
+            window.level = .normal
             window.delegate = self
             self.window = window
         }
         window?.contentViewController = hostingController
-        window?.setContentSize(Self.contentSize)
-        showWindow(nil)
+        window?.setContentSize(WelcomeLayout.contentSize)
         NSApp.activate(ignoringOtherApps: true)
-        window?.center()
+        centerOnActiveScreen()
+        showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }
 
@@ -250,6 +265,19 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         preference.markCompleted()
         close()
     }
+
+    private func centerOnActiveScreen() {
+        guard let window else { return }
+        let pointerLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first {
+            $0.frame.contains(pointerLocation)
+        } ?? NSScreen.main ?? NSScreen.screens.first
+        guard let visibleFrame = targetScreen?.visibleFrame else { return }
+        window.setFrameOrigin(WelcomeWindowPlacement.centeredOrigin(
+            windowSize: window.frame.size,
+            visibleFrame: visibleFrame
+        ))
+    }
 }
 
 private struct WelcomeView: View {
@@ -263,12 +291,12 @@ private struct WelcomeView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .center, spacing: 16) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 68, height: 68)
+                    .frame(width: 58, height: 58)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -281,23 +309,7 @@ private struct WelcomeView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                WelcomeStepRow(
-                    number: 1,
-                    title: copy.copyStepTitle,
-                    detail: copy.copyStepDetail
-                )
-                WelcomeStepRow(
-                    number: 2,
-                    title: copy.renderStepTitle,
-                    detail: copy.renderStepDetail
-                )
-                WelcomeStepRow(
-                    number: 3,
-                    title: copy.pasteStepTitle,
-                    detail: copy.pasteStepDetail
-                )
-            }
+            WelcomeWorkflowDemo(copy: copy)
 
             VStack(alignment: .leading, spacing: 9) {
                 Text(copy.shortcutsTitle)
@@ -320,6 +332,8 @@ private struct WelcomeView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Spacer(minLength: 0)
+
             HStack {
                 Button(action: onTrySample) {
                     Label(copy.trySample, systemImage: "sparkles")
@@ -333,34 +347,158 @@ private struct WelcomeView: View {
             }
         }
         .padding(28)
-        .frame(width: 560, height: 530)
+        .frame(
+            width: WelcomeLayout.contentSize.width,
+            height: WelcomeLayout.contentSize.height
+        )
         .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
-private struct WelcomeStepRow: View {
-    let number: Int
-    let title: String
-    let detail: String
+private struct WelcomeWorkflowDemo: View {
+    private static let phaseInterval: TimeInterval = 1.5
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var startedAt = Date()
+
+    let copy: WelcomeCopy
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text(String(number))
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 26, height: 26)
-                .background(Color.accentColor.opacity(0.12), in: Circle())
-                .accessibilityHidden(true)
+        TimelineView(.periodic(
+            from: startedAt,
+            by: reduceMotion ? 60 : Self.phaseInterval
+        )) { context in
+            let phase = phase(at: context.date)
+            VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    WelcomeDemoStage(
+                        title: copy.copyStepTitle,
+                        symbol: "doc.on.clipboard",
+                        badge: "Markdown",
+                        isActive: phase == 0
+                    )
+                    WelcomeDemoConnector(isActive: phase > 0)
+                    WelcomeDemoStage(
+                        title: copy.renderStepTitle,
+                        symbol: "wand.and.stars",
+                        badge: "⌃⌘X",
+                        isActive: phase == 1
+                    )
+                    WelcomeDemoConnector(isActive: phase > 1)
+                    WelcomeDemoStage(
+                        title: copy.pasteStepTitle,
+                        symbol: "photo.on.rectangle.angled",
+                        badge: "PNG · ⌘V",
+                        isActive: phase == 2
+                    )
+                }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                Text(detail)
+                Text(detail(for: phase))
+                    .font(.callout)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 34)
+                    .id(phase)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
+            .animation(
+                reduceMotion ? nil : .easeInOut(duration: 0.38),
+                value: phase
+            )
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 176)
+        .background(
+            Color(nsColor: .controlBackgroundColor).opacity(0.42),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.7), lineWidth: 0.5)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private func phase(at date: Date) -> Int {
+        guard !reduceMotion else { return 2 }
+        let elapsed = max(0, date.timeIntervalSince(startedAt))
+        return Int(elapsed / Self.phaseInterval) % 3
+    }
+
+    private func detail(for phase: Int) -> String {
+        switch phase {
+        case 0:
+            copy.copyStepDetail
+        case 1:
+            copy.renderStepDetail
+        default:
+            copy.pasteStepDetail
+        }
+    }
+}
+
+private struct WelcomeDemoStage: View {
+    let title: String
+    let symbol: String
+    let badge: String
+    let isActive: Bool
+
+    var body: some View {
+        VStack(spacing: 7) {
+            Image(systemName: symbol)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(
+                    isActive ? Color.accentColor : Color(nsColor: .secondaryLabelColor)
+                )
+
+            Text(title)
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+
+            Text(badge)
+                .font(.system(.caption, design: .rounded).weight(.medium))
+                .foregroundStyle(
+                    isActive ? Color.accentColor : Color(nsColor: .secondaryLabelColor)
+                )
+        }
+        .frame(width: 144, height: 96)
+        .background(
+            isActive
+                ? Color.accentColor.opacity(0.13)
+                : Color(nsColor: .windowBackgroundColor).opacity(0.82),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isActive
+                        ? Color.accentColor.opacity(0.55)
+                        : Color(nsColor: .separatorColor).opacity(0.6),
+                    lineWidth: isActive ? 1 : 0.5
+                )
+        }
+        .scaleEffect(isActive ? 1 : 0.96)
+        .shadow(
+            color: isActive ? Color.accentColor.opacity(0.14) : .clear,
+            radius: 8,
+            y: 3
+        )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct WelcomeDemoConnector: View {
+    let isActive: Bool
+
+    var body: some View {
+        Image(systemName: "arrow.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(
+                isActive ? Color.accentColor : Color(nsColor: .tertiaryLabelColor)
+            )
+            .frame(width: 22)
+            .accessibilityHidden(true)
     }
 }
 

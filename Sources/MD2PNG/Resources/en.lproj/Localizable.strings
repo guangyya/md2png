@@ -10,7 +10,7 @@
 "menu.show_last_render" = "Show Last Render";
 "menu.render_width" = "Output Width";
 "menu.examples" = "Examples";
-"menu.show_welcome" = "Show Welcome…";
+"menu.show_welcome" = "Show Welcome";
 "menu.about" = "About md2png";
 "menu.quit" = "Quit md2png";
 

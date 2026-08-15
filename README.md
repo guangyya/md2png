@@ -87,7 +87,7 @@ A GFM table needs a separator row:
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result; close with `Command-W` |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and immediately renders the selected bundled sample |
-| Show Welcome… | — | Reopens the copy, render, and paste guide with current shortcut status |
+| Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
 | About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
 The top of the menu contains a compact, read-only preview of the current

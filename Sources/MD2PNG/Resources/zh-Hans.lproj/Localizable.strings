@@ -10,7 +10,7 @@
 "menu.show_last_render" = "显示上次渲染";
 "menu.render_width" = "输出宽度";
 "menu.examples" = "示例";
-"menu.show_welcome" = "显示欢迎指南…";
+"menu.show_welcome" = "显示欢迎指南";
 "menu.about" = "关于 md2png";
 "menu.quit" = "退出 md2png";
 

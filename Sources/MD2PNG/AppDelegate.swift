@@ -169,7 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
         let welcomeItem = menu.addItem(
-            withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome…"),
+            withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome"),
             action: #selector(showWelcome),
             keyEquivalent: ""
         )

@@ -41,18 +41,34 @@ final class WelcomeTests: XCTestCase {
     }
 
     func testWelcomeCopyIsLocalizedInEnglishAndSimplifiedChinese() throws {
-        let english = WelcomeCopy(
-            localizationBundle: try XCTUnwrap(L10n.localizedBundle(for: "en"))
-        )
-        let chinese = WelcomeCopy(
-            localizationBundle: try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
-        )
+        let englishBundle = try XCTUnwrap(L10n.localizedBundle(for: "en"))
+        let chineseBundle = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+        let english = WelcomeCopy(localizationBundle: englishBundle)
+        let chinese = WelcomeCopy(localizationBundle: chineseBundle)
 
         XCTAssertEqual(english.windowTitle, "Welcome to md2png")
         XCTAssertEqual(english.trySample, "Try a Short Sample")
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
         XCTAssertTrue(chinese.privacyNote.contains("绝不会"))
+        XCTAssertEqual(
+            L10n.text("menu.show_welcome", defaultValue: "", bundle: englishBundle),
+            "Show Welcome"
+        )
+        XCTAssertEqual(
+            L10n.text("menu.show_welcome", defaultValue: "", bundle: chineseBundle),
+            "显示欢迎指南"
+        )
+    }
+
+    func testWelcomeWindowPlacementCentersInsideTheActiveVisibleFrame() {
+        let origin = WelcomeWindowPlacement.centeredOrigin(
+            windowSize: NSSize(width: 620, height: 648),
+            visibleFrame: NSRect(x: -1920, y: 25, width: 1920, height: 1055)
+        )
+
+        XCTAssertEqual(origin.x, -1270, accuracy: 0.001)
+        XCTAssertEqual(origin.y, 228.5, accuracy: 0.001)
     }
 
     @MainActor
@@ -75,9 +91,10 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(controller.showIfNeeded(shortcuts: shortcuts))
         XCTAssertEqual(controller.window?.title, "Welcome to md2png")
-        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 560, height: 530))
+        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 620, height: 620))
         XCTAssertEqual(controller.displayedShortcutStatuses, shortcuts)
         XCTAssertEqual(controller.window?.isVisible, true)
+        XCTAssertEqual(controller.window?.level, .normal)
 
         controller.trySampleForTesting()
         XCTAssertEqual(sampleCount, 1)
