@@ -218,6 +218,37 @@ test("release authorization checks the PR head and accepts only successful named
   assert.doesNotMatch(release, /SUCCESS\|SKIPPED|SUCCESS\|NEUTRAL|SKIPPED\|NEUTRAL/);
 });
 
+test("published reruns use a protected-main read-only verifier", () => {
+  const release = workflows["release.yml"];
+  const verifyJob = release.slice(release.indexOf("  verify-published:"), release.indexOf("  validate:"));
+  const verifier = fs.readFileSync(path.join(repoRoot, "scripts/verify-published-release.sh"), "utf8");
+
+  assert.match(release, /already_published: \$\{\{ steps\.release\.outputs\.already_published \}\}/);
+  assert.match(release, /"v\$\{version\}"\)[\s\S]*?already_published=true/);
+  assert.match(release, /git cat-file -t "refs\/tags\/\$\{latest_tag\}"/);
+  assert.match(release, /git rev-parse "refs\/tags\/\$\{latest_tag\}\^\{\}"\)" = "\$source_commit"/);
+  assert.match(verifyJob, /already_published == 'true'/);
+  assert.match(verifyJob, /permissions:\n      contents: read\n      issues: read/);
+  assert.doesNotMatch(verifyJob, /contents: write|issues: write|environment: release-signing|secrets\./);
+  assert.match(verifyJob, /WORKFLOW_REF: \$\{\{ github\.ref \}\}/);
+  assert.match(verifyJob, /\[\[ "\$WORKFLOW_REF" != "refs\/heads\/main" \]\]/);
+  assert.match(verifyJob, /git merge-base --is-ancestor "\$WORKFLOW_COMMIT" refs\/remotes\/origin\/main/);
+  assert.match(verifyJob, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
+  assert.match(verifyJob, /run: \.\/scripts\/verify-published-release\.sh/);
+  assert.equal(
+    [...release.matchAll(/if: needs\.detect\.outputs\.is_release == 'true' && needs\.detect\.outputs\.already_published != 'true'/g)].length,
+    3,
+  );
+
+  assert.match(verifier, /gh release download/);
+  assert.match(verifier, /remote_digest/);
+  assert.match(verifier, /codesign --verify --deep --strict/);
+  assert.match(verifier, /xcrun stapler validate/);
+  assert.match(verifier, /spctl --assess --type execute/);
+  assert.match(verifier, /issues\/42/);
+  assert.doesNotMatch(verifier, /gh release (?:create|upload|edit)|--method (?:PATCH|POST|PUT|DELETE)|--clobber/);
+});
+
 test("trusted publication updates coverage history in the originating workflow", () => {
   const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");
   const release = workflows["release.yml"];
