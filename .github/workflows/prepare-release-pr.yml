@@ -1,0 +1,211 @@
+name: Prepare Release PR
+
+run-name: Prepare ${{ inputs.bump }} release PR from main
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Exact semantic-version increment
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: prepare-release-pr
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare reviewed Release PR
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      NODE_VERSION: "24.18.0"
+
+    steps:
+      - name: Check out immutable main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          architecture: arm64
+          package-manager-cache: false
+
+      - name: Resolve plan and reject duplicate release work
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_BUMP: ${{ inputs.bump }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          git fetch origin main --tags
+          base_sha="$(git rev-parse origin/main)"
+          test "$(git rev-parse HEAD)" = "$base_sha"
+
+          release_date="$(node scripts/release-automation.mjs date --instant "$(date -u +%FT%TZ)" | jq -r .date)"
+          plan_file="$RUNNER_TEMP/release-plan.json"
+          node scripts/release-automation.mjs plan \
+            --bump "$REQUESTED_BUMP" \
+            --date "$release_date" \
+            --repo-root "$GITHUB_WORKSPACE" > "$plan_file"
+          version="$(jq -r .version "$plan_file")"
+          old_version="$(jq -r .oldVersion "$plan_file")"
+          build="$(jq -r .build "$plan_file")"
+          old_build="$(jq -r .oldBuild "$plan_file")"
+          branch="$(jq -r .branch "$plan_file")"
+          tag="$(jq -r .tag "$plan_file")"
+
+          latest_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          test "$latest_tag" = "v${old_version}"
+          git rev-parse -q --verify "refs/tags/${latest_tag}" >/dev/null
+          git show "${latest_tag}:Info.plist" > "$RUNNER_TEMP/latest-release-Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$RUNNER_TEMP/latest-release-Info.plist")" = "$old_version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$RUNNER_TEMP/latest-release-Info.plist")" = "$old_build"
+
+          existing_prs="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --json url,headRefName,title \
+            --jq '.[] | select(.headRefName | startswith("codex/release-v")) | "\(.url) (\(.headRefName))"')"
+          existing_branches="$(git ls-remote --heads origin 'refs/heads/codex/release-v*')"
+          if [[ -n "$existing_prs" || -n "$existing_branches" ]]; then
+            {
+              echo "## Release preparation skipped"
+              echo
+              echo "Existing release work must be reviewed or closed before creating another Release PR."
+              [[ -z "$existing_prs" ]] || printf '%s\n' "$existing_prs"
+              [[ -z "$existing_branches" ]] || printf 'Existing release branch:\n%s\n' "$existing_branches"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Target Release already exists: $tag" >&2
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Target tag already exists: $tag" >&2
+            exit 1
+          fi
+          for label in release "release:${REQUESTED_BUMP}"; do
+            gh label list --repo "$GITHUB_REPOSITORY" --limit 200 --json name --jq '.[].name' | grep -Fxq "$label" || {
+              echo "Required label is missing: $label" >&2
+              exit 1
+            }
+          done
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "release_date=$release_date" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "old_version=$old_version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "old_build=$old_build" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Mint repository-scoped preparation token
+        if: steps.plan.outputs.skip == 'false'
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.RELEASE_PREP_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PREP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Create focused release branch and pull request
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_SHA: ${{ steps.plan.outputs.base_sha }}
+          BRANCH: ${{ steps.plan.outputs.branch }}
+          BUILD: ${{ steps.plan.outputs.build }}
+          OLD_BUILD: ${{ steps.plan.outputs.old_build }}
+          OLD_VERSION: ${{ steps.plan.outputs.old_version }}
+          RELEASE_DATE: ${{ steps.plan.outputs.release_date }}
+          REQUESTED_BUMP: ${{ inputs.bump }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          VERSION: ${{ steps.plan.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          node scripts/release-automation.mjs prepare \
+            --bump "$REQUESTED_BUMP" \
+            --date "$RELEASE_DATE" \
+            --repo-root "$GITHUB_WORKSPACE" > "$RUNNER_TEMP/applied-release-plan.json"
+
+          actual_files="$(git diff --name-only | LC_ALL=C sort)"
+          expected_files="$(printf '%s\n' ABOUT_CHANGELOG.md CHANGELOG.md Info.plist | LC_ALL=C sort)"
+          test "$actual_files" = "$expected_files"
+
+          git switch -c "$BRANCH"
+          git config user.name "md2png-release-prep[bot]"
+          git config user.email "md2png-release-prep[bot]@users.noreply.github.com"
+          git add -- ABOUT_CHANGELOG.md CHANGELOG.md Info.plist
+          git commit -m "Prepare md2png ${VERSION}"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$BASE_SHA"
+          auth_header="$(printf 'x-access-token:%s' "$APP_TOKEN" | base64 | tr -d '\n')"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${auth_header}" \
+            push origin "HEAD:refs/heads/${BRANCH}"
+
+          ./scripts/release-notes.sh "$VERSION" CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          body_file="$RUNNER_TEMP/release-pr-body.md"
+          workflow_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "## Release identity"
+            echo
+            echo "- Base: $BASE_SHA"
+            echo "- Version: $OLD_VERSION → $VERSION ($REQUESTED_BUMP)"
+            echo "- Build: $OLD_BUILD → $BUILD"
+            echo "- Tag: $TAG"
+            echo "- Release: md2png $VERSION"
+            echo "- Preparation run: $workflow_url"
+            echo
+            echo "## Proposed assets"
+            jq -r '.artifacts[] | "- \(.)"' "$RUNNER_TEMP/applied-release-plan.json"
+            echo
+            echo "## Release-note preview"
+            echo
+            cat "$RUNNER_TEMP/release-notes.md"
+            echo
+            echo "## Review contract"
+            echo
+            echo "Merging this PR authorizes the trusted release workflow to sign, notarize, tag, and publish this exact merge commit after all required checks pass."
+          } > "$body_file"
+
+          pr_url="$(GH_TOKEN="$APP_TOKEN" gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Prepare md2png ${VERSION}" \
+            --body-file "$body_file" \
+            --label release \
+            --label "release:${REQUESTED_BUMP}")"
+          {
+            echo "## Release PR created"
+            echo
+            echo "$pr_url"
+            echo
+            cat "$body_file"
+          } >> "$GITHUB_STEP_SUMMARY"
