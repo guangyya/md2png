@@ -226,6 +226,11 @@ test("published reruns use a protected-main read-only verifier", () => {
   const verifier = fs.readFileSync(path.join(repoRoot, "scripts/verify-published-release.sh"), "utf8");
 
   assert.match(release, /already_published: \$\{\{ steps\.release\.outputs\.already_published \}\}/);
+  assert.deepEqual(releaseWorkflow.permissions, {
+    checks: "read",
+    contents: "read",
+    "pull-requests": "read",
+  });
   assert.match(release, /"v\$\{version\}"\)[\s\S]*?already_published=true/);
   assert.match(release, /git cat-file -t "refs\/tags\/\$\{latest_tag\}"/);
   assert.match(release, /git rev-parse "refs\/tags\/\$\{latest_tag\}\^\{\}"\)" = "\$source_commit"/);
@@ -251,9 +256,23 @@ test("published reruns use a protected-main read-only verifier", () => {
   for (const jobName of ["validate", "sign", "publish"]) {
     assert.equal(releaseJobs[jobName].if, mutationGuard, `${jobName} must be excluded from published no-op reruns`);
   }
-  const writeJobs = Object.entries(releaseJobs)
-    .filter(([, job]) => Object.values(job.permissions ?? {}).includes("write"))
-    .map(([name]) => name);
+  const writeJobs = [];
+  for (const [jobName, job] of Object.entries(releaseJobs)) {
+    if (job.permissions === undefined) {
+      continue;
+    }
+    if (typeof job.permissions === "string") {
+      assert.equal(job.permissions, "read-all", `${jobName} must not use a broad permission preset`);
+      continue;
+    }
+    assert.equal(typeof job.permissions, "object", `${jobName} permissions must be a map or read-all`);
+    for (const value of Object.values(job.permissions)) {
+      assert.match(value, /^(?:read|write|none)$/, `${jobName} has an unknown permission level`);
+    }
+    if (Object.values(job.permissions).includes("write")) {
+      writeJobs.push(jobName);
+    }
+  }
   assert.deepEqual(writeJobs, ["publish"]);
   assert.deepEqual(releaseJobs.publish.permissions, {
     actions: "read",
