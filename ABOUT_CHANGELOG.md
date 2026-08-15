@@ -5,6 +5,8 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-15
+
 ### Added
 
 - Safely verify global shortcuts from Welcome.
