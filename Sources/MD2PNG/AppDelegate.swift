@@ -21,6 +21,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.renderBundledExample(kind)
         }
     )
+    private lazy var globalShortcutRouter = GlobalShortcutRouter(
+        verify: { [weak self] command in
+            self?.welcomeController.verifyShortcut(command) ?? false
+        },
+        perform: { [weak self] command in
+            guard let self else { return }
+            switch command {
+            case .render:
+                self.renderClipboard()
+            case .showLastRender:
+                self.showLastRender()
+            }
+        }
+    )
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
     private var welcomeShortcutStatuses: [WelcomeShortcutStatus] = []
@@ -52,8 +66,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
         let registrations: [GlobalHotKey.Registration] = [
-            .render { [weak self] in self?.renderClipboard() },
-            .showLastRender { [weak self] in self?.showLastRender() }
+            .render { [weak self] in self?.globalShortcutRouter.handle(.render) },
+            .showLastRender { [weak self] in
+                self?.globalShortcutRouter.handle(.showLastRender)
+            }
         ]
         let hotKey = GlobalHotKey(registrations: registrations)
         self.hotKey = hotKey

@@ -66,9 +66,12 @@
 "welcome.step.paste.title" = "粘贴 PNG";
 "welcome.step.paste.detail" = "按 Command-V 粘贴，检查图片后再自行发送。";
 "welcome.shortcuts" = "全局快捷键";
+"welcome.shortcut_verification_help" = "在此按下快捷键即可测试，不会执行对应命令。";
 "welcome.shortcut_ready" = "可用";
+"welcome.shortcut_verified" = "已生效";
 "welcome.shortcut_unavailable" = "已占用";
 "welcome.shortcut_conflict_help" = "其他应用正在使用该快捷键。仍可从 md2png 菜单执行所有操作。";
+"welcome.shortcut_verified_announcement" = "“%@”快捷键已生效。";
 "welcome.privacy_note" = "md2png 绝不会自动粘贴、发送或上传你的内容。";
 "welcome.reopen_hint" = "如果窗口被遮住，可从 md2png 菜单栏选择“显示欢迎指南”重新打开。";
 "welcome.try_sample" = "试试简短示例";
