@@ -205,6 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        sampleGuideController.dismiss()
         clipboardPreviewView.update(Clipboard.menuPreview(includeLabel: false))
     }
 
@@ -396,7 +397,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !renderActivity.isRendering,
               !isPresentingClipboardConfirmation,
               let button = statusItem.button else { return }
-        sampleGuideController.show(relativeTo: button)
+        sampleGuideController.show(
+            relativeTo: button,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: restoreLastMarkdownMenuItem.isEnabled,
+                canShowLastRender: previewMenuItem.isEnabled
+            )
+        )
     }
 
     @objc private func terminateFromStatusMenu() {
