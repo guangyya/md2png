@@ -103,107 +103,6 @@ final class WelcomeTests: XCTestCase {
         XCTAssertTrue(SampleGuidePhase.submenu.acceptsSubmenuInput)
     }
 
-    func testSampleGuideKeyboardNavigationMovesAndWrapsAcrossExamples() {
-        XCTAssertEqual(
-            SampleGuideFocusNavigation.targetID(from: nil, direction: .next),
-            ExampleKind.short.rawValue
-        )
-        XCTAssertEqual(
-            SampleGuideFocusNavigation.targetID(
-                from: ExampleKind.short.rawValue,
-                direction: .next
-            ),
-            ExampleKind.long.rawValue
-        )
-        XCTAssertEqual(
-            SampleGuideFocusNavigation.targetID(
-                from: ExampleKind.short.rawValue,
-                direction: .previous
-            ),
-            ExampleKind.gantt.rawValue
-        )
-        XCTAssertEqual(
-            SampleGuideFocusNavigation.targetID(
-                from: ExampleKind.gantt.rawValue,
-                direction: .next
-            ),
-            ExampleKind.short.rawValue
-        )
-        XCTAssertEqual(
-            SampleGuideFocusNavigation.targetID(from: Int.max, direction: .previous),
-            ExampleKind.gantt.rawValue
-        )
-    }
-
-    func testSampleGuideKeyRoutingCoversMenuNavigationAndActivation() {
-        XCTAssertEqual(
-            SampleGuideKeyRouting.command(
-                forKeyCode: SampleGuideKeyCode.tab,
-                isShiftPressed: false
-            ),
-            .next
-        )
-        XCTAssertEqual(
-            SampleGuideKeyRouting.command(
-                forKeyCode: SampleGuideKeyCode.tab,
-                isShiftPressed: true
-            ),
-            .previous
-        )
-        XCTAssertEqual(
-            SampleGuideKeyRouting.command(
-                forKeyCode: SampleGuideKeyCode.upArrow,
-                isShiftPressed: false
-            ),
-            .previous
-        )
-        XCTAssertEqual(
-            SampleGuideKeyRouting.command(
-                forKeyCode: SampleGuideKeyCode.downArrow,
-                isShiftPressed: false
-            ),
-            .next
-        )
-        for keyCode in [
-            SampleGuideKeyCode.space,
-            SampleGuideKeyCode.returnKey,
-            SampleGuideKeyCode.keypadEnter
-        ] {
-            XCTAssertEqual(
-                SampleGuideKeyRouting.command(
-                    forKeyCode: keyCode,
-                    isShiftPressed: false
-                ),
-                .activate
-            )
-        }
-        XCTAssertEqual(
-            SampleGuideKeyRouting.command(
-                forKeyCode: SampleGuideKeyCode.escape,
-                isShiftPressed: false
-            ),
-            .dismiss
-        )
-        XCTAssertNil(
-            SampleGuideKeyRouting.command(forKeyCode: UInt16.max, isShiftPressed: false)
-        )
-    }
-
-    @MainActor
-    func testSampleGuideKeyboardStateWaitsForRevealBeforeMovingFocus() {
-        let keyboardState = SampleGuideKeyboardState()
-
-        keyboardState.move(.next)
-        XCTAssertNil(keyboardState.focusedExampleID)
-        XCTAssertFalse(keyboardState.isNavigationEnabled)
-
-        keyboardState.enableAndFocusFirstExample()
-        XCTAssertEqual(keyboardState.focusedExample, .short)
-
-        keyboardState.move(.next)
-        XCTAssertEqual(keyboardState.focusedExample, .long)
-    }
-
     @MainActor
     func testSampleGuideClosesBeforeDeliveringOneSelection() {
         let popover = TestSampleGuidePopover()
@@ -225,7 +124,6 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(popover.isShown)
         XCTAssertNotNil(popover.contentViewController)
-        XCTAssertEqual(popover.makeContentKeyCount, 1)
         XCTAssertEqual(statusButton.cell?.isHighlighted, true)
 
         controller.choose(.short)
@@ -260,40 +158,6 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(popover.closeCount, 1)
         XCTAssertTrue(deliveredSelections.isEmpty)
         XCTAssertEqual(statusButton.cell?.isHighlighted, false)
-    }
-
-    @MainActor
-    func testSampleGuideConsumesNavigationWithoutOwningTheKeyWindow() throws {
-        _ = NSApplication.shared
-        let popover = TestSampleGuidePopover()
-        let statusButton = NSStatusBarButton(
-            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
-        )
-        let controller = SampleGuideController(popover: popover) { _ in }
-        controller.show(
-            relativeTo: statusButton,
-            menuState: SampleGuideMenuState(
-                canRestoreLastMarkdown: false,
-                canShowLastRender: false
-            )
-        )
-        XCTAssertNil(popover.contentViewController?.view.window)
-
-        let downArrow = try XCTUnwrap(NSEvent.keyEvent(
-            with: .keyDown,
-            location: .zero,
-            modifierFlags: [],
-            timestamp: 0,
-            windowNumber: 0,
-            context: nil,
-            characters: "\u{F701}",
-            charactersIgnoringModifiers: "\u{F701}",
-            isARepeat: false,
-            keyCode: SampleGuideKeyCode.downArrow
-        ))
-
-        XCTAssertNil(controller.handleKeyDown(downArrow))
-        controller.dismiss()
     }
 
     @MainActor
@@ -354,7 +218,6 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
     var contentViewController: NSViewController?
     var isShown = false
     private(set) var closeCount = 0
-    private(set) var makeContentKeyCount = 0
 
     func show(
         relativeTo positioningRect: NSRect,
@@ -362,10 +225,6 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
         preferredEdge: NSRectEdge
     ) {
         isShown = true
-    }
-
-    func makeContentKey() {
-        makeContentKeyCount += 1
     }
 
     func close() {

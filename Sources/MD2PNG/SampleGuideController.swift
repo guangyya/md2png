@@ -1,6 +1,4 @@
 import AppKit
-import Carbon
-import Combine
 import SwiftUI
 
 enum SampleGuidePhase: Int, Equatable {
@@ -18,95 +16,6 @@ struct SampleGuideMenuState: Equatable {
     let canShowLastRender: Bool
 }
 
-enum SampleGuideFocusDirection {
-    case previous
-    case next
-}
-
-enum SampleGuideKeyCommand: Equatable {
-    case previous
-    case next
-    case activate
-    case dismiss
-}
-
-enum SampleGuideKeyCode {
-    static let tab = UInt16(kVK_Tab)
-    static let upArrow = UInt16(kVK_UpArrow)
-    static let downArrow = UInt16(kVK_DownArrow)
-    static let space = UInt16(kVK_Space)
-    static let returnKey = UInt16(kVK_Return)
-    static let keypadEnter = UInt16(kVK_ANSI_KeypadEnter)
-    static let escape = UInt16(kVK_Escape)
-}
-
-struct SampleGuideKeyRouting {
-    static func command(
-        forKeyCode keyCode: UInt16,
-        isShiftPressed: Bool
-    ) -> SampleGuideKeyCommand? {
-        switch keyCode {
-        case SampleGuideKeyCode.tab:
-            return isShiftPressed ? .previous : .next
-        case SampleGuideKeyCode.upArrow:
-            return .previous
-        case SampleGuideKeyCode.downArrow:
-            return .next
-        case SampleGuideKeyCode.space,
-             SampleGuideKeyCode.returnKey,
-             SampleGuideKeyCode.keypadEnter:
-            return .activate
-        case SampleGuideKeyCode.escape:
-            return .dismiss
-        default:
-            return nil
-        }
-    }
-}
-
-struct SampleGuideFocusNavigation {
-    static func targetID(
-        from currentID: Int?,
-        direction: SampleGuideFocusDirection
-    ) -> Int? {
-        let ids = ExampleKind.allCases.map(\.rawValue)
-        guard !ids.isEmpty else { return nil }
-        guard let currentID, let currentIndex = ids.firstIndex(of: currentID) else {
-            return direction == .previous ? ids.last : ids.first
-        }
-
-        switch direction {
-        case .previous:
-            return ids[(currentIndex - 1 + ids.count) % ids.count]
-        case .next:
-            return ids[(currentIndex + 1) % ids.count]
-        }
-    }
-}
-
-@MainActor
-final class SampleGuideKeyboardState: ObservableObject {
-    @Published private(set) var focusedExampleID: Int?
-    private(set) var isNavigationEnabled = false
-
-    var focusedExample: ExampleKind? {
-        focusedExampleID.flatMap(ExampleKind.init(rawValue:))
-    }
-
-    func enableAndFocusFirstExample() {
-        isNavigationEnabled = true
-        focusedExampleID = ExampleKind.short.rawValue
-    }
-
-    func move(_ direction: SampleGuideFocusDirection) {
-        guard isNavigationEnabled else { return }
-        focusedExampleID = SampleGuideFocusNavigation.targetID(
-            from: focusedExampleID,
-            direction: direction
-        )
-    }
-}
-
 @MainActor
 protocol SampleGuidePopover: AnyObject {
     var behavior: NSPopover.Behavior { get set }
@@ -121,15 +30,10 @@ protocol SampleGuidePopover: AnyObject {
         of positioningView: NSView,
         preferredEdge: NSRectEdge
     )
-    func makeContentKey()
     func close()
 }
 
-extension NSPopover: SampleGuidePopover {
-    func makeContentKey() {
-        contentViewController?.view.window?.makeKey()
-    }
-}
+extension NSPopover: SampleGuidePopover {}
 
 @MainActor
 final class SampleGuideController: NSObject, NSPopoverDelegate {
@@ -138,8 +42,6 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     private weak var highlightedButton: NSButton?
     private var acceptsSelection = false
     private var pendingSelection: ExampleKind?
-    private var keyboardState: SampleGuideKeyboardState?
-    private var keyEventMonitor: Any?
 
     convenience init(onChoose: @escaping (ExampleKind) -> Void) {
         self.init(popover: NSPopover(), onChoose: onChoose)
@@ -164,17 +66,13 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     ) {
         dismiss()
         acceptsSelection = true
-        let keyboardState = SampleGuideKeyboardState()
-        self.keyboardState = keyboardState
 
         popover.contentViewController = NSHostingController(
             rootView: SampleGuideView(
                 menuState: menuState,
-                keyboardState: keyboardState,
                 onChoose: { [weak self] kind in
                     self?.choose(kind)
-                },
-                onDismiss: { [weak self] in self?.dismiss() }
+                }
             )
         )
         highlightedButton = button
@@ -184,30 +82,23 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
             of: button,
             preferredEdge: .minY
         )
-        popover.makeContentKey()
-        startMonitoringKeyboard()
     }
 
     func dismiss() {
         acceptsSelection = false
         pendingSelection = nil
-        stopMonitoringKeyboard()
         if popover.isShown {
             popover.close()
         }
-        keyboardState = nil
         clearStatusButtonHighlight()
     }
 
     func popoverWillClose(_ notification: Notification) {
-        stopMonitoringKeyboard()
         clearStatusButtonHighlight()
     }
 
     func popoverDidClose(_ notification: Notification) {
         acceptsSelection = false
-        stopMonitoringKeyboard()
-        keyboardState = nil
         clearStatusButtonHighlight()
 
         guard let selection = pendingSelection else { return }
@@ -226,65 +117,14 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         highlightedButton?.highlight(false)
         highlightedButton = nil
     }
-
-    private func startMonitoringKeyboard() {
-        stopMonitoringKeyboard()
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
-            [weak self] event in
-            dispatchPrecondition(condition: .onQueue(.main))
-            return self?.handleKeyDown(event) ?? event
-        }
-    }
-
-    private func stopMonitoringKeyboard() {
-        guard let keyEventMonitor else { return }
-        NSEvent.removeMonitor(keyEventMonitor)
-        self.keyEventMonitor = nil
-    }
-
-    func handleKeyDown(_ event: NSEvent) -> NSEvent? {
-        guard acceptsSelection,
-              popover.isShown,
-              let command = SampleGuideKeyRouting.command(
-                  forKeyCode: event.keyCode,
-                  isShiftPressed: event.modifierFlags.contains(.shift)
-              ) else {
-            return event
-        }
-
-        if command == .dismiss {
-            dismiss()
-            return nil
-        }
-
-        guard let keyboardState, keyboardState.isNavigationEnabled else {
-            return nil
-        }
-
-        switch command {
-        case .previous:
-            keyboardState.move(.previous)
-        case .next:
-            keyboardState.move(.next)
-        case .activate:
-            guard let focusedExample = keyboardState.focusedExample else { return nil }
-            choose(focusedExample)
-        case .dismiss:
-            break
-        }
-        return nil
-    }
 }
 
 private struct SampleGuideView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase = SampleGuidePhase.mainMenu
-    @FocusState private var focusedExampleID: Int?
 
     let menuState: SampleGuideMenuState
-    @ObservedObject var keyboardState: SampleGuideKeyboardState
     let onChoose: (ExampleKind) -> Void
-    let onDismiss: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -303,7 +143,6 @@ private struct SampleGuideView: View {
 
                 SampleExamplesMenu(
                     isInputEnabled: phase.acceptsSubmenuInput,
-                    focusedExampleID: $focusedExampleID,
                     onChoose: { kind in
                         guard phase.acceptsSubmenuInput else { return }
                         onChoose(kind)
@@ -325,17 +164,12 @@ private struct SampleGuideView: View {
         .task {
             await revealMenuPath()
         }
-        .onReceive(keyboardState.$focusedExampleID) { focusedExampleID in
-            self.focusedExampleID = focusedExampleID
-        }
-        .onExitCommand(perform: onDismiss)
     }
 
     @MainActor
     private func revealMenuPath() async {
         if reduceMotion {
             phase = .submenu
-            await focusFirstExample()
             return
         }
 
@@ -348,14 +182,6 @@ private struct SampleGuideView: View {
         withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
             phase = .submenu
         }
-        await focusFirstExample()
-    }
-
-    @MainActor
-    private func focusFirstExample() async {
-        await Task.yield()
-        guard phase.acceptsSubmenuInput else { return }
-        keyboardState.enableAndFocusFirstExample()
     }
 
     private func pause(nanoseconds: UInt64) async -> Bool {
@@ -440,7 +266,6 @@ private struct SampleMainMenu: View {
 
 private struct SampleExamplesMenu: View {
     let isInputEnabled: Bool
-    @FocusState.Binding var focusedExampleID: Int?
     let onChoose: (ExampleKind) -> Void
 
     var body: some View {
@@ -455,7 +280,6 @@ private struct SampleExamplesMenu: View {
                     isInputEnabled: isInputEnabled,
                     action: { onChoose(kind) }
                 )
-                .focused($focusedExampleID, equals: kind.rawValue)
             }
         }
         .padding(6)
