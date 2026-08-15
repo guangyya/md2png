@@ -53,17 +53,6 @@ enum ManualCheckFeedback: Equatable, Sendable {
     case completed
 }
 
-private struct CachedReleaseRecord: Codable {
-    let repositoryOwner: String
-    let repositoryName: String
-    let checkedAt: Date
-    let release: GitHubRelease
-
-    func matches(_ repository: GitHubRepository) -> Bool {
-        repositoryOwner == repository.owner && repositoryName == repository.name
-    }
-}
-
 #if DEBUG
 enum DebugUpdateMockState: String {
     case upToDate = "up-to-date"
@@ -116,7 +105,7 @@ enum DebugUpdateMockState: String {
                 return nil
             }
             let fileURL = directory.appendingPathComponent(update.assetName)
-            if (try? UpdateService.verifyFile(at: fileURL, update: update)) != nil {
+            if (try? UpdateArtifactVerifier().verifyFile(at: fileURL, update: update)) != nil {
                 return UpdateStatus(phase: .readyToInstall(update: update, fileURL: fileURL))
             }
             return UpdateStatus(phase: .failed(
@@ -153,22 +142,14 @@ final class UpdateController {
     static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
     static let manualCheckCooldown: TimeInterval = 60
 
-    private enum DefaultsKey {
-        static let cachedRelease = "Update.cachedRelease.v1"
-        static let lastAttemptAt = "Update.lastAttemptAt.v1"
-        static let serverRetryAt = "Update.serverRetryAt.v1"
-    }
-
     private let service: UpdateService
+    private let checkPolicy: UpdateCheckPolicy
     private let installedVersion: () -> String?
     private let repository: () -> GitHubRepository?
     private let openFile: (URL) -> Bool
     private let revealFile: (URL) -> Void
     private let openWebPage: (URL) -> Bool
-    private let defaults: UserDefaults
     private let now: () -> Date
-    private let automaticCheckInterval: TimeInterval
-    private let manualCheckCooldown: TimeInterval
     private var checkTask: Task<Void, Never>?
     private var downloadTask: Task<Void, Never>?
     private var cooldownTask: Task<Void, Never>?
@@ -212,10 +193,12 @@ final class UpdateController {
         self.openFile = openFile
         self.revealFile = revealFile
         self.openWebPage = openWebPage
-        self.defaults = defaults
         self.now = now
-        self.automaticCheckInterval = automaticCheckInterval
-        self.manualCheckCooldown = manualCheckCooldown
+        checkPolicy = UpdateCheckPolicy(
+            defaults: defaults,
+            automaticCheckInterval: automaticCheckInterval,
+            manualCheckCooldown: manualCheckCooldown
+        )
 #if DEBUG
         if let rawValue = Bundle.main.object(
             forInfoDictionaryKey: "MD2PNGTestUpdateState"
@@ -271,7 +254,7 @@ final class UpdateController {
         guard checkTask == nil, downloadTask == nil, !status.phase.isDownloadActive else { return }
         guard let configuration = configurationOrShowFailure() else { return }
 
-        let cachedRecord = loadCachedRelease(for: configuration.repository)
+        let cachedRecord = checkPolicy.cachedRelease(for: configuration.repository)
         let cachedPhase = cachedRecord.flatMap {
             try? phase(
                 for: $0.release,
@@ -285,16 +268,16 @@ final class UpdateController {
 
         let currentDate = now()
         if let cachedRecord, cachedPhase != nil,
-           currentDate.timeIntervalSince(cachedRecord.checkedAt) < automaticCheckInterval {
+           checkPolicy.isFresh(cachedRecord, at: currentDate) {
             publishManualCheckAvailability(at: currentDate)
             return
         }
 
-        guard canMakeRequest(at: currentDate) else {
+        guard checkPolicy.canMakeRequest(at: currentDate) else {
             if cachedPhase == nil {
                 showRateLimitFailure(
                     repository: configuration.repository,
-                    retryAt: nextAllowedRequestDate(at: currentDate)
+                    retryAt: checkPolicy.nextAllowedRequestDate(at: currentDate)
                 )
             } else {
                 publishManualCheckAvailability(at: currentDate)
@@ -315,8 +298,8 @@ final class UpdateController {
         guard checkTask == nil, downloadTask == nil else { return }
         guard let configuration = configurationOrShowFailure() else { return }
         let currentDate = now()
-        guard canMakeRequest(at: currentDate) else {
-            let retryAt = nextAllowedRequestDate(at: currentDate)
+        guard checkPolicy.canMakeRequest(at: currentDate) else {
+            let retryAt = checkPolicy.nextAllowedRequestDate(at: currentDate)
             if case .unknown = status.phase {
                 showRateLimitFailure(repository: configuration.repository, retryAt: retryAt)
             } else {
@@ -418,7 +401,7 @@ final class UpdateController {
         isManual: Bool
     ) {
         let requestDate = now()
-        defaults.set(requestDate, forKey: DefaultsKey.lastAttemptAt)
+        checkPolicy.recordAttempt(at: requestDate)
         var checkingStatus = status
         checkingStatus.isChecking = true
         checkingStatus.manualCheckFeedback = isManual ? .checking : .none
@@ -434,19 +417,19 @@ final class UpdateController {
                     now: requestDate
                 )
                 try Task.checkCancellation()
-                cache(
+                checkPolicy.cache(
                     release: response.release,
                     repository: repository,
                     checkedAt: now()
                 )
-                applySuccessfulRateLimit(response.rateLimit)
+                checkPolicy.applySuccessfulRateLimit(response.rateLimit, at: now())
                 finishCheck(with: Self.phase(for: response.result))
             } catch is CancellationError {
                 finishCheck(with: status.phase)
             } catch {
                 let retryAt: Date?
                 if case let UpdateError.rateLimited(serverRetryAt) = error {
-                    defaults.set(serverRetryAt, forKey: DefaultsKey.serverRetryAt)
+                    checkPolicy.recordServerRetry(at: serverRetryAt)
                     retryAt = serverRetryAt
                 } else {
                     retryAt = nil
@@ -527,7 +510,7 @@ final class UpdateController {
     }
 
     private func phase(
-        for release: GitHubRelease,
+        for release: UpdateRelease,
         repository: GitHubRepository,
         installedVersion: String
     ) throws -> UpdatePhase {
@@ -553,61 +536,8 @@ final class UpdateController {
         publishManualCheckAvailability(at: now())
     }
 
-    private func cache(
-        release: GitHubRelease,
-        repository: GitHubRepository,
-        checkedAt: Date
-    ) {
-        let record = CachedReleaseRecord(
-            repositoryOwner: repository.owner,
-            repositoryName: repository.name,
-            checkedAt: checkedAt,
-            release: release
-        )
-        if let data = try? PropertyListEncoder().encode(record) {
-            defaults.set(data, forKey: DefaultsKey.cachedRelease)
-        }
-    }
-
-    private func loadCachedRelease(for repository: GitHubRepository) -> CachedReleaseRecord? {
-        guard let data = defaults.data(forKey: DefaultsKey.cachedRelease),
-              let record = try? PropertyListDecoder().decode(CachedReleaseRecord.self, from: data),
-              record.matches(repository) else {
-            return nil
-        }
-        return record
-    }
-
-    private func applySuccessfulRateLimit(_ rateLimit: GitHubRateLimitInfo) {
-        if rateLimit.remaining == 0, let resetAt = rateLimit.resetAt, resetAt > now() {
-            defaults.set(resetAt, forKey: DefaultsKey.serverRetryAt)
-        } else {
-            defaults.removeObject(forKey: DefaultsKey.serverRetryAt)
-        }
-    }
-
-    private func canMakeRequest(at date: Date) -> Bool {
-        guard let nextAllowed = nextAllowedRequestDate(at: date) else { return true }
-        return nextAllowed <= date
-    }
-
-    private func nextAllowedRequestDate(at date: Date) -> Date? {
-        var candidates: [Date] = []
-        if let lastAttemptAt = defaults.object(forKey: DefaultsKey.lastAttemptAt) as? Date {
-            candidates.append(lastAttemptAt.addingTimeInterval(manualCheckCooldown))
-        }
-        if let serverRetryAt = defaults.object(forKey: DefaultsKey.serverRetryAt) as? Date {
-            if serverRetryAt > date {
-                candidates.append(serverRetryAt)
-            } else {
-                defaults.removeObject(forKey: DefaultsKey.serverRetryAt)
-            }
-        }
-        return candidates.max()
-    }
-
     private func showRateLimitFailure(repository: GitHubRepository, retryAt: Date?) {
-        let retryDate = retryAt ?? now().addingTimeInterval(manualCheckCooldown)
+        let retryDate = retryAt ?? checkPolicy.localRetryDate(after: now())
         updateStatus(phase: .failed(
             message: UpdateError.rateLimited(retryAt: retryDate).localizedDescription,
             releasesURL: repository.releasesURL,
@@ -617,7 +547,7 @@ final class UpdateController {
     }
 
     private func publishManualCheckAvailability(at date: Date) {
-        let nextAllowed = nextAllowedRequestDate(at: date)
+        let nextAllowed = checkPolicy.nextAllowedRequestDate(at: date)
         status.nextManualCheckAt = nextAllowed.flatMap { $0 > date ? $0 : nil }
         scheduleManualCheckAvailabilityRefresh()
     }
