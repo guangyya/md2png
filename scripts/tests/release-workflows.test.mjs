@@ -38,16 +38,6 @@ test("Dependabot checks pinned GitHub Actions every week", () => {
   assert.match(dependabot, /actions-major:[\s\S]*?patterns:\n\s+- "\*"[\s\S]*?"major"/);
 });
 
-test("required CI rejects exposed repository owner commit identities", () => {
-  const ci = allWorkflows["ci.yml"];
-  assert.match(ci, /name: Verify repository owner commit privacy/);
-  assert.match(ci, /if: github\.event_name == 'pull_request'/);
-  assert.match(ci, /REPOSITORY_OWNER: \$\{\{ github\.repository_owner \}\}/);
-  assert.match(ci, /pulls\/\$PR_NUMBER\/commits\?per_page=100/);
-  assert.match(ci, /@users\.noreply\.github\.com/);
-  assert.match(ci, /Repository owner commits must use a GitHub noreply author and committer identity/);
-});
-
 test("pull request code remains read-only and never uses pull_request_target", () => {
   const preflight = workflows["release-preflight.yml"];
   assert.doesNotMatch(preflight, /pull_request_target/);

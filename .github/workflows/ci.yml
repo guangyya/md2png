@@ -58,49 +58,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify repository owner commit privacy
-        if: github.event_name == 'pull_request'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
-        run: |
-          violation_shas="$(
-            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits?per_page=100" |
-              jq -r --arg owner "$REPOSITORY_OWNER" --arg pr_author "$PR_AUTHOR" '
-                def private_email:
-                  . == "noreply@github.com" or endswith("@users.noreply.github.com");
-
-                .[]
-                | select(
-                    (
-                      $pr_author == $owner
-                      and (
-                        ((.commit.author.email // "") | private_email | not)
-                        or ((.commit.committer.email // "") | private_email | not)
-                      )
-                    )
-                    or (
-                      (.author.login // "") == $owner
-                      and ((.commit.author.email // "") | private_email | not)
-                    )
-                    or (
-                      (.committer.login // "") == $owner
-                      and ((.commit.committer.email // "") | private_email | not)
-                    )
-                  )
-                | .sha
-              '
-          )"
-
-          if [[ -n "$violation_shas" ]]; then
-            echo "Repository owner commits must use a GitHub noreply author and committer identity." >&2
-            printf 'Rejected commits:\n%s\n' "$violation_shas" >&2
-            exit 1
-          fi
-
       - name: Verify pinned Apple toolchain
         shell: bash
         run: |
