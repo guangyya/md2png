@@ -18,27 +18,65 @@ const allWorkflows = Object.fromEntries(fs.readdirSync(workflowDirectory)
   .sort()
   .map((name) => [name, fs.readFileSync(path.join(workflowDirectory, name), "utf8")]));
 
-function assertPinnedExternalActions(name, content) {
-  const uses = [...content.matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)(?:\s+#\s*(.*?))?\s*$/gm)];
-  assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
-  for (const [, reference, comment] of uses) {
-    if (reference.startsWith("./")) {
-      continue;
-    }
-    assert.match(reference, /^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[0-9a-f]{40}$/, `${name}: ${reference}`);
-    assert.match(comment ?? "", /^v\d+(?:\.\d+){0,2}$/, `${name}: ${reference} needs an exact Dependabot version comment`);
-  }
-}
-
-function parseYaml(filePath) {
+function parseYaml(content) {
   const json = execFileSync("/usr/bin/ruby", [
     "-ryaml",
     "-rjson",
     "-e",
-    "print JSON.generate(YAML.safe_load(File.read(ARGV.fetch(0))))",
-    filePath,
-  ], { encoding: "utf8" });
+    "print JSON.generate(YAML.safe_load(STDIN.read))",
+  ], { encoding: "utf8", input: content });
   return JSON.parse(json);
+}
+
+function collectUses(value, location = "$", result = []) {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectUses(item, `${location}[${index}]`, result));
+  } else if (value && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      const childLocation = `${location}.${key}`;
+      if (key === "uses") {
+        result.push({ location: childLocation, reference: child });
+      }
+      collectUses(child, childLocation, result);
+    }
+  }
+  return result;
+}
+
+function annotationCount(content, reference) {
+  return content.split(/\r?\n/).filter((line) => {
+    const commentOffset = line.indexOf("#");
+    if (commentOffset < 0) {
+      return false;
+    }
+    const code = line.slice(0, commentOffset);
+    const comment = line.slice(commentOffset + 1).trim();
+    return code.includes(reference)
+      && /(?:^|[\s{,])["']?uses["']?\s*:/.test(code)
+      && /^v\d+(?:\.\d+){0,2}$/.test(comment);
+  }).length;
+}
+
+function assertPinnedExternalActions(name, content) {
+  const uses = collectUses(parseYaml(content));
+  assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
+
+  const requiredAnnotations = new Map();
+  for (const { location, reference } of uses) {
+    assert.equal(typeof reference, "string", `${name}: ${location} must be a string`);
+    if (reference.startsWith("./")) {
+      continue;
+    }
+    assert.match(reference, /^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[0-9a-f]{40}$/, `${name}: ${reference}`);
+    requiredAnnotations.set(reference, (requiredAnnotations.get(reference) ?? 0) + 1);
+  }
+
+  for (const [reference, count] of requiredAnnotations) {
+    assert.ok(
+      annotationCount(content, reference) >= count,
+      `${name}: ${reference} needs an exact same-line Dependabot version comment`,
+    );
+  }
 }
 
 test("all workflows pin every external action to a full commit", () => {
@@ -47,17 +85,38 @@ test("all workflows pin every external action to a full commit", () => {
   }
 });
 
-test("action pinning cannot be bypassed with a multiword trailing comment", () => {
-  const fixture = `
+test("action pinning cannot be bypassed with equivalent YAML syntax", () => {
+  const bypasses = [
+    "- uses: actions/checkout@v7 # this unpinned action must still be inspected",
+    "- uses : actions/checkout@v7",
+    "- { uses: actions/checkout@v7 }",
+    "- { \"uses\": \"actions/checkout@v7\" }",
+  ];
+  for (const bypass of bypasses) {
+    const fixture = `
 steps:
-  - uses: actions/checkout@v7 # this unpinned action must still be inspected
+  ${bypass}
   - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
 `;
-  assert.throws(() => assertPinnedExternalActions("multiword-comment.yml", fixture), /actions\/checkout@v7/);
+    assert.throws(
+      () => assertPinnedExternalActions("equivalent-syntax.yml", fixture),
+      /actions\/checkout@v7/,
+      bypass,
+    );
+  }
+});
+
+test("action pinning accepts quoted and inline-map pinned references", () => {
+  const fixture = `
+steps:
+  - uses : "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
+  - { "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020" } # v7.0.0
+`;
+  assertPinnedExternalActions("quoted-pinned.yml", fixture);
 });
 
 test("Dependabot structurally configures weekly GitHub Actions updates", () => {
-  const dependabot = parseYaml(dependabotPath);
+  const dependabot = parseYaml(fs.readFileSync(dependabotPath, "utf8"));
   assert.deepEqual(Object.keys(dependabot).sort(), ["updates", "version"]);
   assert.equal(dependabot.version, 2);
   assert.equal(dependabot.updates.length, 1);
