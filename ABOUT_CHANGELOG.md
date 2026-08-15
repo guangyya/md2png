@@ -5,6 +5,14 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Choose Compact, Standard, or Wide output widths.
+
+### Fixed
+
+- Recover from interrupted or stalled WebKit renders without restarting the app.
+
 ## [0.3.0] - 2026-08-14
 
 ### Added

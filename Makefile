@@ -3,12 +3,16 @@ NODE ?= node
 CONFIGURATION ?= release
 SIGN_IDENTITY ?= -
 NOTARY_PROFILE ?= MDPNGNotary
+NOTARY_KEYCHAIN ?=
 RELEASE_SUFFIX ?=
 GH_HOST ?= github.com
 GH_REPO ?=
 PROJECT_URL ?=
 TEST_UPDATE_VERSION ?=
 TEST_UPDATE_STATE ?=
+BUMP ?=
+RELEASE_DATE ?= $(shell TZ=Asia/Shanghai date +%F)
+BASE_ROOT ?=
 MINIMUM_MACOS_VERSION := 14.0
 TARGET_NAME := md2png
 RESOURCE_BUNDLE_NAME := md2png_MD2PNG.bundle
@@ -33,11 +37,12 @@ RELEASE_DMG := dist/$(ARTIFACT_BASENAME).dmg
 DMG_DIR := .build/dmg-root
 
 SIGN_FLAGS := --force --sign "$(SIGN_IDENTITY)"
+NOTARY_KEYCHAIN_FLAG := $(if $(strip $(NOTARY_KEYCHAIN)),--keychain "$(strip $(NOTARY_KEYCHAIN))",)
 ifneq ($(SIGN_IDENTITY),-)
 SIGN_FLAGS += --options runtime --timestamp
 endif
 
-.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate test build app verify-dist release package-dmg dmg notarize publish-release run clean
+.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate prepare-release validate-release-preparation test build app verify-dist release package-dmg dmg notarize publish-release run clean
 
 bootstrap:
 	cd WebRenderer && $(PNPM) install --frozen-lockfile=false
@@ -85,6 +90,18 @@ coverage-validate:
 		--report "$(COVERAGE_JSON)" \
 		--app-version "$(VERSION)" \
 		--commit "$(SOURCE_COMMIT)"
+
+prepare-release:
+	$(NODE) scripts/release-automation.mjs prepare \
+		--bump "$(BUMP)" \
+		--date "$(RELEASE_DATE)" \
+		--repo-root "$(CURDIR)"
+
+validate-release-preparation:
+	$(NODE) scripts/release-automation.mjs validate-prepared \
+		--bump "$(BUMP)" \
+		--base-root "$(BASE_ROOT)" \
+		--repo-root "$(CURDIR)"
 
 test: renderer coverage-tool-test
 	swift test
@@ -168,7 +185,7 @@ notarize: release
 		echo "SIGN_IDENTITY must be a Developer ID Application identity"; \
 		exit 1; \
 	fi
-	xcrun notarytool submit "$(RELEASE_ZIP)" --keychain-profile "$(NOTARY_PROFILE)" --wait
+	xcrun notarytool submit "$(RELEASE_ZIP)" $(NOTARY_KEYCHAIN_FLAG) --keychain-profile "$(NOTARY_PROFILE)" --wait
 	xcrun stapler staple "$(APP_DIR)"
 	xcrun stapler validate "$(APP_DIR)"
 	rm -f "$(RELEASE_ZIP)"
@@ -176,7 +193,7 @@ notarize: release
 	$(MAKE) package-dmg RELEASE_SUFFIX="$(RELEASE_SUFFIX)"
 	codesign --force --sign "$(SIGN_IDENTITY)" --timestamp "$(RELEASE_DMG)"
 	codesign --verify --verbose=2 "$(RELEASE_DMG)"
-	xcrun notarytool submit "$(RELEASE_DMG)" --keychain-profile "$(NOTARY_PROFILE)" --wait
+	xcrun notarytool submit "$(RELEASE_DMG)" $(NOTARY_KEYCHAIN_FLAG) --keychain-profile "$(NOTARY_PROFILE)" --wait
 	xcrun stapler staple "$(RELEASE_DMG)"
 	xcrun stapler validate "$(RELEASE_DMG)"
 	hdiutil verify "$(RELEASE_DMG)"

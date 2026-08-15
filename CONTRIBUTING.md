@@ -54,9 +54,10 @@ constraints, and validation.
   diagnostics surface rather than the HUD.
 - Documentation changes: verify relative links, command names, shortcuts,
   release filenames, and checked-in render screenshots.
-- User-visible behavior: add an entry under `Unreleased` in `CHANGELOG.md`.
-- Keep `ABOUT_CHANGELOG.md` to short, one-line release highlights, and add the
-  matching version section before a release.
+- User-visible features and fixes: keep the complete notes under `Unreleased`
+  in `CHANGELOG.md` and the concise, one-line in-app highlights under
+  `Unreleased` in `ABOUT_CHANGELOG.md`. Release preparation refuses an empty or
+  malformed section and moves both sections without generating copy.
 
 ## Continuous integration
 
@@ -83,7 +84,8 @@ action to a reviewed immutable commit SHA.
 
 ### Test coverage
 
-Run the same source-line coverage measurement used by CI with:
+Run the same source-line coverage measurement used by the official Release
+workflow with:
 
 ```sh
 make coverage
@@ -97,12 +99,13 @@ set. The summaries contain counts and repository-relative paths only. Raw
 profiles, absolute paths, source text, fixtures, and rendered content must not
 be uploaded.
 
-Pull requests and pushes to `main` do not collect coverage. They continue to run
-the normal compatibility test matrix, including the focused report-generator
-tests, without repeating the full Swift test suite in a separate coverage job.
-The guarded official Release publisher alone collects coverage on the canonical
-Xcode 26.2 toolchain, validates it before publication, and uploads the normalized
-JSON and Markdown summaries with the Release.
+Pull requests and ordinary CI pushes to `main` do not collect coverage. They
+continue to run the normal compatibility test matrix, including the focused
+report-generator tests, without repeating the full Swift test suite in a
+separate coverage job. Only a version-changing Release PR merge starts the
+trusted Release build; that publisher collects coverage once on canonical Xcode
+26.2, validates it before publication, and uploads the normalized JSON and
+Markdown summaries with the Release.
 
 Stable Release JSON assets provide the durable version history. Pinned issue
 [#42](https://github.com/guangyya/md2png/issues/42) is the fixed dashboard

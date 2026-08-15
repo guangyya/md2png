@@ -13,6 +13,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   explicit selection locally.
 - Add same-source Retina reference renders that show the presets' actual
   dimensions, wrapping, and table density.
+- Add a one-choice Release PR workflow and an isolated hosted publisher that
+  validates, signs, notarizes, publishes, verifies, and safely resumes the exact
+  reviewed release commit.
 
 ### Changed
 
