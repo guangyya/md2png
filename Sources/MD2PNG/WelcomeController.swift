@@ -65,7 +65,7 @@ struct WelcomeWindowPlacement {
 }
 
 private enum WelcomeLayout {
-    static let contentSize = NSSize(width: 620, height: 650)
+    static let contentSize = NSSize(width: 560, height: 580)
 }
 
 struct WelcomeCopy {
@@ -303,17 +303,48 @@ private struct WelcomeView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 13) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 58, height: 58)
+                    .frame(width: 44, height: 44)
+                    .padding(7)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                Color.cyan.opacity(0.2),
+                                Color.purple.opacity(0.16)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.cyan.opacity(0.5), Color.purple.opacity(0.4)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.8
+                            )
+                    }
+                    .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(copy.title)
-                        .font(.system(size: 25, weight: .semibold))
+                        .font(.system(size: 23, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.primary, Color.purple.opacity(0.9)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .fixedSize(horizontal: false, vertical: true)
                     Text(copy.subtitle)
                         .foregroundStyle(.secondary)
@@ -323,7 +354,7 @@ private struct WelcomeView: View {
 
             WelcomeWorkflowDemo(copy: copy)
 
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 7) {
                 Text(copy.shortcutsTitle)
                     .font(.headline)
 
@@ -339,13 +370,24 @@ private struct WelcomeView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Label(copy.privacyNote, systemImage: "lock.shield")
                 Label(copy.reopenHint, systemImage: "menubar.rectangle")
             }
             .font(.callout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color.cyan.opacity(0.06),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(Color.cyan.opacity(0.18), lineWidth: 0.6)
+            }
 
             Spacer(minLength: 0)
 
@@ -354,19 +396,39 @@ private struct WelcomeView: View {
                     Label(copy.trySample, systemImage: "sparkles")
                 }
                 .help(copy.trySampleHelp)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
 
                 Spacer()
 
                 Button(copy.done, action: onDone)
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
             }
         }
-        .padding(28)
+        .padding(22)
         .frame(
             width: WelcomeLayout.contentSize.width,
             height: WelcomeLayout.contentSize.height
         )
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            WelcomeBackdrop()
+        }
+    }
+}
+
+private struct WelcomeBackdrop: View {
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color.cyan.opacity(0.055), location: 0),
+                .init(color: Color(nsColor: .windowBackgroundColor), location: 0.42),
+                .init(color: Color.purple.opacity(0.05), location: 1)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
@@ -397,10 +459,13 @@ private struct WelcomeShortcutRow: View {
                 .font(.system(.body, design: .rounded).weight(.medium))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .background(
+                    Color.accentColor.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 7)
+                )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(Color.accentColor.opacity(0.24), lineWidth: 0.6)
                 }
                 .accessibilityLabel(shortcut.shortcutAccessibilityName)
 
@@ -409,9 +474,23 @@ private struct WelcomeShortcutRow: View {
                 .foregroundStyle(statusColor)
                 .frame(width: 74, alignment: .leading)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .controlBackgroundColor).opacity(0.72),
+                    Color.accentColor.opacity(0.045)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            ),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
+        }
         .accessibilityElement(children: .combine)
     }
 }

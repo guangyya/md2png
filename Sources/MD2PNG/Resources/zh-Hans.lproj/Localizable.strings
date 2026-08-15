@@ -72,7 +72,9 @@
 "welcome.privacy_note" = "md2png 绝不会自动粘贴、发送或上传你的内容。";
 "welcome.reopen_hint" = "如果窗口被遮住，可从 md2png 菜单栏选择“显示欢迎指南”重新打开。";
 "welcome.try_sample" = "试试简短示例";
-"welcome.try_sample_help" = "明确复制并渲染应用内置的简短示例。";
+"welcome.try_sample_help" = "打开“示例”菜单，选择“简短示例”后再渲染。";
+"welcome.sample_guide.title" = "在 md2png 菜单中找到“示例”";
+"welcome.replay_demo" = "重新播放操作演示";
 "welcome.done" = "完成";
 
 "about.window_title" = "关于 md2png";

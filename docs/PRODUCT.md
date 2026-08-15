@@ -44,8 +44,8 @@ sending it.
 - Retina-friendly PNG/TIFF clipboard output.
 - Global render and last-preview shortcuts plus equivalent menu commands.
 - A one-time first-launch guide with the three-step workflow, live shortcut
-  registration status, an explicit short-sample action, and a menu command to
-  reopen it.
+  registration status, an explicit menu-guided short-sample action, and a menu
+  command to reopen it. Bundled examples open their preview after rendering.
 - Compact clipboard preview, non-activating HUD, and an in-memory preview of the
   latest successful render.
 - In-memory access to re-render or restore the latest successful Markdown,

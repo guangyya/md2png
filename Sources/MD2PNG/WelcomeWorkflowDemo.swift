@@ -1,127 +1,171 @@
 import AppKit
 import SwiftUI
 
+private enum WelcomeDemoPalette {
+    static let cyan = Color(red: 0.08, green: 0.72, blue: 0.93)
+    static let violet = Color(red: 0.48, green: 0.34, blue: 0.96)
+    static let pink = Color(red: 0.94, green: 0.28, blue: 0.62)
+}
+
+enum WelcomeWorkflowPhase: Int, CaseIterable, Equatable {
+    case copy
+    case render
+    case paste
+    case complete
+}
+
 struct WelcomeAnimationProgress: Equatable {
-    let copyLift: CGFloat
-    let copyTravel: CGFloat
+    let cardTravel: CGFloat
     let keyPress: CGFloat
-    let renderTravel: CGFloat
     let imageReveal: CGFloat
     let pastePrompt: CGFloat
     let activityOpacity: CGFloat
     let detailIndex: Int
 
-    static let reducedMotion = WelcomeAnimationProgress(
-        copyLift: 0,
-        copyTravel: 1,
-        keyPress: 0,
-        renderTravel: 1,
-        imageReveal: 1,
-        pastePrompt: 1,
-        activityOpacity: 1,
-        detailIndex: 2
-    )
+    static let reducedMotion = WelcomeAnimationProgress(phase: .complete)
 
-    init(cycleProgress rawProgress: Double) {
-        let progress = min(max(rawProgress, 0), 1)
-        copyLift = Self.pulse(progress, rise: 0.02, peak: 0.1, fall: 0.24)
-        copyTravel = Self.smoothStep(progress, from: 0.05, to: 0.26)
-        keyPress = Self.pulse(progress, rise: 0.25, peak: 0.34, fall: 0.47)
-        renderTravel = Self.smoothStep(progress, from: 0.34, to: 0.61)
-        imageReveal = Self.smoothStep(progress, from: 0.43, to: 0.68)
-        pastePrompt = Self.smoothStep(progress, from: 0.66, to: 0.78)
-            * (1 - Self.smoothStep(progress, from: 0.92, to: 0.99))
-        activityOpacity = min(
-            Self.smoothStep(progress, from: 0, to: 0.04),
-            1 - Self.smoothStep(progress, from: 0.94, to: 1)
-        )
-        detailIndex = progress < 0.27 ? 0 : (progress < 0.64 ? 1 : 2)
-    }
-
-    private init(
-        copyLift: CGFloat,
-        copyTravel: CGFloat,
-        keyPress: CGFloat,
-        renderTravel: CGFloat,
-        imageReveal: CGFloat,
-        pastePrompt: CGFloat,
-        activityOpacity: CGFloat,
-        detailIndex: Int
-    ) {
-        self.copyLift = copyLift
-        self.copyTravel = copyTravel
-        self.keyPress = keyPress
-        self.renderTravel = renderTravel
-        self.imageReveal = imageReveal
-        self.pastePrompt = pastePrompt
-        self.activityOpacity = activityOpacity
-        self.detailIndex = detailIndex
-    }
-
-    private static func smoothStep(
-        _ value: Double,
-        from start: Double,
-        to end: Double
-    ) -> CGFloat {
-        let normalized = min(max((value - start) / (end - start), 0), 1)
-        return CGFloat(normalized * normalized * (3 - 2 * normalized))
-    }
-
-    private static func pulse(
-        _ value: Double,
-        rise: Double,
-        peak: Double,
-        fall: Double
-    ) -> CGFloat {
-        if value <= peak {
-            return smoothStep(value, from: rise, to: peak)
+    init(phase: WelcomeWorkflowPhase) {
+        switch phase {
+        case .copy:
+            cardTravel = -1
+            keyPress = 0
+            imageReveal = 0
+            pastePrompt = 0
+            activityOpacity = 1
+            detailIndex = 0
+        case .render:
+            cardTravel = 0
+            keyPress = 1
+            imageReveal = 0.56
+            pastePrompt = 0
+            activityOpacity = 1
+            detailIndex = 1
+        case .paste:
+            cardTravel = 1
+            keyPress = 0
+            imageReveal = 1
+            pastePrompt = 1
+            activityOpacity = 1
+            detailIndex = 2
+        case .complete:
+            cardTravel = 1
+            keyPress = 0
+            imageReveal = 1
+            pastePrompt = 0.72
+            activityOpacity = 0.82
+            detailIndex = 2
         }
-        return 1 - smoothStep(value, from: peak, to: fall)
     }
 }
 
 struct WelcomeWorkflowDemo: View {
-    private static let cycleDuration: TimeInterval = 6
-
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var startedAt = Date()
+    @State private var phase = WelcomeWorkflowPhase.copy
+    @State private var sequenceID = 0
 
     let copy: WelcomeCopy
 
     var body: some View {
-        TimelineView(.animation(
-            minimumInterval: 1 / 30,
-            paused: reduceMotion
-        )) { context in
-            let progress = reduceMotion
-                ? WelcomeAnimationProgress.reducedMotion
-                : WelcomeAnimationProgress(cycleProgress: cycleProgress(at: context.date))
-            WelcomeWorkflowScene(copy: copy, progress: progress)
-        }
-        .padding(16)
+        WelcomeWorkflowScene(
+            copy: copy,
+            progress: reduceMotion
+                ? .reducedMotion
+                : WelcomeAnimationProgress(phase: phase)
+        )
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity)
-        .frame(height: 184)
+        .frame(height: 156)
         .background(
-            Color(nsColor: .controlBackgroundColor).opacity(0.42),
+            LinearGradient(
+                colors: [
+                    WelcomeDemoPalette.cyan.opacity(0.12),
+                    Color.accentColor.opacity(0.055),
+                    WelcomeDemoPalette.violet.opacity(0.1)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(cornerRadius: 14, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(
-                    Color(nsColor: .separatorColor).opacity(0.7),
-                    lineWidth: 0.5
+                    LinearGradient(
+                        colors: [
+                            WelcomeDemoPalette.cyan.opacity(0.34),
+                            WelcomeDemoPalette.violet.opacity(0.26)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.7
                 )
         }
+        .overlay(alignment: .topTrailing) {
+            Button(action: replay) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .background(.thinMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(L10n.text(
+                "welcome.replay_demo",
+                defaultValue: "Replay workflow demo"
+            ))
+            .padding(9)
+        }
+        .shadow(color: WelcomeDemoPalette.violet.opacity(0.07), radius: 10, y: 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(copy.copyStepTitle). \(copy.renderStepTitle). \(copy.pasteStepTitle)."
         )
+        .task(id: sequenceID) {
+            await runSequence()
+        }
     }
 
-    private func cycleProgress(at date: Date) -> Double {
-        let elapsed = max(0, date.timeIntervalSince(startedAt))
-        return elapsed.truncatingRemainder(dividingBy: Self.cycleDuration)
-            / Self.cycleDuration
+    @MainActor
+    private func runSequence() async {
+        if reduceMotion {
+            phase = .complete
+            return
+        }
+
+        guard await pause(nanoseconds: 900_000_000) else { return }
+        withAnimation(.spring(response: 0.58, dampingFraction: 0.8)) {
+            phase = .render
+        }
+
+        guard await pause(nanoseconds: 1_250_000_000) else { return }
+        withAnimation(.spring(response: 0.62, dampingFraction: 0.82)) {
+            phase = .paste
+        }
+
+        guard await pause(nanoseconds: 1_150_000_000) else { return }
+        withAnimation(.easeOut(duration: 0.35)) {
+            phase = .complete
+        }
+    }
+
+    private func replay() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            phase = reduceMotion ? .complete : .copy
+        }
+        sequenceID += 1
+    }
+
+    private func pause(nanoseconds: UInt64) async -> Bool {
+        do {
+            try await Task.sleep(nanoseconds: nanoseconds)
+            return !Task.isCancelled
+        } catch {
+            return false
+        }
     }
 }
 
@@ -130,29 +174,37 @@ private struct WelcomeWorkflowScene: View {
     let progress: WelcomeAnimationProgress
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 7) {
             HStack(spacing: 8) {
-                WelcomeMarkdownCard(copy: copy, progress: progress)
-                WelcomeTransferTrack(
-                    progress: progress.copyTravel,
-                    activityOpacity: progress.activityOpacity
+                WelcomeStageLabel(
+                    title: copy.copyStepTitle,
+                    symbol: "doc.on.doc.fill",
+                    color: WelcomeDemoPalette.cyan,
+                    isActive: progress.detailIndex == 0
                 )
-                WelcomeShortcutCard(copy: copy, progress: progress)
-                WelcomeTransferTrack(
-                    progress: progress.renderTravel,
-                    activityOpacity: progress.activityOpacity
+                WelcomeStageLabel(
+                    title: copy.renderStepTitle,
+                    symbol: "command",
+                    color: WelcomeDemoPalette.violet,
+                    isActive: progress.detailIndex == 1
                 )
-                WelcomePNGCard(copy: copy, progress: progress)
+                WelcomeStageLabel(
+                    title: copy.pasteStepTitle,
+                    symbol: "photo.fill",
+                    color: WelcomeDemoPalette.pink,
+                    isActive: progress.detailIndex == 2
+                )
             }
 
+            WelcomeTransformTrack(progress: progress)
+
             Text(detail)
-                .font(.callout)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: 34)
-                .id(progress.detailIndex)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                .animation(.easeInOut(duration: 0.3), value: progress.detailIndex)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 16)
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
         }
     }
 
@@ -168,200 +220,188 @@ private struct WelcomeWorkflowScene: View {
     }
 }
 
-private struct WelcomeMarkdownCard: View {
-    let copy: WelcomeCopy
-    let progress: WelcomeAnimationProgress
-
-    private var tokenOpacity: CGFloat {
-        CGFloat(sin(Double(progress.copyTravel) * .pi))
-            * progress.activityOpacity
-    }
+private struct WelcomeStageLabel: View {
+    let title: String
+    let symbol: String
+    let color: Color
+    let isActive: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Image(systemName: "doc.text.fill")
-                    .foregroundStyle(Color.accentColor)
-                Spacer()
-                Text("MD")
-                    .font(.system(.caption2, design: .rounded).weight(.bold))
-                    .foregroundStyle(.secondary)
+        Label(title, systemImage: symbol)
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(isActive ? color : .secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .background(
+                isActive ? color.opacity(0.12) : Color.clear,
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(isActive ? color.opacity(0.3) : Color.clear, lineWidth: 0.6)
             }
-
-            VStack(alignment: .leading, spacing: 5) {
-                DemoCodeLine(width: 82, color: Color.accentColor.opacity(0.65))
-                DemoCodeLine(width: 104)
-                DemoCodeLine(width: 66)
-            }
-
-            Spacer(minLength: 0)
-            Text(copy.copyStepTitle)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-        }
-        .padding(11)
-        .frame(width: 140, height: 104)
-        .welcomeDemoCardBackground()
-        .offset(y: -3 * progress.copyLift)
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: "doc.on.doc.fill")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 28, height: 28)
-                .background(Color.accentColor, in: Circle())
-                .shadow(color: Color.accentColor.opacity(0.25), radius: 6, y: 2)
-                .scaleEffect(0.72 + 0.28 * progress.copyLift)
-                .offset(
-                    x: 24 * progress.copyTravel,
-                    y: -8 * progress.copyLift
-                )
-                .opacity(tokenOpacity)
-        }
     }
 }
 
-private struct WelcomeShortcutCard: View {
-    let copy: WelcomeCopy
+private struct WelcomeTransformTrack: View {
     let progress: WelcomeAnimationProgress
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 5) {
-                ForEach(["⌃", "⌘", "X"], id: \.self) { key in
-                    Text(key)
-                        .font(.system(.body, design: .rounded).weight(.semibold))
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Color.accentColor.opacity(
-                                0.08 + 0.22 * progress.keyPress
-                            ),
-                            in: RoundedRectangle(cornerRadius: 6)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(
-                                    Color.accentColor.opacity(
-                                        0.25 + 0.45 * progress.keyPress
-                                    ),
-                                    lineWidth: 0.7
-                                )
-                        }
-                }
-            }
-            .scaleEffect(x: 1, y: 1 - 0.08 * progress.keyPress)
-            .offset(y: 2 * progress.keyPress)
-
-            Label(copy.renderStepTitle, systemImage: "wand.and.stars")
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .foregroundStyle(
-                    Color.accentColor.opacity(0.72 + 0.28 * progress.keyPress)
-                )
-        }
-        .frame(width: 130, height: 104)
-        .welcomeDemoCardBackground()
-        .shadow(
-            color: Color.accentColor.opacity(0.18 * progress.keyPress),
-            radius: 10,
-            y: 3
-        )
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(Color.accentColor)
-                .scaleEffect(0.6 + 0.5 * progress.keyPress)
-                .rotationEffect(.degrees(18 * Double(progress.keyPress)))
-                .opacity(progress.keyPress * progress.activityOpacity)
-                .offset(x: 5, y: -7)
-        }
-    }
-}
-
-private struct WelcomePNGCard: View {
-    let copy: WelcomeCopy
-    let progress: WelcomeAnimationProgress
-
-    private var effectiveReveal: CGFloat {
-        progress.imageReveal * progress.activityOpacity
-    }
-
-    var body: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(Color(nsColor: .separatorColor).opacity(0.12))
-
-                ZStack {
-                    LinearGradient(
-                        colors: [Color.accentColor, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-                .mask(alignment: .leading) {
-                    Rectangle()
-                        .scaleEffect(x: effectiveReveal, anchor: .leading)
-                }
-            }
-            .frame(height: 58)
+        ZStack {
+            Capsule()
+                .fill(Color(nsColor: .separatorColor).opacity(0.45))
+                .frame(width: 350, height: 2)
 
             HStack {
-                Text(copy.pasteStepTitle)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
+                WelcomeTrackNode(color: WelcomeDemoPalette.cyan)
                 Spacer()
-                Text("PNG")
-                    .font(.system(.caption2, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color.accentColor)
+                WelcomeTrackNode(color: WelcomeDemoPalette.violet)
+                Spacer()
+                WelcomeTrackNode(color: WelcomeDemoPalette.pink)
             }
-        }
-        .padding(9)
-        .frame(width: 140, height: 104)
-        .welcomeDemoCardBackground()
-        .overlay(alignment: .topTrailing) {
+            .frame(width: 358)
+
+            WelcomeTransformCard(progress: progress)
+                .offset(x: 154 * progress.cardTravel)
+
+            WelcomeShortcutBadge()
+                .offset(y: 28)
+                .opacity(progress.keyPress)
+                .scaleEffect(0.78 + 0.22 * progress.keyPress)
+
             Text("⌘V")
                 .font(.system(.caption, design: .rounded).weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.accentColor, in: Capsule())
-                .shadow(color: Color.accentColor.opacity(0.25), radius: 7, y: 2)
-                .scaleEffect(0.72 + 0.28 * progress.pastePrompt)
-                .offset(x: 7, y: -7 - 6 * progress.pastePrompt)
+                .background(WelcomeDemoPalette.pink, in: Capsule())
+                .shadow(color: WelcomeDemoPalette.pink.opacity(0.28), radius: 6, y: 2)
+                .offset(x: 204, y: -25 - 5 * progress.pastePrompt)
                 .opacity(progress.pastePrompt * progress.activityOpacity)
+                .scaleEffect(0.78 + 0.22 * progress.pastePrompt)
+        }
+        .frame(height: 70)
+    }
+}
+
+private struct WelcomeTrackNode: View {
+    let color: Color
+
+    var body: some View {
+        Circle()
+            .fill(Color(nsColor: .windowBackgroundColor))
+            .frame(width: 12, height: 12)
+            .overlay {
+                Circle().stroke(color.opacity(0.55), lineWidth: 2)
+            }
+    }
+}
+
+private struct WelcomeTransformCard: View {
+    let progress: WelcomeAnimationProgress
+
+    private var flipAngle: Double {
+        sin(Double(progress.imageReveal) * .pi) * 9
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+
+            WelcomeMarkdownFace()
+                .opacity(1 - progress.imageReveal)
+
+            WelcomePNGFace()
+                .opacity(progress.imageReveal)
+
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            WelcomeDemoPalette.cyan.opacity(0.4),
+                            WelcomeDemoPalette.violet.opacity(0.36),
+                            WelcomeDemoPalette.pink.opacity(0.34)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
+        }
+        .frame(width: 128, height: 62)
+        .rotation3DEffect(.degrees(flipAngle), axis: (x: 0, y: 1, z: 0))
+        .scaleEffect(1 + 0.045 * progress.keyPress)
+        .shadow(
+            color: WelcomeDemoPalette.violet.opacity(0.12 + 0.18 * progress.keyPress),
+            radius: 9,
+            y: 4
+        )
+        .overlay(alignment: .topTrailing) {
+            Image(systemName: progress.imageReveal > 0.8 ? "photo.fill" : "doc.text.fill")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(
+                    progress.imageReveal > 0.8
+                        ? WelcomeDemoPalette.pink
+                        : WelcomeDemoPalette.cyan,
+                    in: Circle()
+                )
+                .offset(x: 6, y: -6)
         }
     }
 }
 
-private struct WelcomeTransferTrack: View {
-    let progress: CGFloat
-    let activityOpacity: CGFloat
-
-    private var particleOpacity: CGFloat {
-        CGFloat(sin(Double(progress) * .pi)) * activityOpacity
-    }
-
+private struct WelcomeMarkdownFace: View {
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(Color(nsColor: .separatorColor).opacity(0.45))
-                .frame(height: 2)
-
-            Capsule()
-                .fill(Color.accentColor.opacity(0.7 * activityOpacity))
-                .frame(width: 28 * progress, height: 2)
-
-            Circle()
-                .fill(Color.accentColor)
-                .frame(width: 7, height: 7)
-                .shadow(color: Color.accentColor.opacity(0.5), radius: 4)
-                .offset(x: 21 * progress)
-                .opacity(particleOpacity)
+        VStack(alignment: .leading, spacing: 5) {
+            DemoCodeLine(width: 88, color: WelcomeDemoPalette.cyan.opacity(0.68))
+            DemoCodeLine(width: 102)
+            DemoCodeLine(width: 72)
         }
-        .frame(width: 28, height: 18)
-        .accessibilityHidden(true)
+    }
+}
+
+private struct WelcomePNGFace: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    WelcomeDemoPalette.cyan,
+                    WelcomeDemoPalette.violet,
+                    WelcomeDemoPalette.pink
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(5)
+    }
+}
+
+private struct WelcomeShortcutBadge: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(["⌃", "⌘", "X"], id: \.self) { key in
+                Text(key)
+                    .font(.system(.caption2, design: .rounded).weight(.bold))
+                    .frame(width: 18, height: 18)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 4))
+            }
+        }
+        .padding(4)
+        .background(WelcomeDemoPalette.violet.opacity(0.2), in: Capsule())
+        .overlay {
+            Capsule().stroke(WelcomeDemoPalette.violet.opacity(0.45), lineWidth: 0.7)
+        }
+        .shadow(color: WelcomeDemoPalette.violet.opacity(0.25), radius: 6, y: 2)
     }
 }
 
@@ -372,22 +412,6 @@ private struct DemoCodeLine: View {
     var body: some View {
         Capsule()
             .fill(color)
-            .frame(width: width, height: 5)
-    }
-}
-
-private extension View {
-    func welcomeDemoCardBackground() -> some View {
-        background(
-            Color(nsColor: .windowBackgroundColor).opacity(0.84),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(
-                    Color(nsColor: .separatorColor).opacity(0.62),
-                    lineWidth: 0.5
-                )
-        }
+            .frame(width: width, height: 4)
     }
 }

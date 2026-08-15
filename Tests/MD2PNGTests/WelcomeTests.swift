@@ -48,6 +48,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertEqual(english.windowTitle, "Welcome to md2png")
         XCTAssertEqual(english.trySample, "Try a Short Sample")
+        XCTAssertTrue(english.trySampleHelp.contains("Examples"))
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
         XCTAssertTrue(chinese.privacyNote.contains("绝不会"))
@@ -64,28 +65,39 @@ final class WelcomeTests: XCTestCase {
 
     func testWelcomeWindowPlacementCentersInsideTheActiveVisibleFrame() {
         let origin = WelcomeWindowPlacement.centeredOrigin(
-            windowSize: NSSize(width: 620, height: 678),
+            windowSize: NSSize(width: 560, height: 608),
             visibleFrame: NSRect(x: -1920, y: 25, width: 1920, height: 1055)
         )
 
-        XCTAssertEqual(origin.x, -1270, accuracy: 0.001)
-        XCTAssertEqual(origin.y, 213.5, accuracy: 0.001)
+        XCTAssertEqual(origin.x, -1240, accuracy: 0.001)
+        XCTAssertEqual(origin.y, 248.5, accuracy: 0.001)
     }
 
     func testWelcomeAnimationProgressMovesThroughTheWholeWorkflow() {
-        let copying = WelcomeAnimationProgress(cycleProgress: 0.15)
-        let rendering = WelcomeAnimationProgress(cycleProgress: 0.34)
-        let pasting = WelcomeAnimationProgress(cycleProgress: 0.72)
+        let copying = WelcomeAnimationProgress(phase: .copy)
+        let rendering = WelcomeAnimationProgress(phase: .render)
+        let pasting = WelcomeAnimationProgress(phase: .paste)
 
-        XCTAssertGreaterThan(copying.copyLift, 0)
-        XCTAssertGreaterThan(copying.copyTravel, 0)
+        XCTAssertEqual(copying.cardTravel, -1)
+        XCTAssertEqual(copying.imageReveal, 0)
         XCTAssertEqual(copying.detailIndex, 0)
-        XCTAssertGreaterThan(rendering.keyPress, 0.9)
+        XCTAssertEqual(rendering.cardTravel, 0)
+        XCTAssertEqual(rendering.keyPress, 1)
+        XCTAssertGreaterThan(rendering.imageReveal, 0.5)
         XCTAssertEqual(rendering.detailIndex, 1)
-        XCTAssertGreaterThan(pasting.imageReveal, 0.9)
-        XCTAssertGreaterThan(pasting.pastePrompt, 0)
+        XCTAssertEqual(pasting.cardTravel, 1)
+        XCTAssertEqual(pasting.imageReveal, 1)
+        XCTAssertEqual(pasting.pastePrompt, 1)
         XCTAssertEqual(pasting.detailIndex, 2)
         XCTAssertEqual(WelcomeAnimationProgress.reducedMotion.imageReveal, 1)
+    }
+
+    func testSampleGuideRevealsTheMenuHierarchyInOrder() {
+        XCTAssertFalse(SampleGuidePhase.mainMenu.highlightsExamples)
+        XCTAssertFalse(SampleGuidePhase.mainMenu.showsSubmenu)
+        XCTAssertTrue(SampleGuidePhase.examplesFocused.highlightsExamples)
+        XCTAssertFalse(SampleGuidePhase.examplesFocused.showsSubmenu)
+        XCTAssertTrue(SampleGuidePhase.submenu.showsSubmenu)
     }
 
     @MainActor
@@ -111,7 +123,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(controller.showIfNeeded(shortcuts: shortcuts))
         XCTAssertEqual(controller.window?.title, "Welcome to md2png")
-        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 620, height: 650))
+        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 560, height: 580))
         XCTAssertEqual(controller.displayedShortcutStatuses, shortcuts)
         XCTAssertEqual(controller.window?.isVisible, true)
         XCTAssertEqual(controller.window?.level, .normal)

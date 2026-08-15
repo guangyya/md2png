@@ -14,7 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         onVisibilityChange: { isVisible in
             NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
         },
-        onTrySample: { [weak self] in self?.renderBundledExample(.short) }
+        onTrySample: { [weak self] in self?.showSampleGuide() }
+    )
+    private lazy var sampleGuideController = SampleGuideController(
+        onChoose: { [weak self] kind in
+            self?.renderBundledExample(kind)
+        }
     )
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
@@ -254,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let example = try AppResources.exampleMarkdown(for: kind)
             let changeCount = try Clipboard.write(markdown: example)
             lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
-            render(example)
+            render(example, showsPreviewOnSuccess: true)
         } catch {
             show(error)
         }
@@ -275,7 +280,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func render(_ markdown: String) {
+    private func render(
+        _ markdown: String,
+        showsPreviewOnSuccess: Bool = false
+    ) {
         guard renderActivity.begin() else { return }
         let requestedWidthPreset = renderWidthPreset
         updateRenderingUI(isRendering: true)
@@ -312,6 +320,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         ),
                         symbol: "checkmark.circle.fill"
                     )
+                    if showsPreviewOnSuccess {
+                        self.previewController.show(
+                            image: image,
+                            widthPreset: requestedWidthPreset
+                        )
+                    }
                 } catch {
                     self.show(error)
                 }
@@ -376,6 +390,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showWelcome() {
         welcomeController.show(shortcuts: welcomeShortcutStatuses)
+    }
+
+    private func showSampleGuide() {
+        guard !renderActivity.isRendering,
+              !isPresentingClipboardConfirmation,
+              let button = statusItem.button else { return }
+        sampleGuideController.show(relativeTo: button)
     }
 
     @objc private func terminateFromStatusMenu() {
