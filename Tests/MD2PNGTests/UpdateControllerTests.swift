@@ -58,6 +58,16 @@ final class UpdateControllerTests: XCTestCase {
         let release = UpdateTestFixtures.release(version: "0.2.0")
 
         policy.cache(release: release, repository: repository, checkedAt: checkedAt)
+        let persistedData = try XCTUnwrap(defaults.data(forKey: "Update.cachedRelease.v1"))
+        let legacyReadableRecord = try PropertyListDecoder().decode(
+            LegacyCachedReleaseRecord.self,
+            from: persistedData
+        )
+        XCTAssertEqual(legacyReadableRecord.release.tagName, release.tagName)
+        XCTAssertEqual(
+            legacyReadableRecord.release.assets[0].browserDownloadURL,
+            release.assets[0].downloadURL
+        )
         let cached = try XCTUnwrap(policy.cachedRelease(for: repository))
         XCTAssertEqual(cached.release, release)
         XCTAssertTrue(policy.isFresh(cached, at: checkedAt.addingTimeInterval(86_399)))

@@ -19,11 +19,11 @@ extension CachedUpdateReleaseRecord: Codable {
         case release
     }
 
-    private struct LegacyRelease: Decodable {
+    private struct StoredRelease: Codable {
         let tagName: String
         let draft: Bool
         let prerelease: Bool
-        let assets: [LegacyAsset]
+        let assets: [StoredAsset]
 
         enum CodingKeys: String, CodingKey {
             case tagName = "tag_name"
@@ -40,9 +40,16 @@ extension CachedUpdateReleaseRecord: Codable {
                 assets: assets.map(\.updateAsset)
             )
         }
+
+        init(_ release: UpdateRelease) {
+            tagName = release.tagName
+            draft = release.draft
+            prerelease = release.prerelease
+            assets = release.assets.map(StoredAsset.init)
+        }
     }
 
-    private struct LegacyAsset: Decodable {
+    private struct StoredAsset: Codable {
         let name: String
         let contentType: String
         let size: Int64
@@ -66,6 +73,14 @@ extension CachedUpdateReleaseRecord: Codable {
                 downloadURL: browserDownloadURL
             )
         }
+
+        init(_ asset: UpdateReleaseAsset) {
+            name = asset.name
+            contentType = asset.contentType
+            size = asset.size
+            digest = asset.digest
+            browserDownloadURL = asset.downloadURL
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -76,7 +91,7 @@ extension CachedUpdateReleaseRecord: Codable {
         if let release = try? container.decode(UpdateRelease.self, forKey: .release) {
             self.release = release
         } else {
-            release = try container.decode(LegacyRelease.self, forKey: .release).updateRelease
+            release = try container.decode(StoredRelease.self, forKey: .release).updateRelease
         }
     }
 
@@ -85,7 +100,8 @@ extension CachedUpdateReleaseRecord: Codable {
         try container.encode(repositoryOwner, forKey: .repositoryOwner)
         try container.encode(repositoryName, forKey: .repositoryName)
         try container.encode(checkedAt, forKey: .checkedAt)
-        try container.encode(release, forKey: .release)
+        // Keep v1 readable by builds from before the domain/transport split.
+        try container.encode(StoredRelease(release), forKey: .release)
     }
 }
 
