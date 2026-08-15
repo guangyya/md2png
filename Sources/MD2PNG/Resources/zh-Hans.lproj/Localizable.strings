@@ -68,6 +68,7 @@
 "welcome.shortcuts" = "全局快捷键";
 "welcome.shortcut_verification_help" = "在此按下快捷键即可测试，不会执行对应命令。";
 "welcome.shortcut_ready" = "可用";
+"welcome.shortcut_detected" = "已检测";
 "welcome.shortcut_verified" = "已生效";
 "welcome.shortcut_unavailable" = "已占用";
 "welcome.shortcut_conflict_help" = "其他应用正在使用该快捷键。仍可从 md2png 菜单执行所有操作。";

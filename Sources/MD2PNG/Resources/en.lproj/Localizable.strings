@@ -68,6 +68,7 @@
 "welcome.shortcuts" = "Global shortcuts";
 "welcome.shortcut_verification_help" = "Press a shortcut here to test it without running the command.";
 "welcome.shortcut_ready" = "Ready";
+"welcome.shortcut_detected" = "Detected";
 "welcome.shortcut_verified" = "Works";
 "welcome.shortcut_unavailable" = "In Use";
 "welcome.shortcut_conflict_help" = "Another app is using a shortcut. Every action remains available from the md2png menu.";

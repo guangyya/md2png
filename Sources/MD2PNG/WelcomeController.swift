@@ -111,6 +111,7 @@ struct WelcomeCopy {
     let shortcutsTitle: String
     let shortcutVerificationHelp: String
     let shortcutReady: String
+    let shortcutDetected: String
     let shortcutVerified: String
     let shortcutUnavailable: String
     let shortcutConflictHelp: String
@@ -180,6 +181,11 @@ struct WelcomeCopy {
         shortcutReady = L10n.text(
             "welcome.shortcut_ready",
             defaultValue: "Ready",
+            bundle: localizationBundle
+        )
+        shortcutDetected = L10n.text(
+            "welcome.shortcut_detected",
+            defaultValue: "Detected",
             bundle: localizationBundle
         )
         shortcutVerified = L10n.text(
@@ -516,10 +522,15 @@ private struct WelcomeBackdrop: View {
 private struct WelcomeShortcutRow: View {
     let shortcut: WelcomeShortcutStatus
     let copy: WelcomeCopy
+    @State private var isShowingVerificationFeedback = false
+    @State private var verificationFeedbackTask: Task<Void, Never>?
 
     private var statusText: String {
         if !shortcut.isRegistered {
             return copy.shortcutUnavailable
+        }
+        if isShowingVerificationFeedback {
+            return copy.shortcutDetected
         }
         return shortcut.isVerified ? copy.shortcutVerified : copy.shortcutReady
     }
@@ -562,7 +573,7 @@ private struct WelcomeShortcutRow: View {
             Label(statusText, systemImage: statusSymbol)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
-                .frame(width: 74, alignment: .leading)
+                .frame(width: 88, alignment: .leading)
                 .symbolEffect(.bounce, value: shortcut.verificationCount)
         }
         .padding(.horizontal, 10)
@@ -570,8 +581,12 @@ private struct WelcomeShortcutRow: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color(nsColor: .controlBackgroundColor).opacity(0.72),
-                    Color.accentColor.opacity(0.045)
+                    isShowingVerificationFeedback
+                        ? Color.green.opacity(0.24)
+                        : Color(nsColor: .controlBackgroundColor).opacity(0.72),
+                    isShowingVerificationFeedback
+                        ? Color.green.opacity(0.12)
+                        : Color.accentColor.opacity(0.045)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -580,7 +595,27 @@ private struct WelcomeShortcutRow: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
+                .stroke(
+                    isShowingVerificationFeedback
+                        ? Color.green.opacity(0.75)
+                        : Color.accentColor.opacity(0.1),
+                    lineWidth: isShowingVerificationFeedback ? 1.4 : 0.5
+                )
+        }
+        .scaleEffect(isShowingVerificationFeedback ? 1.012 : 1)
+        .animation(.easeOut(duration: 0.12), value: isShowingVerificationFeedback)
+        .onChange(of: shortcut.verificationCount) { _, verificationCount in
+            guard verificationCount > 0 else { return }
+            verificationFeedbackTask?.cancel()
+            isShowingVerificationFeedback = true
+            verificationFeedbackTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled else { return }
+                isShowingVerificationFeedback = false
+            }
+        }
+        .onDisappear {
+            verificationFeedbackTask?.cancel()
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue(statusText)

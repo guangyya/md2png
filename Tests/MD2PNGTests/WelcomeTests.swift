@@ -51,6 +51,7 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(english.windowTitle, "Welcome to md2png")
         XCTAssertEqual(english.trySample, "Try a Short Sample")
         XCTAssertTrue(english.trySampleHelp.contains("Examples"))
+        XCTAssertEqual(english.shortcutDetected, "Detected")
         XCTAssertEqual(english.shortcutVerified, "Works")
         XCTAssertTrue(english.shortcutVerificationHelp.contains("without running"))
         XCTAssertEqual(
@@ -61,6 +62,7 @@ final class WelcomeTests: XCTestCase {
             "Render Clipboard as Image shortcut works."
         )
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
+        XCTAssertEqual(chinese.shortcutDetected, "已检测")
         XCTAssertEqual(chinese.shortcutVerified, "已生效")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
         XCTAssertTrue(chinese.shortcutVerificationHelp.contains("不会执行"))
