@@ -124,6 +124,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(popover.isShown)
         XCTAssertNotNil(popover.contentViewController)
+        XCTAssertEqual(popover.makeContentKeyCount, 1)
         XCTAssertEqual(statusButton.cell?.isHighlighted, true)
 
         controller.choose(.short)
@@ -218,6 +219,7 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
     var contentViewController: NSViewController?
     var isShown = false
     private(set) var closeCount = 0
+    private(set) var makeContentKeyCount = 0
 
     func show(
         relativeTo positioningRect: NSRect,
@@ -225,6 +227,10 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
         preferredEdge: NSRectEdge
     ) {
         isShown = true
+    }
+
+    func makeContentKey() {
+        makeContentKeyCount += 1
     }
 
     func close() {

@@ -30,10 +30,15 @@ protocol SampleGuidePopover: AnyObject {
         of positioningView: NSView,
         preferredEdge: NSRectEdge
     )
+    func makeContentKey()
     func close()
 }
 
-extension NSPopover: SampleGuidePopover {}
+extension NSPopover: SampleGuidePopover {
+    func makeContentKey() {
+        contentViewController?.view.window?.makeKey()
+    }
+}
 
 @MainActor
 final class SampleGuideController: NSObject, NSPopoverDelegate {
@@ -72,7 +77,8 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
                 menuState: menuState,
                 onChoose: { [weak self] kind in
                     self?.choose(kind)
-                }
+                },
+                onDismiss: { [weak self] in self?.dismiss() }
             )
         )
         highlightedButton = button
@@ -82,6 +88,7 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
             of: button,
             preferredEdge: .minY
         )
+        popover.makeContentKey()
     }
 
     func dismiss() {
@@ -122,9 +129,11 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
 private struct SampleGuideView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase = SampleGuidePhase.mainMenu
+    @FocusState private var focusedExampleID: Int?
 
     let menuState: SampleGuideMenuState
     let onChoose: (ExampleKind) -> Void
+    let onDismiss: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -143,6 +152,7 @@ private struct SampleGuideView: View {
 
                 SampleExamplesMenu(
                     isInputEnabled: phase.acceptsSubmenuInput,
+                    focusedExampleID: $focusedExampleID,
                     onChoose: { kind in
                         guard phase.acceptsSubmenuInput else { return }
                         onChoose(kind)
@@ -164,12 +174,14 @@ private struct SampleGuideView: View {
         .task {
             await revealMenuPath()
         }
+        .onExitCommand(perform: onDismiss)
     }
 
     @MainActor
     private func revealMenuPath() async {
         if reduceMotion {
             phase = .submenu
+            await focusFirstExample()
             return
         }
 
@@ -182,6 +194,14 @@ private struct SampleGuideView: View {
         withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
             phase = .submenu
         }
+        await focusFirstExample()
+    }
+
+    @MainActor
+    private func focusFirstExample() async {
+        await Task.yield()
+        guard phase.acceptsSubmenuInput else { return }
+        focusedExampleID = ExampleKind.short.rawValue
     }
 
     private func pause(nanoseconds: UInt64) async -> Bool {
@@ -266,6 +286,7 @@ private struct SampleMainMenu: View {
 
 private struct SampleExamplesMenu: View {
     let isInputEnabled: Bool
+    @FocusState.Binding var focusedExampleID: Int?
     let onChoose: (ExampleKind) -> Void
 
     var body: some View {
@@ -280,6 +301,7 @@ private struct SampleExamplesMenu: View {
                     isInputEnabled: isInputEnabled,
                     action: { onChoose(kind) }
                 )
+                .focused($focusedExampleID, equals: kind.rawValue)
             }
         }
         .padding(6)
