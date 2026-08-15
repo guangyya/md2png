@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
+  canonicalExecutablePath,
   checkoutIdentity,
+  commandMatchesExecutable,
   debugBundleIdentifier,
+  isIgnorableKillError,
   matchingProcessIDs,
   parseOptions,
   parseProcessTable,
@@ -59,6 +62,37 @@ test("selects only the exact executable path for the current checkout", () => {
 
   assert.deepEqual(matchingProcessIDs(processes, currentExecutable, 999), [101]);
   assert.deepEqual(matchingProcessIDs(processes, currentExecutable, 101), []);
+});
+
+test("matches executable aliases by canonical path without accepting arguments", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "md2png-debug-run-path-"));
+  try {
+    const checkout = path.join(root, "checkout");
+    const alias = path.join(root, "checkout-alias");
+    const executable = path.join(checkout, "dist", "md2png.app", "Contents", "MacOS", "md2png");
+    mkdirSync(path.dirname(executable), { recursive: true });
+    writeFileSync(executable, "");
+    symlinkSync(checkout, alias);
+    const aliasedExecutable = path.join(alias, "dist", "md2png.app", "Contents", "MacOS", "md2png");
+    const canonicalExecutable = realpathSync.native(executable);
+
+    assert.equal(canonicalExecutablePath(aliasedExecutable), canonicalExecutable);
+    assert.equal(commandMatchesExecutable(aliasedExecutable, executable), true);
+    assert.equal(commandMatchesExecutable(`${aliasedExecutable} --argument`, executable), false);
+
+    rmSync(executable);
+    assert.equal(canonicalExecutablePath(aliasedExecutable), canonicalExecutable);
+    assert.equal(commandMatchesExecutable(aliasedExecutable, executable), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("tolerates only vanished or unsignalable process errors", () => {
+  assert.equal(isIgnorableKillError({ code: "ESRCH" }), true);
+  assert.equal(isIgnorableKillError({ code: "EPERM" }), true);
+  assert.equal(isIgnorableKillError({ code: "EINVAL" }), false);
+  assert.equal(isIgnorableKillError(new Error("missing code")), false);
 });
 
 test("rejects unknown, duplicate, and incomplete command options", () => {

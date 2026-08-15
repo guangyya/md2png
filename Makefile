@@ -28,10 +28,9 @@ VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 ifeq ($(CONFIGURATION),debug)
-DEBUG_CHECKOUT_ID := $(shell $(NODE) scripts/debug-run.mjs identity --repo-root "$(CURDIR)")
-EFFECTIVE_BUNDLE_IDENTIFIER := $(shell $(NODE) scripts/debug-run.mjs bundle-identifier --repo-root "$(CURDIR)" --base "$(BUNDLE_IDENTIFIER)")
+DEBUG_APP_PREREQUISITE := debug-stop
 else
-EFFECTIVE_BUNDLE_IDENTIFIER := $(BUNDLE_IDENTIFIER)
+DEBUG_APP_PREREQUISITE :=
 endif
 COVERAGE_DIR ?= .build/coverage
 COVERAGE_JSON := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.json
@@ -48,7 +47,7 @@ ifneq ($(SIGN_IDENTITY),-)
 SIGN_FLAGS += --options runtime --timestamp
 endif
 
-.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate prepare-release validate-release-preparation test build app verify-dist release package-dmg dmg notarize publish-release run clean
+.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate prepare-release validate-release-preparation test build debug-stop app verify-dist release package-dmg dmg notarize publish-release run clean
 
 bootstrap:
 	cd WebRenderer && $(PNPM) install --frozen-lockfile=false
@@ -115,21 +114,32 @@ test: renderer coverage-tool-test
 build: renderer
 	swift build -c $(CONFIGURATION) --triple $(ARM64_TRIPLE)
 
-app: build icon
+debug-stop:
+	$(NODE) scripts/debug-run.mjs stop \
+		--repo-root "$(CURDIR)" \
+		--app "$(APP_DIR)" \
+		--executable "$(TARGET_NAME)"
+
+app: build icon $(DEBUG_APP_PREREQUISITE)
 	rm -rf "$(APP_DIR)"
 	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources"
 	cp "$(ARM64_BUILD_DIR)/$(TARGET_NAME)" "$(CONTENTS)/MacOS/$(TARGET_NAME)"
 	cp Info.plist "$(CONTENTS)/Info.plist"
-	@case "$(EFFECTIVE_BUNDLE_IDENTIFIER)" in \
+	@effective_bundle_identifier="$(BUNDLE_IDENTIFIER)"; \
+	debug_checkout_id=""; \
+	if [ "$(CONFIGURATION)" = "debug" ]; then \
+		debug_checkout_id="$$( $(NODE) scripts/debug-run.mjs identity --repo-root "$(CURDIR)" )" || exit $$?; \
+		effective_bundle_identifier="$$( $(NODE) scripts/debug-run.mjs bundle-identifier --repo-root "$(CURDIR)" --base "$(BUNDLE_IDENTIFIER)" )" || exit $$?; \
+	fi; \
+	case "$$effective_bundle_identifier" in \
 		""|*[!A-Za-z0-9.-]*) \
 			echo "BUNDLE_IDENTIFIER must contain only letters, numbers, dots, and hyphens"; \
 			exit 1 ;; \
 		*) ;; \
-	esac
-	/usr/bin/plutil -replace CFBundleIdentifier -string "$(EFFECTIVE_BUNDLE_IDENTIFIER)" "$(CONTENTS)/Info.plist"
-	@if [ "$(CONFIGURATION)" = "debug" ]; then \
-		test -n "$(DEBUG_CHECKOUT_ID)" || { echo "Debug checkout identity is empty"; exit 1; }; \
-		/usr/bin/plutil -insert MD2PNGDebugCheckoutID -string "$(DEBUG_CHECKOUT_ID)" "$(CONTENTS)/Info.plist"; \
+	esac; \
+	/usr/bin/plutil -replace CFBundleIdentifier -string "$$effective_bundle_identifier" "$(CONTENTS)/Info.plist"; \
+	if [ -n "$$debug_checkout_id" ]; then \
+		/usr/bin/plutil -insert MD2PNGDebugCheckoutID -string "$$debug_checkout_id" "$(CONTENTS)/Info.plist"; \
 	fi
 	@if [ -n "$(SOURCE_COMMIT)" ]; then \
 		if ! /usr/bin/printf '%s\n' "$(SOURCE_COMMIT)" | /usr/bin/grep -Eq '^[0-9a-fA-F]{7,64}$$'; then \
@@ -225,7 +235,7 @@ publish-release:
 
 run: app
 	@if [ "$(CONFIGURATION)" = "debug" ]; then \
-		$(NODE) scripts/debug-run.mjs run \
+		$(NODE) scripts/debug-run.mjs launch \
 			--repo-root "$(CURDIR)" \
 			--app "$(APP_DIR)" \
 			--executable "$(TARGET_NAME)"; \

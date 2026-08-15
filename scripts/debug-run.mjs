@@ -30,11 +30,45 @@ export function parseProcessTable(output) {
     .map((match) => ({ pid: Number(match[1]), command: match[2] }));
 }
 
+export function canonicalExecutablePath(candidate) {
+  const absolutePath = path.resolve(candidate);
+  let existingPath = absolutePath;
+  const missingComponents = [];
+
+  while (true) {
+    try {
+      return path.join(realpathSync.native(existingPath), ...missingComponents);
+    } catch (error) {
+      if (error.code !== "ENOENT" && error.code !== "ENOTDIR") {
+        return absolutePath;
+      }
+      const parentPath = path.dirname(existingPath);
+      if (parentPath === existingPath) {
+        return absolutePath;
+      }
+      missingComponents.unshift(path.basename(existingPath));
+      existingPath = parentPath;
+    }
+  }
+}
+
+export function commandMatchesExecutable(command, executablePath) {
+  if (!path.isAbsolute(command) || path.basename(command) !== path.basename(executablePath)) {
+    return false;
+  }
+  return canonicalExecutablePath(command) === canonicalExecutablePath(executablePath);
+}
+
 export function matchingProcessIDs(processes, executablePath, currentPID = process.pid) {
-  const canonicalExecutable = path.resolve(executablePath);
   return processes
-    .filter(({ pid, command }) => pid !== currentPID && command === canonicalExecutable)
+    .filter(({ pid, command }) => (
+      pid !== currentPID && commandMatchesExecutable(command, executablePath)
+    ))
     .map(({ pid }) => pid);
+}
+
+export function isIgnorableKillError(error) {
+  return error?.code === "ESRCH" || error?.code === "EPERM";
 }
 
 export function shouldRetryOpenFailure(detail) {
@@ -83,7 +117,7 @@ function run(command, args) {
 }
 
 function readProcessCommand(pid) {
-  const result = spawnSync("/bin/ps", ["-p", String(pid), "-o", "command="], {
+  const result = spawnSync("/bin/ps", ["-ww", "-p", String(pid), "-o", "command="], {
     encoding: "utf8"
   });
   if (result.error || result.status !== 0) {
@@ -120,17 +154,19 @@ async function openApp(appPath) {
 }
 
 async function stopMatchingProcesses(executablePath) {
-  const processes = parseProcessTable(run("/bin/ps", ["-axo", "pid=,command="]));
+  const processes = parseProcessTable(run("/bin/ps", ["-axww", "-o", "pid=,command="]));
   const pids = matchingProcessIDs(processes, executablePath);
+  const signaledPIDs = [];
 
   for (const pid of pids) {
-    if (readProcessCommand(pid) !== executablePath) {
+    if (!commandMatchesExecutable(readProcessCommand(pid) ?? "", executablePath)) {
       continue;
     }
     try {
       process.kill(pid, "SIGTERM");
+      signaledPIDs.push(pid);
     } catch (error) {
-      if (error.code !== "ESRCH") {
+      if (!isIgnorableKillError(error)) {
         throw error;
       }
     }
@@ -138,26 +174,43 @@ async function stopMatchingProcesses(executablePath) {
 
   const deadline = Date.now() + 3000;
   while (Date.now() < deadline) {
-    const remaining = pids.filter((pid) => readProcessCommand(pid) === executablePath);
+    const remaining = pids.filter((pid) => (
+      commandMatchesExecutable(readProcessCommand(pid) ?? "", executablePath)
+    ));
     if (remaining.length === 0) {
-      return pids.length;
+      return signaledPIDs.length;
     }
     await delay(50);
   }
 
-  const remaining = pids.filter((pid) => readProcessCommand(pid) === executablePath);
+  const remaining = pids.filter((pid) => (
+    commandMatchesExecutable(readProcessCommand(pid) ?? "", executablePath)
+  ));
   if (remaining.length > 0) {
     throw new Error(`prior Debug instance did not exit: ${remaining.join(", ")}`);
   }
-  return pids.length;
+  return signaledPIDs.length;
 }
 
-async function runDebugApp(options) {
+function debugAppPaths(options) {
   requireOptions(options, ["repo-root", "app", "executable"]);
   const repoRoot = realpathSync.native(path.resolve(options["repo-root"]));
-  const appPath = realpathSync.native(path.resolve(options.app));
+  const appPath = canonicalExecutablePath(options.app);
   const executablePath = path.join(appPath, "Contents", "MacOS", options.executable);
   const plistPath = path.join(appPath, "Contents", "Info.plist");
+  return { repoRoot, appPath, executablePath, plistPath };
+}
+
+async function stopDebugApp(options) {
+  const { executablePath } = debugAppPaths(options);
+  const stoppedCount = await stopMatchingProcesses(executablePath);
+  if (stoppedCount > 0) {
+    process.stdout.write(`Stopped ${stoppedCount} prior Debug instance(s) for this checkout.\n`);
+  }
+}
+
+async function launchDebugApp(options) {
+  const { repoRoot, appPath, plistPath } = debugAppPaths(options);
   const checkoutID = checkoutIdentity(repoRoot);
   const packagedCheckoutID = readPlistValue(plistPath, "MD2PNGDebugCheckoutID");
   const bundleIdentifier = readPlistValue(plistPath, "CFBundleIdentifier");
@@ -169,11 +222,7 @@ async function runDebugApp(options) {
     throw new Error("Debug app bundle identifier is not scoped to the current checkout");
   }
 
-  const stoppedCount = await stopMatchingProcesses(executablePath);
   await openApp(appPath);
-  if (stoppedCount > 0) {
-    process.stdout.write(`Replaced ${stoppedCount} prior Debug instance(s) for this checkout.\n`);
-  }
 }
 
 export async function main(args) {
@@ -194,9 +243,14 @@ export async function main(args) {
     )}\n`);
     break;
   }
-  case "run": {
+  case "stop": {
     const options = parseOptions(optionArgs, ["repo-root", "app", "executable"]);
-    await runDebugApp(options);
+    await stopDebugApp(options);
+    break;
+  }
+  case "launch": {
+    const options = parseOptions(optionArgs, ["repo-root", "app", "executable"]);
+    await launchDebugApp(options);
     break;
   }
   default:
