@@ -47,6 +47,30 @@ Protect `main` and require the stable CI checks plus Release preflight. The App
 token is minted only inside Prepare Release PR, is limited to this repository,
 and is revoked by the pinned token action after the job.
 
+### Credential expiry and rotation
+
+Record the Developer ID Application certificate's expiry date and schedule its
+replacement before the next release would cross that date. Create the
+replacement certificate for the same Team, export and locally validate its
+password-protected PKCS#12 identity, then update the certificate, password,
+identity, and fingerprint secrets together in `release-signing`. Update the
+repository-pinned public leaf-certificate fingerprint through a reviewed
+infrastructure PR before publishing with the replacement. Keep the old identity
+only until any release already signed with it has completed or been abandoned,
+then remove it from CI secrets and active keychains. Do not revoke an old or
+expired Developer ID certificate merely because it was rotated: securely retain
+or destroy its encrypted backup according to the operator's recovery policy,
+and reserve revocation for suspected compromise after assessing the effect on
+already published apps.
+
+Rotate the preparation GitHub App private key without changing its permissions
+or repository selection. Generate a replacement key while the old key is still
+valid, replace `RELEASE_PREP_PRIVATE_KEY`, and confirm the next planned
+**Prepare Release PR** run can mint its short-lived token. Revoke the old App
+key only after that run succeeds. If a key may have been exposed, revoke it
+immediately, replace the repository secret, and audit App installation activity
+before preparing another release.
+
 ## Normal hosted release
 
 Maintain complete release notes under `Unreleased` in `CHANGELOG.md` and concise
@@ -102,6 +126,21 @@ Any mismatch is rejected without replacing the tag, Release, assets, or
 coverage entry. To resume a failed draft, dispatch **Trusted Release** with the
 exact 40-character commit already on `main`; it cannot calculate or introduce
 another version.
+
+If a generated Release PR is abandoned, close it and explicitly delete its
+remote `codex/release-vX.Y.Z` branch. Confirm that neither an open Release PR nor
+that remote branch remains before running **Prepare Release PR** again. When
+`main` or either `Unreleased` section has changed, abandon the stale PR and
+prepare a new one instead of updating previously reviewed release content in
+place.
+
+For a failed trusted run, first preserve the exact source commit, annotated tag,
+draft Release, and any verified assets for diagnosis. After the workflow fix is
+reviewed and merged, dispatch **Trusted Release** from `main` with that same
+40-character source commit. The publisher resumes only a matching draft and
+never overwrites an existing asset; after publication, the same dispatch takes
+the read-only verification path. Do not delete and recreate the tag or Release,
+change the release commit, or merge another Release PR as a recovery shortcut.
 
 This read-only rerun proves that it cannot mutate publication state and that
 the current remote snapshot remains internally valid. The pinned certificate
