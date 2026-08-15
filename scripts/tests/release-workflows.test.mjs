@@ -161,9 +161,9 @@ test("Dependabot structurally configures weekly GitHub Actions updates", () => {
   assert.equal(update["open-pull-requests-limit"], 5);
   assert.deepEqual(update.labels, ["technical-debt"]);
   assert.deepEqual(update.groups, {
-    "actions-minor-patch": {
+    "github-actions": {
+      "applies-to": "version-updates",
       patterns: ["*"],
-      "update-types": ["minor", "patch"],
     },
   });
 });
