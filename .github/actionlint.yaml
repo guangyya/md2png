@@ -1,0 +1,5 @@
+# GitHub's Xcode preview runner is available to this repository before it is
+# recognized by actionlint's built-in GitHub-hosted runner list.
+self-hosted-runner:
+  labels:
+    - xcode-27
