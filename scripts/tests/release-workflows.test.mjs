@@ -235,6 +235,7 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.match(verifyJob, /git merge-base --is-ancestor "\$WORKFLOW_COMMIT" refs\/remotes\/origin\/main/);
   assert.match(verifyJob, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
   assert.match(verifyJob, /run: \.\/scripts\/verify-published-release\.sh/);
+  assert.match(verifyJob, /EXPECTED_CERTIFICATE_SHA256: [0-9A-F]{64}/);
   assert.equal(
     [...release.matchAll(/if: needs\.detect\.outputs\.is_release == 'true' && needs\.detect\.outputs\.already_published != 'true'/g)].length,
     3,
@@ -243,6 +244,9 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.match(verifier, /gh release download/);
   assert.match(verifier, /remote_digest/);
   assert.match(verifier, /codesign --verify --deep --strict/);
+  assert.match(verifier, /codesign -d --extract-certificates/);
+  assert.match(verifier, /openssl x509[\s\S]*?-fingerprint[\s\S]*?-sha256/);
+  assert.match(verifier, /actual_certificate_sha256" = "\$expected_certificate_sha256/);
   assert.match(verifier, /xcrun stapler validate/);
   assert.match(verifier, /spctl --assess --type execute/);
   assert.match(verifier, /issues\/42/);

@@ -10,6 +10,7 @@ gh_repo="${GH_REPO:-}"
 source_commit="${SOURCE_COMMIT:-}"
 expected_version="${EXPECTED_VERSION:-}"
 expected_build="${EXPECTED_BUILD:-}"
+expected_certificate_sha256="${EXPECTED_CERTIFICATE_SHA256:-}"
 project_url="${PROJECT_URL:-}"
 bundle_identifier="${BUNDLE_IDENTIFIER:-}"
 
@@ -27,6 +28,10 @@ if [[ ! "$expected_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*
 fi
 if [[ ! "$expected_build" =~ ^[1-9][0-9]*$ ]]; then
   echo "EXPECTED_BUILD must be a positive integer." >&2
+  exit 1
+fi
+if [[ ! "$expected_certificate_sha256" =~ ^[0-9A-F]{64}$ ]]; then
+  echo "EXPECTED_CERTIFICATE_SHA256 must be an uppercase SHA-256 fingerprint." >&2
   exit 1
 fi
 if [[ "$project_url" != "https://${gh_host}/${gh_repo}" ]]; then
@@ -177,8 +182,11 @@ app_path="$(find "$app_dir" -maxdepth 2 -type d -name md2png.app -print -quit)"
 
 verify_app() {
   local candidate="$1"
+  local package_name="$2"
   local candidate_plist="${candidate}/Contents/Info.plist"
   local candidate_executable="${candidate}/Contents/MacOS/md2png"
+  local certificate_dir="$verify_dir/certificate-${package_name}"
+  local actual_certificate_sha256
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$candidate_plist")" = "$version"
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$candidate_plist")" = "$build_number"
   test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGSourceCommit' "$candidate_plist")" = "$source_commit"
@@ -186,13 +194,28 @@ verify_app() {
   test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$candidate_plist")" = "$project_url"
   test "$(lipo -archs "$candidate_executable")" = "arm64"
   codesign --verify --deep --strict --verbose=2 "$candidate"
+  mkdir -p "$certificate_dir"
+  (
+    cd "$certificate_dir"
+    codesign -d --extract-certificates "$candidate" >/dev/null 2>&1
+  )
+  actual_certificate_sha256="$(openssl x509 \
+    -inform DER \
+    -in "$certificate_dir/codesign0" \
+    -noout \
+    -fingerprint \
+    -sha256 |
+    cut -d= -f2 |
+    tr -d ':' |
+    tr '[:lower:]' '[:upper:]')"
+  test "$actual_certificate_sha256" = "$expected_certificate_sha256"
   xcrun stapler validate "$candidate"
   spctl --assess --type execute --verbose=2 "$candidate" 2>&1 |
     sed -E 's/origin=.*/origin=<redacted>/'
   "$candidate_executable" --self-test
 }
 
-verify_app "$app_path"
+verify_app "$app_path" zip
 xcrun stapler validate "${assets_dir}/${release_dmg_name}"
 hdiutil verify "${assets_dir}/${release_dmg_name}"
 spctl --assess --type open --context context:primary-signature --verbose=2 \
@@ -206,7 +229,7 @@ mounted_dmg=true
 mounted_app_count="$(find "$verify_dir/dmg" -maxdepth 2 -type d -name md2png.app | wc -l | tr -d ' ')"
 test "$mounted_app_count" = "1"
 mounted_app="$(find "$verify_dir/dmg" -maxdepth 2 -type d -name md2png.app -print -quit)"
-verify_app "$mounted_app"
+verify_app "$mounted_app" dmg
 diff -rq "$app_path" "$mounted_app"
 hdiutil detach "$verify_dir/dmg" >/dev/null
 mounted_dmg=false

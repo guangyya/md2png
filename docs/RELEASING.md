@@ -92,11 +92,16 @@ that exact version is already the latest published Release, the workflow skips
 coverage generation, signing, and publication. A read-only macOS job instead
 downloads the existing five assets and verifies their names, labels, sizes,
 content types, SHA-256 digests, release notes, source metadata, signatures,
+the repository-pinned public leaf-certificate SHA-256 fingerprint,
 notarization tickets, architecture, packaged self-test, and issue #42 links.
-It has no environment secrets or repository write permission. Any mismatch is
-rejected without replacing the tag, Release, assets, or coverage entry. To
-resume a failed draft, dispatch **Trusted Release** with the exact 40-character
-commit already on `main`; it cannot calculate or introduce another version.
+It has no environment secrets or repository write permission. The fingerprint
+contains no private key or account credential and is independently observable
+in every signed public app; update it through a reviewed infrastructure PR when
+rotating the Developer ID certificate, before publishing with the replacement.
+Any mismatch is rejected without replacing the tag, Release, assets, or
+coverage entry. To resume a failed draft, dispatch **Trusted Release** with the
+exact 40-character commit already on `main`; it cannot calculate or introduce
+another version.
 
 For a local dry run of deterministic preparation, use a disposable clean branch
 or worktree:
