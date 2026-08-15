@@ -162,6 +162,8 @@ struct WelcomeCopy {
 
 @MainActor
 final class WelcomeController: NSWindowController, NSWindowDelegate {
+    private static let contentSize = NSSize(width: 560, height: 530)
+
     private let preference: WelcomePreference
     private let copy: WelcomeCopy
     private let onTrySample: () -> Void
@@ -170,7 +172,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 #if DEBUG
     var displayedShortcutStatuses: [WelcomeShortcutStatus] { shortcutStatuses }
     var displayedContentSize: NSSize {
-        window?.contentRect(forFrameRect: window?.frame ?? .zero).size ?? .zero
+        window?.contentView?.bounds.size ?? .zero
     }
 #endif
 
@@ -208,7 +210,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 
         if window == nil {
             let window = PreviewWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 560, height: 530),
+                contentRect: NSRect(origin: .zero, size: Self.contentSize),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -219,6 +221,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
             self.window = window
         }
         window?.contentViewController = hostingController
+        window?.setContentSize(Self.contentSize)
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.center()
