@@ -122,18 +122,22 @@ if [[ "$release_exists" = false ]]; then
     --title "md2png $version" \
     --notes-file "$notes_file" \
     --verify-tag \
-    --latest
-else
-  release_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}")"
-  test "$(jq -r .name <<< "$release_json")" = "md2png $version"
-  test "$(jq -r .draft <<< "$release_json")" = "false"
-  test "$(jq -r .prerelease <<< "$release_json")" = "false"
-  expected_notes="$(cat "$notes_file")"
-  actual_notes="$(jq -r .body <<< "$release_json")"
-  if [[ "$actual_notes" != "$expected_notes" ]]; then
-    echo "Existing Release notes do not match the committed changelog." >&2
-    exit 1
-  fi
+    --draft
+fi
+
+release_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}")"
+test "$(jq -r .name <<< "$release_json")" = "md2png $version"
+release_is_draft="$(jq -r .draft <<< "$release_json")"
+case "$release_is_draft" in
+  true|false) ;;
+  *) echo "Cannot determine whether the existing Release is a draft." >&2; exit 1 ;;
+esac
+test "$(jq -r .prerelease <<< "$release_json")" = "false"
+expected_notes="$(cat "$notes_file")"
+actual_notes="$(jq -r .body <<< "$release_json")"
+if [[ "$actual_notes" != "$expected_notes" ]]; then
+  echo "Existing Release notes do not match the committed changelog." >&2
+  exit 1
 fi
 
 asset_label() {
@@ -171,6 +175,10 @@ for name in "${expected_names[@]}"; do
   asset_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}" \
     --jq ".assets[] | select(.name == \"${name}\")")"
   if [[ -z "$asset_json" ]]; then
+    if [[ "$release_is_draft" != "true" ]]; then
+      echo "Published Release is missing a verified asset: $name" >&2
+      exit 1
+    fi
     label="$(asset_label "$name")"
     gh release upload "$tag" "${local_path}#${label}" --repo "$repo_ref"
     asset_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}" \
@@ -199,7 +207,14 @@ if [[ "$published_names" != "$expected_names_text" ]]; then
   exit 1
 fi
 
-gh release edit "$tag" --repo "$repo_ref" --latest
+if [[ "$release_is_draft" = "true" ]]; then
+  gh release edit "$tag" --repo "$repo_ref" --draft=false --latest
+else
+  gh release edit "$tag" --repo "$repo_ref" --latest
+fi
+published_release_json="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/tags/${tag}")"
+test "$(jq -r .draft <<< "$published_release_json")" = "false"
+test "$(jq -r .prerelease <<< "$published_release_json")" = "false"
 latest_tag="$(gh api --hostname "$gh_host" "repos/${gh_repo}/releases/latest" --jq .tag_name)"
 test "$latest_tag" = "$tag"
 

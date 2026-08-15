@@ -131,10 +131,15 @@ jobs:
           fi
           pr_number="$(jq -r '.[0].number' <<< "$pr_json")"
           merge_commit="$(jq -r '.[0].merge_commit_sha' <<< "$pr_json")"
+          pr_head_sha="$(jq -r '.[0].head.sha' <<< "$pr_json")"
           test "$merge_commit" = "$source_commit"
+          if [[ ! "$pr_head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Cannot resolve the authorizing PR head commit." >&2
+            exit 1
+          fi
 
           checks_json="$(gh api -H 'Accept: application/vnd.github+json' \
-            "repos/${GITHUB_REPOSITORY}/commits/${source_commit}/check-runs?per_page=100" \
+            "repos/${GITHUB_REPOSITORY}/commits/${pr_head_sha}/check-runs?per_page=100" \
             --jq '.check_runs')"
           for required_check in \
             "CI / macOS 15 / Xcode 26.2" \
@@ -149,10 +154,10 @@ jobs:
               echo "The authorizing PR is missing required check: $required_check" >&2
               exit 1
             fi
-            case "$check_state" in
-              SUCCESS|SKIPPED|NEUTRAL) ;;
-              *) echo "Required check did not pass: $required_check ($check_state)" >&2; exit 1 ;;
-            esac
+            if [[ "$check_state" != "SUCCESS" ]]; then
+              echo "Required check did not succeed: $required_check ($check_state)" >&2
+              exit 1
+            fi
           done
 
           echo "is_release=true" >> "$GITHUB_OUTPUT"

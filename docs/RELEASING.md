@@ -79,14 +79,16 @@ The trusted workflow isolates responsibilities:
   the exact source, and emits a one-day handoff with a SHA-256 manifest; and
 - `publish` receives no Apple secret. It alone can create the annotated tag and
   Release and update issue #42. It revalidates signatures, staples, metadata,
-  manifest digests, asset digests, and the source commit before the first public
-  write.
+  manifest digests, asset digests, and the source commit, creates the Release as
+  a draft, and makes it public/latest only after all five assets match.
 
 The workflow is serialized and non-canceling. A retry accepts an existing tag
-only when it resolves to the same commit, skips byte-identical assets, uploads
-only missing verified assets, and rejects any mismatch. To resume a failed run,
-dispatch **Trusted Release** with the exact 40-character commit already on
-`main`; it cannot calculate or introduce another version.
+only when it resolves to the same commit. It resumes a matching draft by
+skipping byte-identical assets and uploading only missing verified assets; an
+already-published Release must already contain the exact verified asset set.
+Any mismatch is rejected. To resume a failed run, dispatch **Trusted Release**
+with the exact 40-character commit already on `main`; it cannot calculate or
+introduce another version.
 
 For a local dry run of deterministic preparation, use a disposable clean branch
 or worktree:
