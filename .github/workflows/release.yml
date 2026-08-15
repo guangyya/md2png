@@ -437,8 +437,22 @@ jobs:
           name: signed-release-${{ needs.detect.outputs.source_commit }}
           path: .build/release-handoff/
 
+      - name: Stage trusted publication implementation
+        env:
+          WORKFLOW_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${WORKFLOW_COMMIT}^{commit}"
+          git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
+          trusted_publisher="$RUNNER_TEMP/publish-hosted-release.sh"
+          git show "${WORKFLOW_COMMIT}:scripts/publish-hosted-release.sh" > "$trusted_publisher"
+          chmod +x "$trusted_publisher"
+          test -s "$trusted_publisher"
+          printf 'TRUSTED_PUBLISHER=%s\n' "$trusted_publisher" >> "$GITHUB_ENV"
+
       - name: Publish or safely resume exact release
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./scripts/publish-hosted-release.sh
+        run: REPO_ROOT="$GITHUB_WORKSPACE" "$TRUSTED_PUBLISHER"

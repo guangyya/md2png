@@ -220,23 +220,33 @@ test("release authorization checks the PR head and accepts only successful named
 
 test("trusted publication updates coverage history in the originating workflow", () => {
   const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");
+  const release = workflows["release.yml"];
   assert.match(publisher, /scripts\/coverage-history\.mjs/);
   assert.match(publisher, /git merge-base --is-ancestor "\$source_commit" origin\/main/);
   assert.doesNotMatch(publisher, /--clobber|pull_request_target/);
+  assert.match(release, /WORKFLOW_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(release, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
+  assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/publish-hosted-release\.sh"/);
+  assert.match(release, /run: REPO_ROOT="\$GITHUB_WORKSPACE" "\$TRUSTED_PUBLISHER"/);
 });
 
 test("release remains draft until every uploaded asset has been verified", () => {
   const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");
+  const resolveReleaseId = publisher.indexOf("--json databaseId");
+  const releaseEndpoint = publisher.indexOf('release_endpoint="repos/${gh_repo}/releases/${release_id}"');
   const createDraft = publisher.indexOf("--draft");
   const upload = publisher.indexOf("gh release upload");
   const exactAssetSet = publisher.indexOf('if [[ "$published_names" != "$expected_names_text" ]]');
   const publish = publisher.indexOf('--draft=false --latest');
 
+  assert.ok(resolveReleaseId >= 0, "draft Releases must be resolved through gh release view");
+  assert.ok(releaseEndpoint > resolveReleaseId, "Release API reads must use the resolved database ID");
+  assert.doesNotMatch(publisher, /releases\/tags\//);
   assert.ok(createDraft >= 0, "new releases must start as drafts");
   assert.ok(upload > createDraft, "assets must upload after draft creation");
   assert.ok(exactAssetSet > upload, "the complete asset set must be verified after upload");
   assert.ok(publish > exactAssetSet, "the draft must publish only after asset verification");
   assert.match(publisher, /Published Release is missing a verified asset/);
-  assert.match(publisher, /published_release_json=.*releases\/tags\/\$\{tag\}/);
+  assert.match(publisher, /published_release_json=.*"\$release_endpoint"/);
   assert.match(publisher, /\.draft <<< "\$published_release_json"\)" = "false"/);
 });
