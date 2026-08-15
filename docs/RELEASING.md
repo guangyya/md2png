@@ -64,10 +64,15 @@ while preserving any evidence needed for diagnosis. Enter a maintenance window:
 do not merge a Release PR or dispatch **Trusted Release** until the switch is
 complete. During that window, replace the certificate, password, identity, and
 fingerprint secrets together in `release-signing`, then merge the already
-reviewed fingerprint PR. Either intermediate state is intentionally fail-closed;
-never publish while the secrets and repository pin disagree. Resume releases
-only after `main` and all four environment secrets describe the replacement
-identity.
+reviewed fingerprint PR. Neither intermediate state is safe for publication:
+the current sign and publish jobs do not compare their signer with the
+repository-pinned verifier fingerprint, so the safety boundary is the operator's
+maintenance-window freeze. Do not merge a Release PR or dispatch **Trusted
+Release** while the secrets and repository pin disagree. Resume releases only
+after `main` and all four environment secrets describe the replacement identity
+and that agreement has been checked. A technical fail-closed boundary would
+require a separate workflow change that makes sign and publish read and verify
+the pin from protected `main` before publication.
 
 The old private key may remain only as an encrypted offline recovery backup; it
 cannot remain active in the same single-slot CI secrets. After a release signed
