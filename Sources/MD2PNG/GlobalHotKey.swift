@@ -6,6 +6,9 @@ final class GlobalHotKey {
         let id: UInt32
         let keyCode: UInt32
         let modifiers: UInt32
+        let commandTitle: String
+        let shortcutGlyphs: String
+        let shortcutAccessibilityName: String
         let displayName: String
         let action: () -> Void
 
@@ -14,6 +17,15 @@ final class GlobalHotKey {
                 id: 1,
                 keyCode: UInt32(kVK_ANSI_X),
                 modifiers: UInt32(cmdKey | controlKey),
+                commandTitle: L10n.text(
+                    "menu.render",
+                    defaultValue: "Render Clipboard as Image"
+                ),
+                shortcutGlyphs: "⌃⌘X",
+                shortcutAccessibilityName: L10n.text(
+                    "shortcut.control_command_x",
+                    defaultValue: "Control-Command-X"
+                ),
                 displayName: L10n.text(
                     "hotkey.render",
                     defaultValue: "Render (Control-Command-X)"
@@ -27,6 +39,15 @@ final class GlobalHotKey {
                 id: 2,
                 keyCode: UInt32(kVK_ANSI_Z),
                 modifiers: UInt32(cmdKey | controlKey),
+                commandTitle: L10n.text(
+                    "menu.show_last_render",
+                    defaultValue: "Show Last Render"
+                ),
+                shortcutGlyphs: "⌃⌘Z",
+                shortcutAccessibilityName: L10n.text(
+                    "shortcut.control_command_z",
+                    defaultValue: "Control-Command-Z"
+                ),
                 displayName: L10n.text(
                     "hotkey.show_last_render",
                     defaultValue: "Show Last Render (Control-Command-Z)"

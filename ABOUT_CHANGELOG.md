@@ -7,6 +7,7 @@ for the complete project history and release details.
 
 ### Added
 
+- Learn the copy, render, and paste workflow from a first-launch guide.
 - Choose Compact, Standard, or Wide output widths.
 
 ### Fixed

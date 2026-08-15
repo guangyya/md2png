@@ -8,8 +8,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let previewController = PreviewController()
     private let updateController = UpdateController()
     private lazy var aboutController = AboutController(updateController: updateController)
+    private let welcomePreference = WelcomePreference()
+    private lazy var welcomeController = WelcomeController(
+        preference: welcomePreference,
+        onVisibilityChange: { isVisible in
+            NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
+        },
+        onTrySample: { [weak self] in self?.showSampleGuide() }
+    )
+    private lazy var sampleGuideController = SampleGuideController(
+        onChoose: { [weak self] kind in
+            self?.renderBundledExample(kind)
+        }
+    )
     private var statusItem: NSStatusItem!
     private var hotKey: GlobalHotKey?
+    private var welcomeShortcutStatuses: [WelcomeShortcutStatus] = []
     private var lastImage: NSImage?
     private var lastRenderWidthPreset: RenderWidthPreset?
     private var lastSource = LastSourceState()
@@ -37,12 +51,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
-        let hotKey = GlobalHotKey(registrations: [
+        let registrations: [GlobalHotKey.Registration] = [
             .render { [weak self] in self?.renderClipboard() },
             .showLastRender { [weak self] in self?.showLastRender() }
-        ])
+        ]
+        let hotKey = GlobalHotKey(registrations: registrations)
         self.hotKey = hotKey
-        if !hotKey.failedRegistrations.isEmpty {
+        let failedRegistrationIDs = Set(hotKey.failedRegistrations.map(\.id))
+        welcomeShortcutStatuses = registrations.map {
+            WelcomeShortcutStatus(
+                registration: $0,
+                failedRegistrationIDs: failedRegistrationIDs
+            )
+        }
+
+        if welcomePreference.shouldShowOnLaunch {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.welcomeController.showIfNeeded(
+                    shortcuts: self.welcomeShortcutStatuses
+                )
+            }
+        } else if !hotKey.failedRegistrations.isEmpty {
             DispatchQueue.main.async { [weak self] in
                 self?.hud.show(
                     L10n.text(
@@ -146,6 +176,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(examplesMenuItem)
 
         menu.addItem(.separator())
+        let welcomeItem = menu.addItem(
+            withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome"),
+            action: #selector(showWelcome),
+            keyEquivalent: ""
+        )
+        welcomeItem.target = self
+
         let aboutItem = menu.addItem(
             withTitle: L10n.text("menu.about", defaultValue: "About md2png"),
             action: #selector(showAbout),
@@ -211,14 +248,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func renderExample(_ sender: NSMenuItem) {
+        guard let kind = ExampleKind(rawValue: sender.tag) else { return }
+        renderBundledExample(kind)
+    }
+
+    private func renderBundledExample(_ kind: ExampleKind) {
         guard !renderActivity.isRendering,
               !isPresentingClipboardConfirmation else { return }
-        guard let kind = ExampleKind(rawValue: sender.tag) else { return }
         do {
             let example = try AppResources.exampleMarkdown(for: kind)
             let changeCount = try Clipboard.write(markdown: example)
             lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
-            render(example)
+            render(example, showsPreviewOnSuccess: true)
         } catch {
             show(error)
         }
@@ -239,7 +280,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func render(_ markdown: String) {
+    private func render(
+        _ markdown: String,
+        showsPreviewOnSuccess: Bool = false
+    ) {
         guard renderActivity.begin() else { return }
         let requestedWidthPreset = renderWidthPreset
         updateRenderingUI(isRendering: true)
@@ -276,6 +320,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         ),
                         symbol: "checkmark.circle.fill"
                     )
+                    if showsPreviewOnSuccess {
+                        self.previewController.show(
+                            image: image,
+                            widthPreset: requestedWidthPreset
+                        )
+                    }
                 } catch {
                     self.show(error)
                 }
@@ -336,6 +386,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showAbout() {
         aboutController.show()
+    }
+
+    @objc private func showWelcome() {
+        welcomeController.show(shortcuts: welcomeShortcutStatuses)
+    }
+
+    private func showSampleGuide() {
+        guard !renderActivity.isRendering,
+              !isPresentingClipboardConfirmation,
+              let button = statusItem.button else { return }
+        sampleGuideController.show(relativeTo: button)
     }
 
     @objc private func terminateFromStatusMenu() {

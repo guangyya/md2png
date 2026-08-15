@@ -10,6 +10,7 @@
 "menu.show_last_render" = "Show Last Render";
 "menu.render_width" = "Output Width";
 "menu.examples" = "Examples";
+"menu.show_welcome" = "Show Welcome";
 "menu.about" = "About md2png";
 "menu.quit" = "Quit md2png";
 
@@ -33,6 +34,8 @@
 
 "hotkey.render" = "Render (Control-Command-X)";
 "hotkey.show_last_render" = "Show Last Render (Control-Command-Z)";
+"shortcut.control_command_x" = "Control-Command-X";
+"shortcut.control_command_z" = "Control-Command-Z";
 "hud.shortcut_conflict" = "A global shortcut is already in use — menu commands still work";
 "hud.png_copied" = "PNG copied — paste with Command-V";
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
@@ -52,6 +55,27 @@
 
 "preview.window_title" = "Last Markdown Render";
 "preview.window_title_with_width" = "Last Markdown Render — %@ · %ld × %ld pt";
+
+"welcome.window_title" = "Welcome to md2png";
+"welcome.title" = "Turn Markdown into a polished PNG";
+"welcome.subtitle" = "A private, local workflow in three simple steps.";
+"welcome.step.copy.title" = "Copy Markdown";
+"welcome.step.copy.detail" = "Copy Markdown text in any app.";
+"welcome.step.render.title" = "Render it";
+"welcome.step.render.detail" = "Use the global shortcut or choose Render Clipboard as Image from the menu bar.";
+"welcome.step.paste.title" = "Paste the PNG";
+"welcome.step.paste.detail" = "Press Command-V, review the image, and send it yourself.";
+"welcome.shortcuts" = "Global shortcuts";
+"welcome.shortcut_ready" = "Ready";
+"welcome.shortcut_unavailable" = "In Use";
+"welcome.shortcut_conflict_help" = "Another app is using a shortcut. Every action remains available from the md2png menu.";
+"welcome.privacy_note" = "md2png never pastes, sends, or uploads your content automatically.";
+"welcome.reopen_hint" = "If this window gets hidden, choose Show Welcome from the md2png menu bar.";
+"welcome.try_sample" = "Try a Short Sample";
+"welcome.try_sample_help" = "Open Examples and choose Short Sample to render it.";
+"welcome.sample_guide.title" = "Find Examples in the md2png menu";
+"welcome.replay_demo" = "Replay workflow demo";
+"welcome.done" = "Done";
 
 "about.window_title" = "About md2png";
 "about.development" = "Development";
