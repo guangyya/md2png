@@ -12,6 +12,7 @@ for the complete project history and release details.
 
 ### Fixed
 
+- Keep Welcome sample selection and menu handoff deterministic.
 - Recover from interrupted or stalled WebKit renders without restarting the app.
 
 ## [0.3.0] - 2026-08-14

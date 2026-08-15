@@ -28,6 +28,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Prevent hidden Welcome sample controls from receiving input, close the guide
+  before the real status menu or sample render begins, and deliver each sample
+  choice only once.
 - Reload the bundled WebKit renderer after its content process terminates,
   retry the interrupted render once, and fail queued work deterministically if
   recovery cannot complete. A later user-initiated render starts a fresh local

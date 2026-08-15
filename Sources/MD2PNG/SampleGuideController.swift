@@ -8,15 +8,51 @@ enum SampleGuidePhase: Int, Equatable {
 
     var highlightsExamples: Bool { self != .mainMenu }
     var showsSubmenu: Bool { self == .submenu }
+    var acceptsSubmenuInput: Bool { self == .submenu }
+}
+
+struct SampleGuideMenuState: Equatable {
+    let canRestoreLastMarkdown: Bool
+    let canShowLastRender: Bool
 }
 
 @MainActor
+protocol SampleGuidePopover: AnyObject {
+    var behavior: NSPopover.Behavior { get set }
+    var animates: Bool { get set }
+    var delegate: (any NSPopoverDelegate)? { get set }
+    var contentSize: NSSize { get set }
+    var contentViewController: NSViewController? { get set }
+    var isShown: Bool { get }
+
+    func show(
+        relativeTo positioningRect: NSRect,
+        of positioningView: NSView,
+        preferredEdge: NSRectEdge
+    )
+    func close()
+}
+
+extension NSPopover: SampleGuidePopover {}
+
+@MainActor
 final class SampleGuideController: NSObject, NSPopoverDelegate {
-    private let popover = NSPopover()
+    private let popover: any SampleGuidePopover
     private let onChoose: (ExampleKind) -> Void
     private weak var highlightedButton: NSButton?
+    private var acceptsSelection = false
+    private var pendingSelection: ExampleKind?
+    private var isClosing = false
 
-    init(onChoose: @escaping (ExampleKind) -> Void) {
+    convenience init(onChoose: @escaping (ExampleKind) -> Void) {
+        self.init(popover: NSPopover(), onChoose: onChoose)
+    }
+
+    init(
+        popover: any SampleGuidePopover,
+        onChoose: @escaping (ExampleKind) -> Void
+    ) {
+        self.popover = popover
         self.onChoose = onChoose
         super.init()
         popover.behavior = .transient
@@ -25,15 +61,20 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         popover.contentSize = NSSize(width: 548, height: 382)
     }
 
-    func show(relativeTo button: NSStatusBarButton) {
-        if popover.isShown {
-            popover.performClose(nil)
-        }
+    func show(
+        relativeTo button: NSStatusBarButton,
+        menuState: SampleGuideMenuState
+    ) {
+        guard !popover.isShown, !isClosing else { return }
+        acceptsSelection = true
 
         popover.contentViewController = NSHostingController(
-            rootView: SampleGuideView { [weak self] kind in
-                self?.choose(kind)
-            }
+            rootView: SampleGuideView(
+                menuState: menuState,
+                onChoose: { [weak self] kind in
+                    self?.choose(kind)
+                }
+            )
         )
         highlightedButton = button
         button.highlight(true)
@@ -42,16 +83,61 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
             of: button,
             preferredEdge: .minY
         )
+        guard popover.isShown else {
+            acceptsSelection = false
+            popover.contentViewController = nil
+            clearStatusButtonHighlight()
+            return
+        }
+    }
+
+    func dismiss() {
+        acceptsSelection = false
+        if popover.isShown, !isClosing {
+            isClosing = true
+            popover.close()
+        } else if !popover.isShown {
+            isClosing = false
+            deliverPendingSelection()
+        }
+        clearStatusButtonHighlight()
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        acceptsSelection = false
+        isClosing = true
+        clearStatusButtonHighlight()
     }
 
     func popoverDidClose(_ notification: Notification) {
+        acceptsSelection = false
+        isClosing = false
+        clearStatusButtonHighlight()
+        deliverPendingSelection()
+    }
+
+    func choose(_ kind: ExampleKind) {
+        guard acceptsSelection else { return }
+        acceptsSelection = false
+        pendingSelection = kind
+        guard popover.isShown else {
+            deliverPendingSelection()
+            return
+        }
+        isClosing = true
+        popover.close()
+    }
+
+    private func clearStatusButtonHighlight() {
         highlightedButton?.highlight(false)
         highlightedButton = nil
     }
 
-    private func choose(_ kind: ExampleKind) {
-        popover.performClose(nil)
-        onChoose(kind)
+    private func deliverPendingSelection() {
+        guard let selection = pendingSelection else { return }
+        pendingSelection = nil
+        clearStatusButtonHighlight()
+        onChoose(selection)
     }
 }
 
@@ -59,6 +145,7 @@ private struct SampleGuideView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase = SampleGuidePhase.mainMenu
 
+    let menuState: SampleGuideMenuState
     let onChoose: (ExampleKind) -> Void
 
     var body: some View {
@@ -74,15 +161,23 @@ private struct SampleGuideView: View {
             }
 
             HStack(alignment: .top, spacing: 10) {
-                SampleMainMenu(phase: phase)
+                SampleMainMenu(phase: phase, menuState: menuState)
 
-                SampleExamplesMenu(onChoose: onChoose)
+                SampleExamplesMenu(
+                    isInputEnabled: phase.acceptsSubmenuInput,
+                    onChoose: { kind in
+                        guard phase.acceptsSubmenuInput else { return }
+                        onChoose(kind)
+                    }
+                )
                     .opacity(phase.showsSubmenu ? 1 : 0)
                     .offset(x: phase.showsSubmenu ? 0 : -14)
                     .scaleEffect(
                         phase.showsSubmenu ? 1 : 0.97,
                         anchor: .topLeading
                     )
+                    .allowsHitTesting(phase.acceptsSubmenuInput)
+                    .disabled(!phase.acceptsSubmenuInput)
                     .accessibilityHidden(!phase.showsSubmenu)
             }
         }
@@ -123,6 +218,7 @@ private struct SampleGuideView: View {
 
 private struct SampleMainMenu: View {
     let phase: SampleGuidePhase
+    let menuState: SampleGuideMenuState
 
     var body: some View {
         VStack(spacing: 2) {
@@ -145,7 +241,7 @@ private struct SampleMainMenu: View {
                     "menu.restore_last_markdown",
                     defaultValue: "Restore Last Markdown"
                 ),
-                isDisabled: true
+                isDisabled: !menuState.canRestoreLastMarkdown
             )
             GuideMenuRow(
                 title: L10n.text(
@@ -153,7 +249,7 @@ private struct SampleMainMenu: View {
                     defaultValue: "Show Last Render"
                 ),
                 trailing: "⌃⌘Z",
-                isDisabled: true
+                isDisabled: !menuState.canShowLastRender
             )
 
             GuideDivider()
@@ -191,6 +287,7 @@ private struct SampleMainMenu: View {
 }
 
 private struct SampleExamplesMenu: View {
+    let isInputEnabled: Bool
     let onChoose: (ExampleKind) -> Void
 
     var body: some View {
@@ -202,6 +299,7 @@ private struct SampleExamplesMenu: View {
                 SampleExampleButton(
                     kind: kind,
                     isRecommended: kind == .short,
+                    isInputEnabled: isInputEnabled,
                     action: { onChoose(kind) }
                 )
             }
@@ -254,6 +352,7 @@ private struct GuideMenuRow: View {
 private struct SampleExampleButton: View {
     let kind: ExampleKind
     let isRecommended: Bool
+    let isInputEnabled: Bool
     let action: () -> Void
 
     @State private var isHovering = false
@@ -283,6 +382,8 @@ private struct SampleExampleButton: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!isInputEnabled)
+        .allowsHitTesting(isInputEnabled)
         .onHover { isHovering = $0 }
     }
 }

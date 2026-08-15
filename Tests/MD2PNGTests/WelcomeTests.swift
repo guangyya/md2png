@@ -95,9 +95,153 @@ final class WelcomeTests: XCTestCase {
     func testSampleGuideRevealsTheMenuHierarchyInOrder() {
         XCTAssertFalse(SampleGuidePhase.mainMenu.highlightsExamples)
         XCTAssertFalse(SampleGuidePhase.mainMenu.showsSubmenu)
+        XCTAssertFalse(SampleGuidePhase.mainMenu.acceptsSubmenuInput)
         XCTAssertTrue(SampleGuidePhase.examplesFocused.highlightsExamples)
         XCTAssertFalse(SampleGuidePhase.examplesFocused.showsSubmenu)
+        XCTAssertFalse(SampleGuidePhase.examplesFocused.acceptsSubmenuInput)
         XCTAssertTrue(SampleGuidePhase.submenu.showsSubmenu)
+        XCTAssertTrue(SampleGuidePhase.submenu.acceptsSubmenuInput)
+    }
+
+    @MainActor
+    func testSampleGuideClosesBeforeDeliveringOneSelection() {
+        let popover = TestSampleGuidePopover()
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) { kind in
+            XCTAssertFalse(popover.isShown)
+            deliveredSelections.append(kind)
+        }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: true,
+                canShowLastRender: false
+            )
+        )
+
+        XCTAssertTrue(popover.isShown)
+        XCTAssertNotNil(popover.contentViewController)
+        XCTAssertEqual(statusButton.cell?.isHighlighted, true)
+
+        controller.choose(.short)
+        controller.choose(.table)
+
+        XCTAssertEqual(popover.closeCount, 1)
+        XCTAssertEqual(deliveredSelections, [.short])
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
+    func testSampleGuideDismissalClearsPendingSelectionWithoutCallback() {
+        let popover = TestSampleGuidePopover()
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+
+        controller.dismiss()
+        controller.choose(.short)
+
+        XCTAssertEqual(popover.closeCount, 1)
+        XCTAssertTrue(deliveredSelections.isEmpty)
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
+    func testSampleGuideDismissDuringAnimatedClosePreservesCommittedSelection() {
+        let popover = TestSampleGuidePopover()
+        popover.completesCloseImmediately = false
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: true,
+                canShowLastRender: true
+            )
+        )
+
+        controller.choose(.short)
+        controller.dismiss()
+
+        XCTAssertEqual(popover.closeCount, 1)
+        XCTAssertTrue(deliveredSelections.isEmpty)
+
+        popover.completeClose()
+
+        XCTAssertEqual(deliveredSelections, [.short])
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
+    func testSampleGuideRecoversWhenPopoverCannotRemainShown() {
+        let popover = TestSampleGuidePopover()
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+        popover.hideWithoutDelegate()
+
+        controller.choose(.table)
+        controller.choose(.short)
+
+        XCTAssertEqual(deliveredSelections, [.table])
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
+    }
+
+    @MainActor
+    func testSampleGuideShowFailureDoesNotLeaveAnInteractiveHalfOpenState() {
+        let popover = TestSampleGuidePopover()
+        popover.showsWhenRequested = false
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        var deliveredSelections: [ExampleKind] = []
+        let controller = SampleGuideController(popover: popover) {
+            deliveredSelections.append($0)
+        }
+
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+        controller.choose(.short)
+
+        XCTAssertFalse(popover.isShown)
+        XCTAssertNil(popover.contentViewController)
+        XCTAssertTrue(deliveredSelections.isEmpty)
+        XCTAssertEqual(statusButton.cell?.isHighlighted, false)
     }
 
     @MainActor
@@ -146,5 +290,51 @@ final class WelcomeTests: XCTestCase {
     private func makeDefaults() throws -> (UserDefaults, String) {
         let suiteName = "MD2PNGWelcomeTests.\(UUID().uuidString)"
         return (try XCTUnwrap(UserDefaults(suiteName: suiteName)), suiteName)
+    }
+}
+
+@MainActor
+private final class TestSampleGuidePopover: SampleGuidePopover {
+    var behavior: NSPopover.Behavior = .applicationDefined
+    var animates = false
+    weak var delegate: (any NSPopoverDelegate)?
+    var contentSize = NSSize.zero
+    var contentViewController: NSViewController?
+    var isShown = false
+    var showsWhenRequested = true
+    var completesCloseImmediately = true
+    private(set) var closeCount = 0
+    private var isClosing = false
+
+    func show(
+        relativeTo positioningRect: NSRect,
+        of positioningView: NSView,
+        preferredEdge: NSRectEdge
+    ) {
+        guard showsWhenRequested else { return }
+        isShown = true
+        isClosing = false
+    }
+
+    func close() {
+        guard isShown, !isClosing else { return }
+        closeCount += 1
+        isClosing = true
+        delegate?.popoverWillClose?(Notification(name: NSPopover.willCloseNotification))
+        if completesCloseImmediately {
+            completeClose()
+        }
+    }
+
+    func completeClose() {
+        guard isClosing else { return }
+        isShown = false
+        isClosing = false
+        delegate?.popoverDidClose?(Notification(name: NSPopover.didCloseNotification))
+    }
+
+    func hideWithoutDelegate() {
+        isShown = false
+        isClosing = false
     }
 }
