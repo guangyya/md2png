@@ -103,6 +103,38 @@ final class WelcomeTests: XCTestCase {
         XCTAssertTrue(SampleGuidePhase.submenu.acceptsSubmenuInput)
     }
 
+    func testSampleGuideKeyboardNavigationMovesAndWrapsAcrossExamples() {
+        XCTAssertEqual(
+            SampleGuideFocusNavigation.targetID(from: nil, direction: .next),
+            ExampleKind.short.rawValue
+        )
+        XCTAssertEqual(
+            SampleGuideFocusNavigation.targetID(
+                from: ExampleKind.short.rawValue,
+                direction: .next
+            ),
+            ExampleKind.long.rawValue
+        )
+        XCTAssertEqual(
+            SampleGuideFocusNavigation.targetID(
+                from: ExampleKind.short.rawValue,
+                direction: .previous
+            ),
+            ExampleKind.gantt.rawValue
+        )
+        XCTAssertEqual(
+            SampleGuideFocusNavigation.targetID(
+                from: ExampleKind.gantt.rawValue,
+                direction: .next
+            ),
+            ExampleKind.short.rawValue
+        )
+        XCTAssertEqual(
+            SampleGuideFocusNavigation.targetID(from: Int.max, direction: .previous),
+            ExampleKind.gantt.rawValue
+        )
+    }
+
     @MainActor
     func testSampleGuideClosesBeforeDeliveringOneSelection() {
         let popover = TestSampleGuidePopover()

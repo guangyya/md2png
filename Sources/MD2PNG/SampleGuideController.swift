@@ -16,6 +16,31 @@ struct SampleGuideMenuState: Equatable {
     let canShowLastRender: Bool
 }
 
+enum SampleGuideFocusDirection {
+    case previous
+    case next
+}
+
+struct SampleGuideFocusNavigation {
+    static func targetID(
+        from currentID: Int?,
+        direction: SampleGuideFocusDirection
+    ) -> Int? {
+        let ids = ExampleKind.allCases.map(\.rawValue)
+        guard !ids.isEmpty else { return nil }
+        guard let currentID, let currentIndex = ids.firstIndex(of: currentID) else {
+            return direction == .previous ? ids.last : ids.first
+        }
+
+        switch direction {
+        case .previous:
+            return ids[(currentIndex - 1 + ids.count) % ids.count]
+        case .next:
+            return ids[(currentIndex + 1) % ids.count]
+        }
+    }
+}
+
 @MainActor
 protocol SampleGuidePopover: AnyObject {
     var behavior: NSPopover.Behavior { get set }
@@ -299,7 +324,8 @@ private struct SampleExamplesMenu: View {
                     kind: kind,
                     isRecommended: kind == .short,
                     isInputEnabled: isInputEnabled,
-                    action: { onChoose(kind) }
+                    action: { onChoose(kind) },
+                    onMoveFocus: moveFocus
                 )
                 .focused($focusedExampleID, equals: kind.rawValue)
             }
@@ -307,6 +333,13 @@ private struct SampleExamplesMenu: View {
         .padding(6)
         .frame(width: 252, height: 326, alignment: .top)
         .guideMenuBackground()
+    }
+
+    private func moveFocus(_ direction: SampleGuideFocusDirection) {
+        focusedExampleID = SampleGuideFocusNavigation.targetID(
+            from: focusedExampleID,
+            direction: direction
+        )
     }
 }
 
@@ -354,6 +387,7 @@ private struct SampleExampleButton: View {
     let isRecommended: Bool
     let isInputEnabled: Bool
     let action: () -> Void
+    let onMoveFocus: (SampleGuideFocusDirection) -> Void
 
     @State private var isHovering = false
 
@@ -384,9 +418,23 @@ private struct SampleExampleButton: View {
         .buttonStyle(.plain)
         .disabled(!isInputEnabled)
         .allowsHitTesting(isInputEnabled)
-        .onKeyPress(.return) {
+        .onKeyPress(
+            keys: [.tab, .upArrow, .downArrow, .space, .return],
+            phases: .down
+        ) { keyPress in
             guard isInputEnabled else { return .ignored }
-            action()
+
+            if keyPress.key == .tab {
+                onMoveFocus(keyPress.modifiers.contains(.shift) ? .previous : .next)
+            } else if keyPress.key == .upArrow {
+                onMoveFocus(.previous)
+            } else if keyPress.key == .downArrow {
+                onMoveFocus(.next)
+            } else if keyPress.key == .space || keyPress.key == .return {
+                action()
+            } else {
+                return .ignored
+            }
             return .handled
         }
         .onHover { isHovering = $0 }
