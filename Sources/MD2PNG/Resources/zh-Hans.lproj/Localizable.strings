@@ -70,6 +70,7 @@
 "welcome.shortcut_unavailable" = "已占用";
 "welcome.shortcut_conflict_help" = "其他应用正在使用该快捷键。仍可从 md2png 菜单执行所有操作。";
 "welcome.privacy_note" = "md2png 绝不会自动粘贴、发送或上传你的内容。";
+"welcome.reopen_hint" = "如果窗口被遮住，可从 md2png 菜单栏选择“显示欢迎指南”重新打开。";
 "welcome.try_sample" = "试试简短示例";
 "welcome.try_sample_help" = "明确复制并渲染应用内置的简短示例。";
 "welcome.done" = "完成";

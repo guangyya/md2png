@@ -51,6 +51,7 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
         XCTAssertTrue(chinese.privacyNote.contains("绝不会"))
+        XCTAssertTrue(chinese.reopenHint.contains("显示欢迎指南"))
         XCTAssertEqual(
             L10n.text("menu.show_welcome", defaultValue: "", bundle: englishBundle),
             "Show Welcome"
@@ -63,12 +64,28 @@ final class WelcomeTests: XCTestCase {
 
     func testWelcomeWindowPlacementCentersInsideTheActiveVisibleFrame() {
         let origin = WelcomeWindowPlacement.centeredOrigin(
-            windowSize: NSSize(width: 620, height: 648),
+            windowSize: NSSize(width: 620, height: 678),
             visibleFrame: NSRect(x: -1920, y: 25, width: 1920, height: 1055)
         )
 
         XCTAssertEqual(origin.x, -1270, accuracy: 0.001)
-        XCTAssertEqual(origin.y, 228.5, accuracy: 0.001)
+        XCTAssertEqual(origin.y, 213.5, accuracy: 0.001)
+    }
+
+    func testWelcomeAnimationProgressMovesThroughTheWholeWorkflow() {
+        let copying = WelcomeAnimationProgress(cycleProgress: 0.15)
+        let rendering = WelcomeAnimationProgress(cycleProgress: 0.34)
+        let pasting = WelcomeAnimationProgress(cycleProgress: 0.72)
+
+        XCTAssertGreaterThan(copying.copyLift, 0)
+        XCTAssertGreaterThan(copying.copyTravel, 0)
+        XCTAssertEqual(copying.detailIndex, 0)
+        XCTAssertGreaterThan(rendering.keyPress, 0.9)
+        XCTAssertEqual(rendering.detailIndex, 1)
+        XCTAssertGreaterThan(pasting.imageReveal, 0.9)
+        XCTAssertGreaterThan(pasting.pastePrompt, 0)
+        XCTAssertEqual(pasting.detailIndex, 2)
+        XCTAssertEqual(WelcomeAnimationProgress.reducedMotion.imageReveal, 1)
     }
 
     @MainActor
@@ -78,9 +95,12 @@ final class WelcomeTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preference = WelcomePreference(defaults: defaults)
         var sampleCount = 0
-        let controller = WelcomeController(preference: preference) {
-            sampleCount += 1
-        }
+        var visibilityChanges: [Bool] = []
+        let controller = WelcomeController(
+            preference: preference,
+            onVisibilityChange: { visibilityChanges.append($0) },
+            onTrySample: { sampleCount += 1 }
+        )
         let shortcuts = [WelcomeShortcutStatus(
             id: 1,
             title: "Render Clipboard as Image",
@@ -91,7 +111,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(controller.showIfNeeded(shortcuts: shortcuts))
         XCTAssertEqual(controller.window?.title, "Welcome to md2png")
-        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 620, height: 620))
+        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 620, height: 650))
         XCTAssertEqual(controller.displayedShortcutStatuses, shortcuts)
         XCTAssertEqual(controller.window?.isVisible, true)
         XCTAssertEqual(controller.window?.level, .normal)
@@ -99,6 +119,7 @@ final class WelcomeTests: XCTestCase {
             controller.window?.collectionBehavior.contains(.moveToActiveSpace),
             true
         )
+        XCTAssertEqual(visibilityChanges, [true])
 
         controller.trySampleForTesting()
         XCTAssertEqual(sampleCount, 1)
@@ -106,6 +127,7 @@ final class WelcomeTests: XCTestCase {
         controller.completeForTesting()
         XCTAssertFalse(preference.shouldShowOnLaunch)
         XCTAssertEqual(controller.window?.isVisible, false)
+        XCTAssertEqual(visibilityChanges, [true, false])
         XCTAssertFalse(controller.showIfNeeded(shortcuts: shortcuts))
     }
 

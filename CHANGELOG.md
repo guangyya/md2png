@@ -10,7 +10,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Add a first-launch guide for the copy, render, and paste workflow, including
-  live global-shortcut status and an explicit bundled sample action.
+  a native animated walkthrough, live global-shortcut status, an explicit
+  bundled sample action, and Command-Tab recovery while the guide is open.
 - Add Compact, Standard, and Wide output-width presets and remember the last
   explicit selection locally.
 - Add same-source Retina reference renders that show the presets' actual

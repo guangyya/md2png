@@ -70,6 +70,7 @@
 "welcome.shortcut_unavailable" = "In Use";
 "welcome.shortcut_conflict_help" = "Another app is using a shortcut. Every action remains available from the md2png menu.";
 "welcome.privacy_note" = "md2png never pastes, sends, or uploads your content automatically.";
+"welcome.reopen_hint" = "If this window gets hidden, choose Show Welcome from the md2png menu bar.";
 "welcome.try_sample" = "Try a Short Sample";
 "welcome.try_sample_help" = "Explicitly copy and render the bundled short sample.";
 "welcome.done" = "Done";

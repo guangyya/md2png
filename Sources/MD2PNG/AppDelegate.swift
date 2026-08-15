@@ -11,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
+        onVisibilityChange: { isVisible in
+            NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
+        },
         onTrySample: { [weak self] in self?.renderBundledExample(.short) }
     )
     private var statusItem: NSStatusItem!

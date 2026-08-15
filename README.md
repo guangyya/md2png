@@ -99,7 +99,9 @@ and asks before replacing clipboard content changed by another application. The
 Last Render window opens at a width that reflects the output, within the current
 screen, and identifies the preset and actual dimensions in its title.
 The welcome guide opens once on first launch and can be reopened from the menu;
-trying its bundled sample always requires an explicit click.
+trying its bundled sample always requires an explicit click. While the guide is
+open, md2png appears in Command-Tab so the window cannot become unreachable;
+closing the guide returns the app to its menu bar-only mode.
 See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
 dimensions and same-source reference renders.
 

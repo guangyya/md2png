@@ -65,7 +65,7 @@ struct WelcomeWindowPlacement {
 }
 
 private enum WelcomeLayout {
-    static let contentSize = NSSize(width: 620, height: 620)
+    static let contentSize = NSSize(width: 620, height: 650)
 }
 
 struct WelcomeCopy {
@@ -83,6 +83,7 @@ struct WelcomeCopy {
     let shortcutUnavailable: String
     let shortcutConflictHelp: String
     let privacyNote: String
+    let reopenHint: String
     let trySample: String
     let trySampleHelp: String
     let done: String
@@ -158,6 +159,11 @@ struct WelcomeCopy {
             defaultValue: "md2png never pastes, sends, or uploads your content automatically.",
             bundle: localizationBundle
         )
+        reopenHint = L10n.text(
+            "welcome.reopen_hint",
+            defaultValue: "If this window gets hidden, choose Show Welcome from the md2png menu bar.",
+            bundle: localizationBundle
+        )
         trySample = L10n.text(
             "welcome.try_sample",
             defaultValue: "Try a Short Sample",
@@ -180,6 +186,7 @@ struct WelcomeCopy {
 final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let preference: WelcomePreference
     private let copy: WelcomeCopy
+    private let onVisibilityChange: (Bool) -> Void
     private let onTrySample: () -> Void
     private var shortcutStatuses: [WelcomeShortcutStatus] = []
 
@@ -193,10 +200,12 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     init(
         preference: WelcomePreference = WelcomePreference(),
         localizationBundle: Bundle? = nil,
+        onVisibilityChange: @escaping (Bool) -> Void = { _ in },
         onTrySample: @escaping () -> Void
     ) {
         self.preference = preference
         copy = WelcomeCopy(localizationBundle: localizationBundle)
+        self.onVisibilityChange = onVisibilityChange
         self.onTrySample = onTrySample
         super.init(window: nil)
     }
@@ -238,6 +247,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         }
         window?.contentViewController = hostingController
         window?.setContentSize(WelcomeLayout.contentSize)
+        onVisibilityChange(true)
         NSApp.activate(ignoringOtherApps: true)
         centerOnActiveScreen()
         showWindow(nil)
@@ -246,6 +256,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         preference.markCompleted()
+        onVisibilityChange(false)
     }
 
 #if DEBUG
@@ -328,10 +339,13 @@ private struct WelcomeView: View {
                 }
             }
 
-            Label(copy.privacyNote, systemImage: "lock.shield")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 6) {
+                Label(copy.privacyNote, systemImage: "lock.shield")
+                Label(copy.reopenHint, systemImage: "menubar.rectangle")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
 
@@ -353,153 +367,6 @@ private struct WelcomeView: View {
             height: WelcomeLayout.contentSize.height
         )
         .background(Color(nsColor: .windowBackgroundColor))
-    }
-}
-
-private struct WelcomeWorkflowDemo: View {
-    private static let phaseInterval: TimeInterval = 1.5
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var startedAt = Date()
-
-    let copy: WelcomeCopy
-
-    var body: some View {
-        TimelineView(.periodic(
-            from: startedAt,
-            by: reduceMotion ? 60 : Self.phaseInterval
-        )) { context in
-            let phase = phase(at: context.date)
-            VStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    WelcomeDemoStage(
-                        title: copy.copyStepTitle,
-                        symbol: "doc.on.clipboard",
-                        badge: "Markdown",
-                        isActive: phase == 0
-                    )
-                    WelcomeDemoConnector(isActive: phase > 0)
-                    WelcomeDemoStage(
-                        title: copy.renderStepTitle,
-                        symbol: "wand.and.stars",
-                        badge: "⌃⌘X",
-                        isActive: phase == 1
-                    )
-                    WelcomeDemoConnector(isActive: phase > 1)
-                    WelcomeDemoStage(
-                        title: copy.pasteStepTitle,
-                        symbol: "photo.on.rectangle.angled",
-                        badge: "PNG · ⌘V",
-                        isActive: phase == 2
-                    )
-                }
-
-                Text(detail(for: phase))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, minHeight: 34)
-                    .id(phase)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-            .animation(
-                reduceMotion ? nil : .easeInOut(duration: 0.38),
-                value: phase
-            )
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .frame(height: 176)
-        .background(
-            Color(nsColor: .controlBackgroundColor).opacity(0.42),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.7), lineWidth: 0.5)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func phase(at date: Date) -> Int {
-        guard !reduceMotion else { return 2 }
-        let elapsed = max(0, date.timeIntervalSince(startedAt))
-        return Int(elapsed / Self.phaseInterval) % 3
-    }
-
-    private func detail(for phase: Int) -> String {
-        switch phase {
-        case 0:
-            copy.copyStepDetail
-        case 1:
-            copy.renderStepDetail
-        default:
-            copy.pasteStepDetail
-        }
-    }
-}
-
-private struct WelcomeDemoStage: View {
-    let title: String
-    let symbol: String
-    let badge: String
-    let isActive: Bool
-
-    var body: some View {
-        VStack(spacing: 7) {
-            Image(systemName: symbol)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(
-                    isActive ? Color.accentColor : Color(nsColor: .secondaryLabelColor)
-                )
-
-            Text(title)
-                .font(.callout.weight(.semibold))
-                .lineLimit(1)
-
-            Text(badge)
-                .font(.system(.caption, design: .rounded).weight(.medium))
-                .foregroundStyle(
-                    isActive ? Color.accentColor : Color(nsColor: .secondaryLabelColor)
-                )
-        }
-        .frame(width: 144, height: 96)
-        .background(
-            isActive
-                ? Color.accentColor.opacity(0.13)
-                : Color(nsColor: .windowBackgroundColor).opacity(0.82),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(
-                    isActive
-                        ? Color.accentColor.opacity(0.55)
-                        : Color(nsColor: .separatorColor).opacity(0.6),
-                    lineWidth: isActive ? 1 : 0.5
-                )
-        }
-        .scaleEffect(isActive ? 1 : 0.96)
-        .shadow(
-            color: isActive ? Color.accentColor.opacity(0.14) : .clear,
-            radius: 8,
-            y: 3
-        )
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct WelcomeDemoConnector: View {
-    let isActive: Bool
-
-    var body: some View {
-        Image(systemName: "arrow.right")
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(
-                isActive ? Color.accentColor : Color(nsColor: .tertiaryLabelColor)
-            )
-            .frame(width: 22)
-            .accessibilityHidden(true)
     }
 }
 
