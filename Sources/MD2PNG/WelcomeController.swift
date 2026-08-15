@@ -26,6 +26,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
     let shortcutAccessibilityName: String
     let isRegistered: Bool
     fileprivate(set) var isVerified: Bool
+    fileprivate(set) var verificationCount: Int
 
     init(
         registration: GlobalHotKey.Registration,
@@ -37,6 +38,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         shortcutAccessibilityName = registration.shortcutAccessibilityName
         isRegistered = !failedRegistrationIDs.contains(registration.id)
         isVerified = false
+        verificationCount = 0
     }
 
     init(
@@ -53,6 +55,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         self.shortcutAccessibilityName = shortcutAccessibilityName
         self.isRegistered = isRegistered
         self.isVerified = isRegistered && isVerified
+        verificationCount = 0
     }
 }
 
@@ -64,6 +67,7 @@ private final class WelcomeShortcutVerificationState: ObservableObject {
         self.shortcuts = shortcuts.map { shortcut in
             var shortcut = shortcut
             shortcut.isVerified = false
+            shortcut.verificationCount = 0
             return shortcut
         }
     }
@@ -73,6 +77,7 @@ private final class WelcomeShortcutVerificationState: ObservableObject {
         guard let index = shortcuts.firstIndex(where: { $0.id == id }),
               shortcuts[index].isRegistered else { return nil }
         shortcuts[index].isVerified = true
+        shortcuts[index].verificationCount += 1
         return shortcuts[index]
     }
 }
@@ -558,6 +563,7 @@ private struct WelcomeShortcutRow: View {
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
                 .frame(width: 74, alignment: .leading)
+                .symbolEffect(.bounce, value: shortcut.verificationCount)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

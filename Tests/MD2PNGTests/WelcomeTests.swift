@@ -35,6 +35,7 @@ final class WelcomeTests: XCTestCase {
         XCTAssertTrue(statuses[0].isRegistered)
         XCTAssertFalse(statuses[1].isRegistered)
         XCTAssertEqual(statuses.map(\.isVerified), [false, false])
+        XCTAssertEqual(statuses.map(\.verificationCount), [0, 0])
         XCTAssertEqual(
             statuses[0].title,
             L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
@@ -117,6 +118,10 @@ final class WelcomeTests: XCTestCase {
             controller.displayedShortcutStatuses.map(\.isVerified),
             [true, false]
         )
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.verificationCount),
+            [2, 0]
+        )
 
         router.handle(.showLastRender)
 
@@ -124,6 +129,10 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(
             controller.displayedShortcutStatuses.map(\.isVerified),
             [true, true]
+        )
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.verificationCount),
+            [2, 1]
         )
 
         controller.close()
@@ -138,6 +147,10 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(
             controller.displayedShortcutStatuses.map(\.isVerified),
             [false, false]
+        )
+        XCTAssertEqual(
+            controller.displayedShortcutStatuses.map(\.verificationCount),
+            [0, 0]
         )
 
         controller.window?.orderOut(nil)
@@ -181,6 +194,7 @@ final class WelcomeTests: XCTestCase {
         XCTAssertTrue(performedCommands.isEmpty)
         XCTAssertFalse(controller.displayedShortcutStatuses[1].isRegistered)
         XCTAssertFalse(controller.displayedShortcutStatuses[1].isVerified)
+        XCTAssertEqual(controller.displayedShortcutStatuses[1].verificationCount, 0)
     }
 
     func testWelcomeWindowPlacementCentersInsideTheActiveVisibleFrame() {
