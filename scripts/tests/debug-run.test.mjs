@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   canonicalExecutablePath,
@@ -15,6 +17,23 @@ import {
   parseProcessTable,
   shouldRetryOpenFailure
 } from "../debug-run.mjs";
+
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+
+function configuredAppPaths(configuration) {
+  const makefile = `include Makefile
+.PHONY: print-app-paths
+print-app-paths:
+\t@printf '%s|%s\\n' "$(APP_DIR)" "$(CONTENTS)"
+`;
+  const result = spawnSync(
+    "/usr/bin/make",
+    ["--no-print-directory", "-s", "-f", "-", `CONFIGURATION=${configuration}`, "print-app-paths"],
+    { cwd: repoRoot, encoding: "utf8", input: makefile }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim().split("|");
+}
 
 test("derives a stable checkout identity from the canonical checkout path", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "md2png-debug-run-"));
@@ -50,14 +69,26 @@ test("adds the checkout identity only to a validated Debug bundle identifier", (
   );
 });
 
-test("selects only the exact executable path for the current checkout", () => {
-  const currentExecutable = "/worktrees/one/dist/md2png.app/Contents/MacOS/md2png";
+test("keeps Debug output separate from same-checkout Release output", () => {
+  assert.deepEqual(configuredAppPaths("release"), [
+    "dist/md2png.app",
+    "dist/md2png.app/Contents"
+  ]);
+  assert.deepEqual(configuredAppPaths("debug"), [
+    "dist/debug/md2png.app",
+    "dist/debug/md2png.app/Contents"
+  ]);
+});
+
+test("selects only the exact Debug executable path for the current checkout", () => {
+  const currentExecutable = "/worktrees/one/dist/debug/md2png.app/Contents/MacOS/md2png";
   const processes = parseProcessTable(`
   101 ${currentExecutable}
   102 /Applications/md2png.app/Contents/MacOS/md2png
-  103 /worktrees/two/dist/md2png.app/Contents/MacOS/md2png
-  104 ${currentExecutable} --unexpected-argument
-  105 helper ${currentExecutable}
+  103 /worktrees/one/dist/md2png.app/Contents/MacOS/md2png
+  104 /worktrees/two/dist/debug/md2png.app/Contents/MacOS/md2png
+  105 ${currentExecutable} --unexpected-argument
+  106 helper ${currentExecutable}
   `);
 
   assert.deepEqual(matchingProcessIDs(processes, currentExecutable, 999), [101]);
