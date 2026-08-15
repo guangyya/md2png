@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -6,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const workflowDirectory = path.join(repoRoot, ".github/workflows");
-const dependabot = fs.readFileSync(path.join(repoRoot, ".github/dependabot.yml"), "utf8");
+const dependabotPath = path.join(repoRoot, ".github/dependabot.yml");
 const workflowNames = ["prepare-release-pr.yml", "release-preflight.yml", "release.yml"];
 const workflows = Object.fromEntries(workflowNames.map((name) => [
   name,
@@ -17,25 +18,75 @@ const allWorkflows = Object.fromEntries(fs.readdirSync(workflowDirectory)
   .sort()
   .map((name) => [name, fs.readFileSync(path.join(workflowDirectory, name), "utf8")]));
 
+function assertPinnedExternalActions(name, content) {
+  const uses = [...content.matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)(?:\s+#\s*(.*?))?\s*$/gm)];
+  assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
+  for (const [, reference, comment] of uses) {
+    if (reference.startsWith("./")) {
+      continue;
+    }
+    assert.match(reference, /^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[0-9a-f]{40}$/, `${name}: ${reference}`);
+    assert.match(comment ?? "", /^v\d+(?:\.\d+){0,2}$/, `${name}: ${reference} needs an exact Dependabot version comment`);
+  }
+}
+
+function parseYaml(filePath) {
+  const json = execFileSync("/usr/bin/ruby", [
+    "-ryaml",
+    "-rjson",
+    "-e",
+    "print JSON.generate(YAML.safe_load(File.read(ARGV.fetch(0))))",
+    filePath,
+  ], { encoding: "utf8" });
+  return JSON.parse(json);
+}
+
 test("all workflows pin every external action to a full commit", () => {
   for (const [name, content] of Object.entries(allWorkflows)) {
-    const uses = [...content.matchAll(/^\s*uses:\s*([^\s#]+)(?:\s+#\s*(\S+))?\s*$/gm)];
-    assert.ok(uses.length > 0, `${name} should use at least one reviewed action`);
-    for (const [, reference, version] of uses) {
-      assert.match(reference, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/, `${name}: ${reference}`);
-      assert.match(version ?? "", /^v\d+(?:\.\d+){0,2}$/, `${name}: ${reference} needs a Dependabot version comment`);
-    }
+    assertPinnedExternalActions(name, content);
   }
 });
 
-test("Dependabot checks pinned GitHub Actions every week", () => {
-  assert.match(dependabot, /package-ecosystem:\s*"github-actions"/);
-  assert.match(dependabot, /directory:\s*"\/"/);
-  assert.match(dependabot, /schedule:\n\s+interval:\s*"weekly"/);
-  assert.match(dependabot, /day:\s*"monday"/);
-  assert.match(dependabot, /timezone:\s*"Asia\/Shanghai"/);
-  assert.match(dependabot, /actions-minor-patch:[\s\S]*?patterns:\n\s+- "\*"[\s\S]*?"minor"[\s\S]*?"patch"/);
-  assert.match(dependabot, /actions-major:[\s\S]*?patterns:\n\s+- "\*"[\s\S]*?"major"/);
+test("action pinning cannot be bypassed with a multiword trailing comment", () => {
+  const fixture = `
+steps:
+  - uses: actions/checkout@v7 # this unpinned action must still be inspected
+  - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+`;
+  assert.throws(() => assertPinnedExternalActions("multiword-comment.yml", fixture), /actions\/checkout@v7/);
+});
+
+test("Dependabot structurally configures weekly GitHub Actions updates", () => {
+  const dependabot = parseYaml(dependabotPath);
+  assert.deepEqual(Object.keys(dependabot).sort(), ["updates", "version"]);
+  assert.equal(dependabot.version, 2);
+  assert.equal(dependabot.updates.length, 1);
+
+  const update = dependabot.updates[0];
+  assert.deepEqual(Object.keys(update).sort(), [
+    "directory",
+    "groups",
+    "labels",
+    "open-pull-requests-limit",
+    "package-ecosystem",
+    "schedule",
+  ]);
+  assert.equal(update["package-ecosystem"], "github-actions");
+  assert.equal(update.directory, "/");
+  assert.deepEqual(update.schedule, {
+    interval: "weekly",
+    day: "monday",
+    time: "09:00",
+    timezone: "Asia/Shanghai",
+  });
+  assert.equal(update["open-pull-requests-limit"], 5);
+  assert.deepEqual(update.labels, ["technical-debt"]);
+  assert.deepEqual(update.groups, {
+    "actions-minor-patch": {
+      patterns: ["*"],
+      "update-types": ["minor", "patch"],
+    },
+  });
 });
 
 test("pull request code remains read-only and never uses pull_request_target", () => {

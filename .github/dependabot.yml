@@ -18,8 +18,3 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      actions-major:
-        patterns:
-          - "*"
-        update-types:
-          - "major"
