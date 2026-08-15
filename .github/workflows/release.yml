@@ -440,10 +440,17 @@ jobs:
       - name: Stage trusted publication implementation
         env:
           WORKFLOW_COMMIT: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.ref }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "$WORKFLOW_REF" != "refs/heads/main" ]]; then
+            echo "Release publication recovery must run from refs/heads/main." >&2
+            exit 1
+          fi
+          git fetch origin main:refs/remotes/origin/main
           git cat-file -e "${WORKFLOW_COMMIT}^{commit}"
+          git merge-base --is-ancestor "$WORKFLOW_COMMIT" refs/remotes/origin/main
           git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
           trusted_publisher="$RUNNER_TEMP/publish-hosted-release.sh"
           git show "${WORKFLOW_COMMIT}:scripts/publish-hosted-release.sh" > "$trusted_publisher"

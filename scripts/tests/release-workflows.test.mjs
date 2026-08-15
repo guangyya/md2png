@@ -225,6 +225,10 @@ test("trusted publication updates coverage history in the originating workflow",
   assert.match(publisher, /git merge-base --is-ancestor "\$source_commit" origin\/main/);
   assert.doesNotMatch(publisher, /--clobber|pull_request_target/);
   assert.match(release, /WORKFLOW_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(release, /WORKFLOW_REF: \$\{\{ github\.ref \}\}/);
+  assert.match(release, /\[\[ "\$WORKFLOW_REF" != "refs\/heads\/main" \]\]/);
+  assert.match(release, /git fetch origin main:refs\/remotes\/origin\/main/);
+  assert.match(release, /git merge-base --is-ancestor "\$WORKFLOW_COMMIT" refs\/remotes\/origin\/main/);
   assert.match(release, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/publish-hosted-release\.sh"/);
   assert.match(release, /run: REPO_ROOT="\$GITHUB_WORKSPACE" "\$TRUSTED_PUBLISHER"/);
