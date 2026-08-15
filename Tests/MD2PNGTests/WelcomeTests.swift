@@ -263,6 +263,40 @@ final class WelcomeTests: XCTestCase {
     }
 
     @MainActor
+    func testSampleGuideConsumesNavigationWithoutOwningTheKeyWindow() throws {
+        _ = NSApplication.shared
+        let popover = TestSampleGuidePopover()
+        let statusButton = NSStatusBarButton(
+            frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+        )
+        let controller = SampleGuideController(popover: popover) { _ in }
+        controller.show(
+            relativeTo: statusButton,
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+        XCTAssertNil(popover.contentViewController?.view.window)
+
+        let downArrow = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "\u{F701}",
+            charactersIgnoringModifiers: "\u{F701}",
+            isARepeat: false,
+            keyCode: SampleGuideKeyCode.downArrow
+        ))
+
+        XCTAssertNil(controller.handleKeyDown(downArrow))
+        controller.dismiss()
+    }
+
+    @MainActor
     func testWelcomeWindowCanTrySampleCompleteAndStayDismissed() throws {
         _ = NSApplication.shared
         let (defaults, suiteName) = try makeDefaults()

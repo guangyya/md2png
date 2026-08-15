@@ -242,10 +242,9 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         self.keyEventMonitor = nil
     }
 
-    private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+    func handleKeyDown(_ event: NSEvent) -> NSEvent? {
         guard acceptsSelection,
               popover.isShown,
-              popover.contentViewController?.view.window?.isKeyWindow == true,
               let command = SampleGuideKeyRouting.command(
                   forKeyCode: event.keyCode,
                   isShiftPressed: event.modifierFlags.contains(.shift)
