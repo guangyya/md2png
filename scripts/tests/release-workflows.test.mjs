@@ -63,7 +63,10 @@ test("release authorization checks the PR head and accepts only successful named
   assert.match(release, /commits\/\$\{pr_head_sha\}\/check-runs\?per_page=100/);
   assert.doesNotMatch(release, /commits\/\$\{source_commit\}\/check-runs\?per_page=100/);
   assert.doesNotMatch(release, /gh pr checks/);
+  assert.match(release, /CI \/ macOS 15 \/ Xcode 26\.2/);
+  assert.match(release, /CI \/ macOS 26 \/ Xcode 26\.6/);
   assert.match(release, /Release preflight \/ Xcode 26\.2/);
+  assert.doesNotMatch(release, /CI \/ Xcode 27 preview/);
   assert.match(release, /\[\[ "\$check_state" != "SUCCESS" \]\]/);
   assert.doesNotMatch(release, /SUCCESS\|SKIPPED|SUCCESS\|NEUTRAL|SKIPPED\|NEUTRAL/);
 });

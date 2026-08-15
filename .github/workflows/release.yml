@@ -144,7 +144,6 @@ jobs:
           for required_check in \
             "CI / macOS 15 / Xcode 26.2" \
             "CI / macOS 26 / Xcode 26.6" \
-            "CI / Xcode 27 preview" \
             "Detect Release PR" \
             "Release preflight / Xcode 26.2"; do
             check_state="$(jq -r --arg name "$required_check" \

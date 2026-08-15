@@ -68,7 +68,10 @@ To release:
 Release preflight derives the bump independently, rejects stale or unrelated
 edits, runs tests, and verifies an ad-hoc release package without secrets or
 write permission. Coverage is deliberately not collected on the Release PR.
-The post-merge trusted Release build collects it once on Xcode 26.2.
+The post-merge trusted Release build collects it once on Xcode 26.2. The two
+stable CI jobs and Release preflight are hard publication gates; the explicitly
+experimental Xcode preview job remains informational and cannot block a stable
+release.
 
 The trusted workflow isolates responsibilities:
 
