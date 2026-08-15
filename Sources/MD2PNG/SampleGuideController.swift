@@ -1,4 +1,6 @@
 import AppKit
+import Carbon
+import Combine
 import SwiftUI
 
 enum SampleGuidePhase: Int, Equatable {
@@ -21,6 +23,47 @@ enum SampleGuideFocusDirection {
     case next
 }
 
+enum SampleGuideKeyCommand: Equatable {
+    case previous
+    case next
+    case activate
+    case dismiss
+}
+
+enum SampleGuideKeyCode {
+    static let tab = UInt16(kVK_Tab)
+    static let upArrow = UInt16(kVK_UpArrow)
+    static let downArrow = UInt16(kVK_DownArrow)
+    static let space = UInt16(kVK_Space)
+    static let returnKey = UInt16(kVK_Return)
+    static let keypadEnter = UInt16(kVK_ANSI_KeypadEnter)
+    static let escape = UInt16(kVK_Escape)
+}
+
+struct SampleGuideKeyRouting {
+    static func command(
+        forKeyCode keyCode: UInt16,
+        isShiftPressed: Bool
+    ) -> SampleGuideKeyCommand? {
+        switch keyCode {
+        case SampleGuideKeyCode.tab:
+            return isShiftPressed ? .previous : .next
+        case SampleGuideKeyCode.upArrow:
+            return .previous
+        case SampleGuideKeyCode.downArrow:
+            return .next
+        case SampleGuideKeyCode.space,
+             SampleGuideKeyCode.returnKey,
+             SampleGuideKeyCode.keypadEnter:
+            return .activate
+        case SampleGuideKeyCode.escape:
+            return .dismiss
+        default:
+            return nil
+        }
+    }
+}
+
 struct SampleGuideFocusNavigation {
     static func targetID(
         from currentID: Int?,
@@ -38,6 +81,29 @@ struct SampleGuideFocusNavigation {
         case .next:
             return ids[(currentIndex + 1) % ids.count]
         }
+    }
+}
+
+@MainActor
+final class SampleGuideKeyboardState: ObservableObject {
+    @Published private(set) var focusedExampleID: Int?
+    private(set) var isNavigationEnabled = false
+
+    var focusedExample: ExampleKind? {
+        focusedExampleID.flatMap(ExampleKind.init(rawValue:))
+    }
+
+    func enableAndFocusFirstExample() {
+        isNavigationEnabled = true
+        focusedExampleID = ExampleKind.short.rawValue
+    }
+
+    func move(_ direction: SampleGuideFocusDirection) {
+        guard isNavigationEnabled else { return }
+        focusedExampleID = SampleGuideFocusNavigation.targetID(
+            from: focusedExampleID,
+            direction: direction
+        )
     }
 }
 
@@ -72,6 +138,8 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     private weak var highlightedButton: NSButton?
     private var acceptsSelection = false
     private var pendingSelection: ExampleKind?
+    private var keyboardState: SampleGuideKeyboardState?
+    private var keyEventMonitor: Any?
 
     convenience init(onChoose: @escaping (ExampleKind) -> Void) {
         self.init(popover: NSPopover(), onChoose: onChoose)
@@ -96,10 +164,13 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     ) {
         dismiss()
         acceptsSelection = true
+        let keyboardState = SampleGuideKeyboardState()
+        self.keyboardState = keyboardState
 
         popover.contentViewController = NSHostingController(
             rootView: SampleGuideView(
                 menuState: menuState,
+                keyboardState: keyboardState,
                 onChoose: { [weak self] kind in
                     self?.choose(kind)
                 },
@@ -114,23 +185,29 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
             preferredEdge: .minY
         )
         popover.makeContentKey()
+        startMonitoringKeyboard()
     }
 
     func dismiss() {
         acceptsSelection = false
         pendingSelection = nil
+        stopMonitoringKeyboard()
         if popover.isShown {
             popover.close()
         }
+        keyboardState = nil
         clearStatusButtonHighlight()
     }
 
     func popoverWillClose(_ notification: Notification) {
+        stopMonitoringKeyboard()
         clearStatusButtonHighlight()
     }
 
     func popoverDidClose(_ notification: Notification) {
         acceptsSelection = false
+        stopMonitoringKeyboard()
+        keyboardState = nil
         clearStatusButtonHighlight()
 
         guard let selection = pendingSelection else { return }
@@ -149,6 +226,55 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         highlightedButton?.highlight(false)
         highlightedButton = nil
     }
+
+    private func startMonitoringKeyboard() {
+        stopMonitoringKeyboard()
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            dispatchPrecondition(condition: .onQueue(.main))
+            return self?.handleKeyDown(event) ?? event
+        }
+    }
+
+    private func stopMonitoringKeyboard() {
+        guard let keyEventMonitor else { return }
+        NSEvent.removeMonitor(keyEventMonitor)
+        self.keyEventMonitor = nil
+    }
+
+    private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+        guard acceptsSelection,
+              popover.isShown,
+              popover.contentViewController?.view.window?.isKeyWindow == true,
+              let command = SampleGuideKeyRouting.command(
+                  forKeyCode: event.keyCode,
+                  isShiftPressed: event.modifierFlags.contains(.shift)
+              ) else {
+            return event
+        }
+
+        if command == .dismiss {
+            dismiss()
+            return nil
+        }
+
+        guard let keyboardState, keyboardState.isNavigationEnabled else {
+            return nil
+        }
+
+        switch command {
+        case .previous:
+            keyboardState.move(.previous)
+        case .next:
+            keyboardState.move(.next)
+        case .activate:
+            guard let focusedExample = keyboardState.focusedExample else { return nil }
+            choose(focusedExample)
+        case .dismiss:
+            break
+        }
+        return nil
+    }
 }
 
 private struct SampleGuideView: View {
@@ -157,6 +283,7 @@ private struct SampleGuideView: View {
     @FocusState private var focusedExampleID: Int?
 
     let menuState: SampleGuideMenuState
+    @ObservedObject var keyboardState: SampleGuideKeyboardState
     let onChoose: (ExampleKind) -> Void
     let onDismiss: () -> Void
 
@@ -199,6 +326,9 @@ private struct SampleGuideView: View {
         .task {
             await revealMenuPath()
         }
+        .onReceive(keyboardState.$focusedExampleID) { focusedExampleID in
+            self.focusedExampleID = focusedExampleID
+        }
         .onExitCommand(perform: onDismiss)
     }
 
@@ -226,7 +356,7 @@ private struct SampleGuideView: View {
     private func focusFirstExample() async {
         await Task.yield()
         guard phase.acceptsSubmenuInput else { return }
-        focusedExampleID = ExampleKind.short.rawValue
+        keyboardState.enableAndFocusFirstExample()
     }
 
     private func pause(nanoseconds: UInt64) async -> Bool {
@@ -324,8 +454,7 @@ private struct SampleExamplesMenu: View {
                     kind: kind,
                     isRecommended: kind == .short,
                     isInputEnabled: isInputEnabled,
-                    action: { onChoose(kind) },
-                    onMoveFocus: moveFocus
+                    action: { onChoose(kind) }
                 )
                 .focused($focusedExampleID, equals: kind.rawValue)
             }
@@ -333,13 +462,6 @@ private struct SampleExamplesMenu: View {
         .padding(6)
         .frame(width: 252, height: 326, alignment: .top)
         .guideMenuBackground()
-    }
-
-    private func moveFocus(_ direction: SampleGuideFocusDirection) {
-        focusedExampleID = SampleGuideFocusNavigation.targetID(
-            from: focusedExampleID,
-            direction: direction
-        )
     }
 }
 
@@ -387,7 +509,6 @@ private struct SampleExampleButton: View {
     let isRecommended: Bool
     let isInputEnabled: Bool
     let action: () -> Void
-    let onMoveFocus: (SampleGuideFocusDirection) -> Void
 
     @State private var isHovering = false
 
@@ -418,25 +539,6 @@ private struct SampleExampleButton: View {
         .buttonStyle(.plain)
         .disabled(!isInputEnabled)
         .allowsHitTesting(isInputEnabled)
-        .onKeyPress(
-            keys: [.tab, .upArrow, .downArrow, .space, .return],
-            phases: .down
-        ) { keyPress in
-            guard isInputEnabled else { return .ignored }
-
-            if keyPress.key == .tab {
-                onMoveFocus(keyPress.modifiers.contains(.shift) ? .previous : .next)
-            } else if keyPress.key == .upArrow {
-                onMoveFocus(.previous)
-            } else if keyPress.key == .downArrow {
-                onMoveFocus(.next)
-            } else if keyPress.key == .space || keyPress.key == .return {
-                action()
-            } else {
-                return .ignored
-            }
-            return .handled
-        }
         .onHover { isHovering = $0 }
     }
 }

@@ -135,6 +135,75 @@ final class WelcomeTests: XCTestCase {
         )
     }
 
+    func testSampleGuideKeyRoutingCoversMenuNavigationAndActivation() {
+        XCTAssertEqual(
+            SampleGuideKeyRouting.command(
+                forKeyCode: SampleGuideKeyCode.tab,
+                isShiftPressed: false
+            ),
+            .next
+        )
+        XCTAssertEqual(
+            SampleGuideKeyRouting.command(
+                forKeyCode: SampleGuideKeyCode.tab,
+                isShiftPressed: true
+            ),
+            .previous
+        )
+        XCTAssertEqual(
+            SampleGuideKeyRouting.command(
+                forKeyCode: SampleGuideKeyCode.upArrow,
+                isShiftPressed: false
+            ),
+            .previous
+        )
+        XCTAssertEqual(
+            SampleGuideKeyRouting.command(
+                forKeyCode: SampleGuideKeyCode.downArrow,
+                isShiftPressed: false
+            ),
+            .next
+        )
+        for keyCode in [
+            SampleGuideKeyCode.space,
+            SampleGuideKeyCode.returnKey,
+            SampleGuideKeyCode.keypadEnter
+        ] {
+            XCTAssertEqual(
+                SampleGuideKeyRouting.command(
+                    forKeyCode: keyCode,
+                    isShiftPressed: false
+                ),
+                .activate
+            )
+        }
+        XCTAssertEqual(
+            SampleGuideKeyRouting.command(
+                forKeyCode: SampleGuideKeyCode.escape,
+                isShiftPressed: false
+            ),
+            .dismiss
+        )
+        XCTAssertNil(
+            SampleGuideKeyRouting.command(forKeyCode: UInt16.max, isShiftPressed: false)
+        )
+    }
+
+    @MainActor
+    func testSampleGuideKeyboardStateWaitsForRevealBeforeMovingFocus() {
+        let keyboardState = SampleGuideKeyboardState()
+
+        keyboardState.move(.next)
+        XCTAssertNil(keyboardState.focusedExampleID)
+        XCTAssertFalse(keyboardState.isNavigationEnabled)
+
+        keyboardState.enableAndFocusFirstExample()
+        XCTAssertEqual(keyboardState.focusedExample, .short)
+
+        keyboardState.move(.next)
+        XCTAssertEqual(keyboardState.focusedExample, .long)
+    }
+
     @MainActor
     func testSampleGuideClosesBeforeDeliveringOneSelection() {
         let popover = TestSampleGuidePopover()
