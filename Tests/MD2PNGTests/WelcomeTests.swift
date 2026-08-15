@@ -95,6 +95,10 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(controller.displayedShortcutStatuses, shortcuts)
         XCTAssertEqual(controller.window?.isVisible, true)
         XCTAssertEqual(controller.window?.level, .normal)
+        XCTAssertEqual(
+            controller.window?.collectionBehavior.contains(.moveToActiveSpace),
+            true
+        )
 
         controller.trySampleForTesting()
         XCTAssertEqual(sampleCount, 1)

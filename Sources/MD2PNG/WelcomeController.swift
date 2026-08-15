@@ -232,6 +232,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
             window.title = copy.windowTitle
             window.isReleasedWhenClosed = false
             window.level = .normal
+            window.collectionBehavior.insert(.moveToActiveSpace)
             window.delegate = self
             self.window = window
         }
