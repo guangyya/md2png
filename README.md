@@ -188,11 +188,13 @@ published v0.1.0 DMG metadata so retries run through real verification. If that
 cached DMG has been removed, `ready-to-install` starts at the recoverable
 download failure instead of exposing an invalid Open action.
 
-`make app` creates `dist/md2png.app`. Local builds are ad-hoc signed unless a
-signing identity is supplied. `PROJECT_URL` is optional; when omitted, About
-hides the project and update controls. The source contains
-no repository URL. `BUNDLE_IDENTIFIER` defaults to the personal identifier in
-`Info.plist` and can be overridden without editing source files.
+`make app` creates the default Release bundle at `dist/md2png.app`.
+`make app CONFIGURATION=debug` and `make run CONFIGURATION=debug` use the
+separate Debug bundle at `dist/debug/md2png.app`. Local builds are ad-hoc signed
+unless a signing identity is supplied. `PROJECT_URL` is optional; when omitted,
+About hides the project and update controls. The source contains no repository
+URL. `BUNDLE_IDENTIFIER` defaults to the personal identifier in `Info.plist`
+and can be overridden without editing source files.
 `make verify-dist` rebuilds the app, verifies its signature and arm64
 architecture, then renders a bundled Markdown, GFM table, highlighted Swift
 snippet, and Mermaid diagram without reading or modifying the clipboard.
