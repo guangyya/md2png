@@ -38,6 +38,7 @@
 "shortcut.control_command_z" = "Control-Command-Z";
 "hud.shortcut_conflict" = "全局快捷键已被占用，但菜单命令仍可使用";
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
+"hud.png_copied_again" = "PNG 已再次复制——请按 Command-V 粘贴";
 "hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
 
 "confirmation.clipboard_changed.title" = "剪贴板已更改";
@@ -50,11 +51,23 @@
 "error.invalid_renderer_response" = "渲染器返回了无效的图片尺寸。";
 "error.content_too_large" = "渲染内容过大（%ld × %ld）。请尝试缩短内容。";
 "error.png_encoding_failed" = "无法将渲染结果编码为 PNG。";
+"error.png_write_failed" = "无法保存 PNG。";
+"error.preview_open_failed" = "无法在“预览”中打开渲染图片。";
 "error.clipboard_write_failed" = "无法更新剪贴板。";
 "error.example_unavailable" = "无法加载“%@”Markdown 文件。";
 
-"preview.window_title" = "上次 Markdown 渲染";
-"preview.window_title_with_width" = "上次 Markdown 渲染 — %@ · %ld × %ld pt";
+"preview.window_title" = "上次渲染";
+"preview.window_title_with_dimensions" = "上次渲染 — %ld × %ld px";
+"preview.window_title_with_width" = "上次渲染 — %@ · %ld × %ld px";
+"preview.copy_again" = "再次复制";
+"preview.save_png" = "保存 PNG…";
+"preview.open_in_preview" = "在“预览”中打开";
+"preview.fit" = "适合窗口";
+"preview.actual_size" = "实际大小";
+"preview.zoom_in" = "放大";
+"preview.zoom_out" = "缩小";
+"preview.zoom_level" = "预览缩放";
+"preview.zoom_percent" = "%ld%%";
 
 "welcome.window_title" = "欢迎使用 md2png";
 "welcome.title" = "把 Markdown 变成精美 PNG";

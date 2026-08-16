@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Copy, save, open, and zoom the latest rendered image from Last Render.
+
 ## [0.4.0] - 2026-08-15
 
 ### Added

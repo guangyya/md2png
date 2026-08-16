@@ -8,6 +8,8 @@ enum AppError: LocalizedError {
     case invalidRendererResponse
     case contentTooLarge(width: Int, height: Int)
     case pngEncodingFailed
+    case pngWriteFailed
+    case previewOpenFailed
     case clipboardWriteFailed
     case exampleUnavailable(String)
 
@@ -49,6 +51,16 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.png_encoding_failed",
                 defaultValue: "The rendered image could not be encoded as PNG."
+            )
+        case .pngWriteFailed:
+            return L10n.text(
+                "error.png_write_failed",
+                defaultValue: "The PNG could not be saved."
+            )
+        case .previewOpenFailed:
+            return L10n.text(
+                "error.preview_open_failed",
+                defaultValue: "The rendered image could not be opened in Preview."
             )
         case .clipboardWriteFailed:
             return L10n.text(

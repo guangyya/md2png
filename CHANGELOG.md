@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add Last Render controls to copy the image again, save it as PNG, open it in
+  Preview, fit it to the window, inspect it at pixel-accurate actual size, and
+  zoom from 25% to 400% without changing the generated image.
+
 ## [0.4.0] - 2026-08-15
 
 ### Added

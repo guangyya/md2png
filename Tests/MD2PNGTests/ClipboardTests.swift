@@ -73,6 +73,70 @@ final class ClipboardTests: XCTestCase {
         XCTAssertFalse(window.isVisible)
     }
 
+    @MainActor
+    func testPreviewWindowMapsActionAndZoomShortcuts() throws {
+        func event(_ characters: String, modifiers: NSEvent.ModifierFlags = .command) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: modifiers,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: characters,
+                charactersIgnoringModifiers: characters,
+                isARepeat: false,
+                keyCode: 0
+            ))
+        }
+
+        XCTAssertEqual(PreviewWindow.command(for: try event("c")), .copyAgain)
+        XCTAssertEqual(PreviewWindow.command(for: try event("s")), .savePNG)
+        XCTAssertEqual(PreviewWindow.command(for: try event("9")), .fit)
+        XCTAssertEqual(PreviewWindow.command(for: try event("0")), .actualSize)
+        XCTAssertEqual(PreviewWindow.command(for: try event("-")), .zoomOut)
+        XCTAssertEqual(PreviewWindow.command(for: try event("=")), .zoomIn)
+        XCTAssertEqual(
+            PreviewWindow.command(for: try event("=", modifiers: [.command, .shift])),
+            .zoomIn
+        )
+        XCTAssertNil(PreviewWindow.command(for: try event("c", modifiers: [.command, .option])))
+    }
+
+    @MainActor
+    func testPreviewCopyAgainUsesInjectedClipboardBoundary() throws {
+        _ = NSApplication.shared
+        let image = NSImage(size: NSSize(width: 120, height: 80))
+        var copiedImage: NSImage?
+        var recordedChangeCount: Int?
+        let controller = PreviewController(
+            copyImage: {
+                copiedImage = $0
+                return 73
+            },
+            onCopied: { recordedChangeCount = $0 }
+        )
+        controller.show(image: image)
+        defer { controller.close() }
+        let commandC = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: .command,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "c",
+            charactersIgnoringModifiers: "c",
+            isARepeat: false,
+            keyCode: 8
+        ))
+
+        controller.window?.sendEvent(commandC)
+
+        XCTAssertTrue(copiedImage === image)
+        XCTAssertEqual(recordedChangeCount, 73)
+    }
+
     func testPackagedRendererResolvesFromContentsResources() throws {
         let fileManager = FileManager.default
         let testRoot = fileManager.temporaryDirectory
@@ -165,6 +229,8 @@ final class ClipboardTests: XCTestCase {
         XCTAssertNotNil(AppError.invalidRendererResponse.errorDescription)
         XCTAssertNotNil(AppError.contentTooLarge(width: 1, height: 2).errorDescription)
         XCTAssertNotNil(AppError.pngEncodingFailed.errorDescription)
+        XCTAssertNotNil(AppError.pngWriteFailed.errorDescription)
+        XCTAssertNotNil(AppError.previewOpenFailed.errorDescription)
         XCTAssertNotNil(AppError.clipboardWriteFailed.errorDescription)
         XCTAssertNotNil(AppError.exampleUnavailable("Short Sample").errorDescription)
     }

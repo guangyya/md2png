@@ -5,14 +5,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let renderer = MarkdownRenderer()
     private let renderWidthPreference: RenderWidthPreference
     private let hud = HUDController()
-    private let previewController = PreviewController()
+    private lazy var previewController = PreviewController(
+        onCopied: { [weak self] changeCount in
+            guard let self else { return }
+            self.lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
+            self.hud.show(
+                L10n.text(
+                    "hud.png_copied_again",
+                    defaultValue: "PNG copied again — paste with Command-V"
+                ),
+                symbol: "doc.on.clipboard.fill"
+            )
+        },
+        onError: { [weak self] error in
+            self?.show(error)
+        },
+        onVisibilityChange: { [weak self] isVisible in
+            self?.setPreviewWindowVisible(isVisible)
+        }
+    )
     private let updateController = UpdateController()
     private lazy var aboutController = AboutController(updateController: updateController)
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
-        onVisibilityChange: { isVisible in
-            NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
+        onVisibilityChange: { [weak self] isVisible in
+            self?.setWelcomeWindowVisible(isVisible)
         },
         onTrySample: { [weak self] in self?.showSampleGuide() }
     )
@@ -53,6 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isPresentingClipboardConfirmation = false
     private var currentUpdateStatus = UpdateStatus()
     private var updateStatusObserverID: UUID?
+    private var isPreviewWindowVisible = false
+    private var isWelcomeWindowVisible = false
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
 
     override init() {
@@ -60,6 +80,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.renderWidthPreference = renderWidthPreference
         renderWidthPreset = renderWidthPreference.selectedPreset
         super.init()
+    }
+
+    private func setPreviewWindowVisible(_ isVisible: Bool) {
+        isPreviewWindowVisible = isVisible
+        updateWindowedActivationPolicy()
+    }
+
+    private func setWelcomeWindowVisible(_ isVisible: Bool) {
+        isWelcomeWindowVisible = isVisible
+        updateWindowedActivationPolicy()
+    }
+
+    private func updateWindowedActivationPolicy() {
+        NSApp.setActivationPolicy(
+            isPreviewWindowVisible || isWelcomeWindowVisible ? .regular : .accessory
+        )
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -240,7 +276,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let lastImage else { return }
         previewController.show(
             image: lastImage,
-            widthPreset: lastRenderWidthPreset
+            widthPreset: lastRenderWidthPreset,
+            markdown: lastSource.markdown
         )
     }
 
@@ -340,7 +377,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     if showsPreviewOnSuccess {
                         self.previewController.show(
                             image: image,
-                            widthPreset: requestedWidthPreset
+                            widthPreset: requestedWidthPreset,
+                            markdown: markdown
                         )
                     }
                 } catch {

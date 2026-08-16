@@ -38,6 +38,7 @@
 "shortcut.control_command_z" = "Control-Command-Z";
 "hud.shortcut_conflict" = "A global shortcut is already in use — menu commands still work";
 "hud.png_copied" = "PNG copied — paste with Command-V";
+"hud.png_copied_again" = "PNG copied again — paste with Command-V";
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
 
 "confirmation.clipboard_changed.title" = "Clipboard Changed";
@@ -50,11 +51,23 @@
 "error.invalid_renderer_response" = "The renderer returned an invalid image size.";
 "error.content_too_large" = "The rendered content is too large (%ld × %ld). Try a shorter selection.";
 "error.png_encoding_failed" = "The rendered image could not be encoded as PNG.";
+"error.png_write_failed" = "The PNG could not be saved.";
+"error.preview_open_failed" = "The rendered image could not be opened in Preview.";
 "error.clipboard_write_failed" = "The clipboard could not be updated.";
 "error.example_unavailable" = "The %@ Markdown file could not be loaded.";
 
-"preview.window_title" = "Last Markdown Render";
-"preview.window_title_with_width" = "Last Markdown Render — %@ · %ld × %ld pt";
+"preview.window_title" = "Last Render";
+"preview.window_title_with_dimensions" = "Last Render — %ld × %ld px";
+"preview.window_title_with_width" = "Last Render — %@ · %ld × %ld px";
+"preview.copy_again" = "Copy Again";
+"preview.save_png" = "Save PNG…";
+"preview.open_in_preview" = "Open in Preview";
+"preview.fit" = "Fit to Window";
+"preview.actual_size" = "Actual Size";
+"preview.zoom_in" = "Zoom In";
+"preview.zoom_out" = "Zoom Out";
+"preview.zoom_level" = "Preview zoom";
+"preview.zoom_percent" = "%ld%%";
 
 "welcome.window_title" = "Welcome to md2png";
 "welcome.title" = "Turn Markdown into a polished PNG";

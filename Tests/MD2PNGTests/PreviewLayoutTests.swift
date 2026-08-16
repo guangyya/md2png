@@ -152,12 +152,176 @@ final class PreviewLayoutTests: XCTestCase {
             controller.window?.title,
             L10n.format(
                 "preview.window_title_with_width",
-                defaultValue: "Last Markdown Render — %@ · %ld × %ld pt",
+                defaultValue: "Last Render — %@ · %ld × %ld px",
                 RenderWidthPreset.compact.menuTitle,
                 720,
                 1_120
             )
         )
+    }
+
+    @MainActor
+    func testPreviewProvidesActionsAndResetsNewImagesToFit() throws {
+        _ = NSApplication.shared
+        let first = try makeImage(
+            pixelsWide: 1_200,
+            pixelsHigh: 800,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+        let second = try makeImage(
+            pixelsWide: 600,
+            pixelsHigh: 1_600,
+            backgroundColor: .white,
+            accentColor: .systemPurple
+        )
+        let controller = PreviewController()
+        controller.show(image: first, markdown: "# Monthly Product Update")
+        defer { controller.close() }
+
+        XCTAssertEqual(controller.previewZoomMode, .fit)
+        XCTAssertTrue(controller.previewHasHorizontalScroller)
+        XCTAssertEqual(controller.previewScrollerStyle, .overlay)
+        XCTAssertEqual(controller.previewToolbarStyle, .expanded)
+        XCTAssertEqual(
+            controller.previewZoomStatusContainerSize,
+            NSSize(width: 64, height: 22)
+        )
+        XCTAssertEqual(
+            controller.previewSelectedToolbarIdentifier,
+            NSToolbarItem.Identifier("preview.fit")
+        )
+        XCTAssertEqual(
+            Set(controller.previewToolbarLabels),
+            Set([
+                L10n.text("preview.copy_again", defaultValue: "Copy Again"),
+                L10n.text("preview.save_png", defaultValue: "Save PNG…"),
+                L10n.text("preview.open_in_preview", defaultValue: "Open in Preview"),
+                L10n.text("preview.fit", defaultValue: "Fit to Window"),
+                L10n.text("preview.zoom_out", defaultValue: "Zoom Out"),
+                L10n.text("preview.zoom_level", defaultValue: "Preview zoom"),
+                L10n.text("preview.zoom_in", defaultValue: "Zoom In")
+            ])
+        )
+        XCTAssertEqual(controller.previewToolbarIconSizes.count, 6)
+        XCTAssertEqual(controller.previewSuggestedPNGFilename, "Monthly Product Update.png")
+        XCTAssertEqual(
+            controller.toolbarDefaultItemIdentifiers(NSToolbar(identifier: "preview-layout-test")),
+            [
+                NSToolbarItem.Identifier("preview.copy-again"),
+                NSToolbarItem.Identifier("preview.save-png"),
+                NSToolbarItem.Identifier("preview.open-in-preview"),
+                .flexibleSpace,
+                NSToolbarItem.Identifier("preview.fit"),
+                NSToolbarItem.Identifier("preview.zoom-out"),
+                NSToolbarItem.Identifier("preview.zoom-status"),
+                NSToolbarItem.Identifier("preview.zoom-in")
+            ]
+        )
+
+        controller.selectActualSizeForTesting()
+        XCTAssertEqual(controller.previewZoomMode, .actualSize)
+        XCTAssertEqual(controller.previewZoomFactor, 1)
+        XCTAssertNil(controller.previewSelectedToolbarIdentifier)
+        let actualSizeFrame = controller.displayedImageFrame
+        controller.selectActualSizeForTesting()
+        XCTAssertEqual(controller.displayedImageFrame, actualSizeFrame)
+        controller.zoomInForTesting()
+        XCTAssertEqual(controller.previewZoomMode, .custom(1.25))
+        XCTAssertNil(controller.previewSelectedToolbarIdentifier)
+        controller.clickZoomStatusForTesting()
+        XCTAssertEqual(controller.previewZoomMode, .actualSize)
+        XCTAssertEqual(controller.previewZoomFactor, 1)
+
+        controller.show(image: second)
+        XCTAssertEqual(controller.previewZoomMode, .fit)
+        XCTAssertTrue(controller.previewZoomStatus.contains("%"))
+        XCTAssertFalse(controller.previewZoomStatus.contains("Fit"))
+        let fitFrame = controller.displayedImageFrame
+        let fitFactor = controller.previewZoomFactor
+        controller.selectFitForTesting()
+        XCTAssertEqual(controller.displayedImageFrame, fitFrame)
+        XCTAssertEqual(controller.previewZoomFactor, fitFactor)
+    }
+
+    @MainActor
+    func testPreviewVisibilityBoundaryChangesOnlyOnShowAndClose() throws {
+        _ = NSApplication.shared
+        let image = try makeImage(
+            pixelsWide: 520,
+            pixelsHigh: 180,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+        var visibilityChanges: [Bool] = []
+        let controller = PreviewController(
+            onVisibilityChange: { visibilityChanges.append($0) }
+        )
+
+        controller.show(image: image)
+        controller.show(image: image)
+        XCTAssertEqual(visibilityChanges, [true])
+
+        controller.close()
+        XCTAssertEqual(visibilityChanges, [true, false])
+    }
+
+    @MainActor
+    func testStalePreviewOpenFailureCannotDeleteTheCurrentGeneration() async throws {
+        _ = NSApplication.shared
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "PreviewOpenLifecycleTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+        let store = PreviewTemporaryImageStore(baseDirectory: baseDirectory)
+        var requests: [(url: URL, completion: PreviewFileOpenCompletion)] = []
+        var reportedErrors: [Error] = []
+        let controller = PreviewController(
+            onError: { reportedErrors.append($0) },
+            temporaryImageStore: store,
+            openFileInPreview: { url, completion in
+                requests.append((url, completion))
+            }
+        )
+        defer { controller.close() }
+        let first = try makeImage(
+            pixelsWide: 320,
+            pixelsHigh: 200,
+            backgroundColor: .white,
+            accentColor: .systemRed
+        )
+        let second = try makeImage(
+            pixelsWide: 640,
+            pixelsHigh: 360,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+
+        controller.show(image: first)
+        controller.openInPreviewForTesting()
+        controller.show(image: second)
+        controller.openInPreviewForTesting()
+
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertNotEqual(requests[0].url, requests[1].url)
+        XCTAssertEqual(store.currentFileURL, requests[1].url)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: requests[1].url.path))
+
+        requests[0].completion(false)
+        try await Task.sleep(for: .milliseconds(20))
+
+        XCTAssertEqual(store.currentFileURL, requests[1].url)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: requests[1].url.path))
+        XCTAssertTrue(reportedErrors.isEmpty)
+
+        requests[1].completion(false)
+        try await Task.sleep(for: .milliseconds(20))
+
+        XCTAssertNil(store.currentFileURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: requests[1].url.path))
+        XCTAssertEqual(reportedErrors.count, 1)
     }
 
     private func containsDarkContent(in bitmap: NSBitmapImageRep) -> Bool {
@@ -233,14 +397,15 @@ final class PreviewLayoutTests: XCTestCase {
         return false
     }
 
-    func testSmallImageIsCenteredWithoutUpscaling() {
+    func testFitUpscalesSmallImageToAvailableWidth() {
         let layout = PreviewLayout.calculate(
             imageSize: NSSize(width: 400, height: 300),
             viewportSize: NSSize(width: 720, height: 580)
         )
 
         XCTAssertEqual(layout.canvasSize, NSSize(width: 720, height: 580))
-        XCTAssertEqual(layout.imageFrame.size, NSSize(width: 400, height: 300))
+        XCTAssertEqual(layout.zoomFactor, 1.68, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.size, NSSize(width: 672, height: 504))
         XCTAssertEqual(layout.imageFrame.midX, 360, accuracy: 0.001)
         XCTAssertEqual(layout.imageFrame.midY, 290, accuracy: 0.001)
     }
@@ -289,5 +454,67 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertEqual(wide.contentSize, NSSize(width: 1_360, height: 640))
         XCTAssertLessThan(compact.contentSize.width, standard.contentSize.width)
         XCTAssertLessThan(standard.contentSize.width, wide.contentSize.width)
+    }
+
+    func testActualSizeMapsOneImagePixelToOneBackingPixel() {
+        let layout = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 1_440, height: 2_240),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 900, height: 700),
+            zoomMode: .actualSize
+        )
+
+        XCTAssertEqual(layout.zoomFactor, 1)
+        XCTAssertEqual(layout.imageFrame.size, NSSize(width: 720, height: 1_120))
+        XCTAssertEqual(layout.imageFrame.minY, 24)
+    }
+
+    func testRetinaFitCanExceedOneHundredPercentToFillTheWindow() {
+        let layout = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 520, height: 180),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 568, height: 420),
+            zoomMode: .fit
+        )
+
+        XCTAssertEqual(layout.zoomFactor, 2, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 520, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.midX, 284, accuracy: 0.001)
+    }
+
+    func testFitUsesActualPixelSizeAndPreservesTallScrolling() {
+        let layout = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 2_240, height: 8_000),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 720, height: 580),
+            zoomMode: .fit
+        )
+
+        XCTAssertEqual(layout.zoomFactor, 0.6, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 672, accuracy: 0.001)
+        XCTAssertGreaterThan(layout.canvasSize.height, 580)
+        XCTAssertEqual(layout.imageFrame.minY, 24, accuracy: 0.001)
+    }
+
+    func testCustomZoomClampsAndCreatesHorizontalScrollingCanvas() {
+        let maximum = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 800, height: 600),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 720, height: 580),
+            zoomMode: .custom(10)
+        )
+        let minimum = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 800, height: 600),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 720, height: 580),
+            zoomMode: .custom(0.01)
+        )
+
+        XCTAssertEqual(maximum.zoomFactor, 4)
+        XCTAssertEqual(maximum.imageFrame.size, NSSize(width: 1_600, height: 1_200))
+        XCTAssertGreaterThan(maximum.canvasSize.width, 720)
+        XCTAssertEqual(maximum.imageFrame.minX, 24)
+        XCTAssertEqual(minimum.zoomFactor, 0.25)
+        XCTAssertEqual(minimum.imageFrame.size, NSSize(width: 100, height: 75))
     }
 }
