@@ -176,7 +176,7 @@ final class PreviewLayoutTests: XCTestCase {
             accentColor: .systemPurple
         )
         let controller = PreviewController()
-        controller.show(image: first)
+        controller.show(image: first, markdown: "# Monthly Product Update")
         defer { controller.close() }
 
         XCTAssertEqual(controller.previewZoomMode, .fit)
@@ -204,6 +204,7 @@ final class PreviewLayoutTests: XCTestCase {
             ])
         )
         XCTAssertEqual(controller.previewToolbarIconSizes.count, 6)
+        XCTAssertEqual(controller.previewSuggestedPNGFilename, "Monthly Product Update.png")
         XCTAssertEqual(
             controller.toolbarDefaultItemIdentifiers(NSToolbar(identifier: "preview-layout-test")),
             [

@@ -222,6 +222,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     private let openFileInPreview: PreviewFileOpener
     private var zoomMode: PreviewZoomMode = .fit
     private var currentZoomFactor: CGFloat = 1
+    private var suggestedPNGFilename = "md2png-render.png"
 
     private static let zoomSteps: [CGFloat] = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4]
     private enum ToolbarIdentifier {
@@ -250,6 +251,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     var previewHasHorizontalScroller: Bool { scrollView.hasHorizontalScroller }
     var previewScrollerStyle: NSScroller.Style { scrollView.scrollerStyle }
     var previewZoomStatus: String { zoomStatusButton.title }
+    var previewSuggestedPNGFilename: String { suggestedPNGFilename }
     var previewZoomStatusContainerSize: NSSize { zoomStatusContainer.frame.size }
     var previewToolbarStyle: NSWindow.ToolbarStyle? { window?.toolbarStyle }
     var previewSelectedToolbarIdentifier: NSToolbarItem.Identifier? {
@@ -339,13 +341,15 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
 
     func show(
         image: NSImage,
-        widthPreset: RenderWidthPreset? = nil
+        widthPreset: RenderWidthPreset? = nil,
+        markdown: String? = nil
     ) {
         let isBecomingVisible = window?.isVisible != true
         if imageView.image !== image {
             temporaryImageStore.clear()
         }
         imageView.image = image
+        suggestedPNGFilename = SuggestedPNGFilename.make(from: markdown)
         zoomMode = .fit
         updateWindowTitle(image: image, widthPreset: widthPreset)
         if window?.isVisible != true {
@@ -524,7 +528,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "md2png-render.png"
+        panel.nameFieldStringValue = suggestedPNGFilename
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             do {

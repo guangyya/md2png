@@ -276,7 +276,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let lastImage else { return }
         previewController.show(
             image: lastImage,
-            widthPreset: lastRenderWidthPreset
+            widthPreset: lastRenderWidthPreset,
+            markdown: lastSource.markdown
         )
     }
 
@@ -376,7 +377,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     if showsPreviewOnSuccess {
                         self.previewController.show(
                             image: image,
-                            widthPreset: requestedWidthPreset
+                            widthPreset: requestedWidthPreset,
+                            markdown: markdown
                         )
                     }
                 } catch {
