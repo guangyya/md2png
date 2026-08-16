@@ -146,16 +146,18 @@ test("release tooling consumes the contract instead of redefining canonical asse
 });
 
 test("Makefile producers resolve canonical release paths from the contract", () => {
+  const producerVersion = "9.8.7";
   const result = spawnSync("make", [
     "--no-print-directory",
     "-s",
     "release-asset-paths",
     `NODE=${process.execPath}`,
+    `VERSION=${producerVersion}`,
     "RELEASE_SUFFIX=developer-id",
   ], { cwd: repoRoot, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   const actual = Object.fromEntries(result.stdout.trim().split("\n").map((line) => line.split("=")));
-  assert.deepEqual(actual, Object.fromEntries(expected
+  assert.deepEqual(actual, Object.fromEntries(releaseAssets(producerVersion)
     .filter((asset) => asset.key !== "latestDmg")
     .map((asset) => [asset.key, asset.sourcePath])));
 });
