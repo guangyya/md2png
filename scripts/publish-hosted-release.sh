@@ -209,6 +209,11 @@ if [[ "$published_names" != "$expected_names_text" ]]; then
   exit 1
 fi
 
+GITHUB_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN is required}" \
+  "$node_binary" scripts/release-milestone.mjs sync \
+    --tag "$tag" \
+    --source-commit "$source_commit"
+
 if [[ "$release_is_draft" = "true" ]]; then
   gh release edit "$tag" --repo "$repo_ref" --draft=false --latest
 else

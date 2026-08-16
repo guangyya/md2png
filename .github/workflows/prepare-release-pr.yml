@@ -145,6 +145,7 @@ jobs:
           REQUESTED_BUMP: ${{ inputs.bump }}
           TAG: ${{ steps.plan.outputs.tag }}
           VERSION: ${{ steps.plan.outputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -170,6 +171,9 @@ jobs:
             push origin "HEAD:refs/heads/${BRANCH}"
 
           ./scripts/release-notes.sh "$VERSION" CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          node scripts/release-milestone.mjs plan \
+            --tag "$TAG" \
+            --source-commit "$BASE_SHA" > "$RUNNER_TEMP/release-milestone-plan.json"
           body_file="$RUNNER_TEMP/release-pr-body.md"
           workflow_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           {
@@ -188,6 +192,15 @@ jobs:
             echo "## Release-note preview"
             echo
             cat "$RUNNER_TEMP/release-notes.md"
+            echo
+            jq -r '
+              "## Planned " + .tag + " issue milestone\n\n" +
+              (if (.issues | length) == 0 then
+                "No closed FEAT/TD issue is associated with this release."
+              else
+                (.issues | map("- #\(.number) — \(.title)") | join("\n"))
+              end)
+            ' "$RUNNER_TEMP/release-milestone-plan.json"
             echo
             echo "## Review contract"
             echo

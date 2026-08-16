@@ -408,6 +408,7 @@ test("release remains draft until every uploaded asset has been verified", () =>
   const createDraft = publisher.indexOf("--draft");
   const upload = publisher.indexOf("gh release upload");
   const exactAssetSet = publisher.indexOf('if [[ "$published_names" != "$expected_names_text" ]]');
+  const milestone = publisher.indexOf("scripts/release-milestone.mjs sync");
   const publish = publisher.indexOf('--draft=false --latest');
 
   assert.ok(resolveReleaseId >= 0, "draft Releases must be resolved through gh release view");
@@ -416,10 +417,23 @@ test("release remains draft until every uploaded asset has been verified", () =>
   assert.ok(createDraft >= 0, "new releases must start as drafts");
   assert.ok(upload > createDraft, "assets must upload after draft creation");
   assert.ok(exactAssetSet > upload, "the complete asset set must be verified after upload");
+  assert.ok(milestone > exactAssetSet, "the release milestone must be synchronized after asset verification");
+  assert.ok(publish > milestone, "the Release must remain draft until milestone synchronization succeeds");
   assert.ok(publish > exactAssetSet, "the draft must publish only after asset verification");
   assert.match(publisher, /Published Release is missing a verified asset/);
   assert.match(publisher, /jq -c --arg name "\$name"/);
   assert.doesNotMatch(publisher, /select\(\.name == \\"\$\{name\}/);
   assert.match(publisher, /published_release_json=.*"\$release_endpoint"/);
   assert.match(publisher, /\.draft <<< "\$published_release_json"\)" = "false"/);
+});
+
+test("Release PR previews and trusted publication applies the issue milestone", () => {
+  const prepare = workflows["prepare-release-pr.yml"];
+  const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");
+
+  assert.match(prepare, /release-milestone\.mjs plan/);
+  assert.match(prepare, /Planned .* issue milestone/);
+  assert.match(publisher, /release-milestone\.mjs sync/);
+  assert.match(publisher, /--tag "\$tag"/);
+  assert.match(publisher, /--source-commit "\$source_commit"/);
 });

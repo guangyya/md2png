@@ -102,7 +102,9 @@ To release:
 2. Choose exactly `patch`, `minor`, or `major` once.
 3. Review the generated `codex/release-vX.Y.Z` PR. It changes only `Info.plist`,
    `CHANGELOG.md`, and `ABOUT_CHANGELOG.md`, increments the build by one, and
-   moves both `Unreleased` sections to the same Asia/Shanghai release date.
+   moves both `Unreleased` sections to the same Asia/Shanghai release date. Its
+   body also previews the closed `FEAT-*` and `TD-*` issues that will be grouped
+   under the release milestone.
 4. Wait for normal CI and Release preflight, then merge the PR through the
    protected branch. The preparation workflow cannot approve or merge it.
 5. Watch **Trusted Release** validate, sign, notarize, publish, verify the five
@@ -124,9 +126,27 @@ The trusted workflow isolates responsibilities:
   temporary keychain, checks its identity, Team ID, and fingerprint, notarizes
   the exact source, and emits a one-day handoff with a SHA-256 manifest; and
 - `publish` receives no Apple secret. It alone can create the annotated tag and
-  Release and update issue #42. It revalidates signatures, staples, metadata,
-  manifest digests, asset digests, and the source commit, creates the Release as
-  a draft, and makes it public/latest only after all five assets match.
+  Release, synchronize the release milestone, and update issue #42. It
+  revalidates signatures, staples, metadata, manifest digests, asset digests,
+  and the source commit, creates the Release as a draft, and makes it
+  public/latest only after all five assets match and milestone synchronization
+  succeeds.
+
+The milestone synchronizer compares the previous stable tag with the exact
+release commit. For each merged PR in that first-parent range, it includes
+closed `FEAT-*` and `TD-*` issues referenced with GitHub closing keywords. It
+also matches a leading identifier in the PR title, such as `FEAT-003`, so an
+already completed issue remains discoverable even when it was closed manually.
+It creates or reuses the exact `vX.Y.Z` milestone, refuses to overwrite an issue
+explicitly closed by a PR into another version, ignores later same-identifier
+maintenance PRs for an issue already shipped, refuses to close a milestone
+containing open work, and closes the milestone before the draft Release becomes
+public.
+Keep the issue identifier at the start of implementation PR titles and use a
+closing reference such as `Closes #3` in the PR body whenever possible.
+After publication, use `is:issue milestone:vX.Y.Z` in GitHub Issues to see the
+complete version scope. Add `label:enhancement` for features or
+`label:technical-debt` for internal work.
 
 The workflow is serialized and non-canceling. A retry accepts an existing tag
 only when it resolves to the same commit. It resumes a matching draft by
