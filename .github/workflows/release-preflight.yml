@@ -217,11 +217,7 @@ jobs:
             echo
             echo "### Assets"
             echo
-            echo "- md2png-${VERSION}-macOS-arm64-developer-id.zip"
-            echo "- md2png-${VERSION}-macOS-arm64-developer-id.dmg"
-            echo "- md2png-latest.dmg"
-            echo "- md2png-${VERSION}-coverage.json"
-            echo "- md2png-${VERSION}-coverage.md"
+            node scripts/release-assets.mjs names --version "$VERSION" | sed 's/^/- /'
             echo
             echo "### Release notes"
             echo

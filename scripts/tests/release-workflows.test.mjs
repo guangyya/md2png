@@ -311,6 +311,9 @@ test("trusted publication updates coverage history in the originating workflow",
   assert.match(release, /git merge-base --is-ancestor "\$WORKFLOW_COMMIT" refs\/remotes\/origin\/main/);
   assert.match(release, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/publish-hosted-release\.sh"/);
+  assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-assets\.mjs"/);
+  assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-assets\.json"/);
+  assert.match(release, /RELEASE_ASSETS_SCRIPT/);
   assert.match(release, /run: REPO_ROOT="\$GITHUB_WORKSPACE" "\$TRUSTED_PUBLISHER"/);
 });
 

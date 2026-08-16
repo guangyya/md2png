@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { createManifest, validateManifest } from "../release-manifest.mjs";
+import { releaseAssetNames } from "../release-assets.mjs";
 
 const scriptPath = fileURLToPath(new URL("../release-manifest.mjs", import.meta.url));
 
@@ -16,13 +17,7 @@ const commit = "0123456789abcdef0123456789abcdef01234567";
 
 function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "md2png-manifest-test-"));
-  const files = [
-    `md2png-${version}-macOS-arm64-developer-id.zip`,
-    `md2png-${version}-macOS-arm64-developer-id.dmg`,
-    "md2png-latest.dmg",
-    `md2png-${version}-coverage.json`,
-    `md2png-${version}-coverage.md`,
-  ];
+  const files = releaseAssetNames(version);
   for (const name of files) {
     fs.writeFileSync(path.join(directory, name), name.endsWith(".dmg") ? "same dmg" : `content:${name}`);
   }
@@ -117,4 +112,22 @@ test("manifest CLI rejects unknown and duplicate scalar options", () => {
   ], { encoding: "utf8" });
   assert.equal(duplicate.status, 1);
   assert.match(duplicate.stderr, /duplicate option: --version/);
+});
+
+test("manifest CLI defaults to the complete release asset contract", (context) => {
+  const { directory, files } = fixture();
+  const output = path.join(directory, "release-manifest.json");
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, [
+    scriptPath,
+    "create",
+    "--directory", directory,
+    "--version", version,
+    "--build", build,
+    "--commit", commit,
+    "--output", output,
+  ], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  const manifest = JSON.parse(fs.readFileSync(output, "utf8"));
+  assert.deepEqual(manifest.assets.map((asset) => asset.name), [...files].sort());
 });

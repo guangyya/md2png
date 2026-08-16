@@ -304,8 +304,11 @@ jobs:
       - name: Stage normalized coverage handoff
         run: |
           mkdir -p .build/coverage-handoff
-          cp ".build/coverage/md2png-${VERSION}-coverage.json" .build/coverage-handoff/
-          cp ".build/coverage/md2png-${VERSION}-coverage.md" .build/coverage-handoff/
+          asset_contract="$(node scripts/release-assets.mjs json --version "$VERSION")"
+          for key in coverageJson coverageMarkdown; do
+            source_path="$(jq -er --arg key "$key" '.assets[] | select(.key == $key) | .sourcePath' <<< "$asset_contract")"
+            cp "$source_path" .build/coverage-handoff/
+          done
 
       - name: Upload short-lived coverage handoff
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -425,8 +428,10 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --keychain "$keychain"
 
+          asset_contract="$(node scripts/release-assets.mjs json --version "$VERSION")"
+          coverage_json_path="$(jq -er '.assets[] | select(.key == "coverageJson") | .sourcePath' <<< "$asset_contract")"
           node scripts/coverage-report.mjs validate \
-            --report ".build/coverage/md2png-${VERSION}-coverage.json" \
+            --report "$coverage_json_path" \
             --app-version "$VERSION" \
             --commit "$SOURCE_COMMIT"
           make notarize \
@@ -441,26 +446,22 @@ jobs:
 
           handoff=".build/release-handoff"
           mkdir -p "$handoff"
-          zip_name="md2png-${VERSION}-macOS-arm64-developer-id.zip"
-          dmg_name="md2png-${VERSION}-macOS-arm64-developer-id.dmg"
-          coverage_json="md2png-${VERSION}-coverage.json"
-          coverage_markdown="md2png-${VERSION}-coverage.md"
-          cp "dist/$zip_name" "$handoff/"
-          cp "dist/$dmg_name" "$handoff/"
-          cp "dist/$dmg_name" "$handoff/md2png-latest.dmg"
-          cp ".build/coverage/$coverage_json" "$handoff/"
-          cp ".build/coverage/$coverage_markdown" "$handoff/"
+          release_dmg_path="$(jq -er '.assets[] | select(.key == "releaseDmg") | .sourcePath' <<< "$asset_contract")"
+          while IFS= read -r asset; do
+            key="$(jq -r .key <<< "$asset")"
+            name="$(jq -r .name <<< "$asset")"
+            source_path="$(jq -r .sourcePath <<< "$asset")"
+            if [[ "$key" = "latestDmg" ]]; then
+              source_path="$release_dmg_path"
+            fi
+            cp "$source_path" "$handoff/$name"
+          done < <(jq -c '.assets[]' <<< "$asset_contract")
           node scripts/release-manifest.mjs create \
             --output "$handoff/release-manifest.json" \
             --directory "$handoff" \
             --version "$VERSION" \
             --build "$BUILD" \
-            --commit "$SOURCE_COMMIT" \
-            --file "$zip_name" \
-            --file "$dmg_name" \
-            --file md2png-latest.dmg \
-            --file "$coverage_json" \
-            --file "$coverage_markdown"
+            --commit "$SOURCE_COMMIT"
 
       - name: Upload verified signed handoff
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -528,10 +529,17 @@ jobs:
           git merge-base --is-ancestor "$WORKFLOW_COMMIT" refs/remotes/origin/main
           git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
           trusted_publisher="$RUNNER_TEMP/publish-hosted-release.sh"
+          trusted_release_assets="$RUNNER_TEMP/release-assets.mjs"
+          trusted_asset_contract="$RUNNER_TEMP/release-assets.json"
           git show "${WORKFLOW_COMMIT}:scripts/publish-hosted-release.sh" > "$trusted_publisher"
+          git show "${WORKFLOW_COMMIT}:scripts/release-assets.mjs" > "$trusted_release_assets"
+          git show "${WORKFLOW_COMMIT}:scripts/release-assets.json" > "$trusted_asset_contract"
           chmod +x "$trusted_publisher"
           test -s "$trusted_publisher"
+          test -s "$trusted_release_assets"
+          test -s "$trusted_asset_contract"
           printf 'TRUSTED_PUBLISHER=%s\n' "$trusted_publisher" >> "$GITHUB_ENV"
+          printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_release_assets" >> "$GITHUB_ENV"
 
       - name: Publish or safely resume exact release
         env:

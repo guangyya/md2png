@@ -6,6 +6,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { releaseAsset, releaseAssetNames } from "./release-assets.mjs";
+
 const schemaVersion = 1;
 const stableVersionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const commitPattern = /^[0-9a-f]{40}$/;
@@ -86,23 +88,13 @@ function digestFile(filePath) {
   };
 }
 
-function expectedAssetNames(version) {
-  return [
-    `md2png-${version}-macOS-arm64-developer-id.zip`,
-    `md2png-${version}-macOS-arm64-developer-id.dmg`,
-    "md2png-latest.dmg",
-    `md2png-${version}-coverage.json`,
-    `md2png-${version}-coverage.md`,
-  ];
-}
-
 export function createManifest({ directory, files, version, build, commit }) {
   validateIdentity({ version, build, commit });
-  const names = files.map(safeAssetName);
+  const names = (files ?? releaseAssetNames(version)).map(safeAssetName);
   if (new Set(names).size !== names.length) {
     fail("manifest asset names must be unique");
   }
-  const expected = expectedAssetNames(version);
+  const expected = releaseAssetNames(version);
   if (JSON.stringify([...names].sort()) !== JSON.stringify([...expected].sort())) {
     fail(`manifest assets must be exactly: ${expected.join(", ")}`);
   }
@@ -114,10 +106,10 @@ export function createManifest({ directory, files, version, build, commit }) {
     }
     return { name, ...digestFile(filePath) };
   });
-  const versionedDmg = assets.find((asset) => asset.name.endsWith("-developer-id.dmg"));
-  const latestDmg = assets.find((asset) => asset.name === "md2png-latest.dmg");
+  const versionedDmg = assets.find((asset) => asset.name === releaseAsset(version, "releaseDmg").name);
+  const latestDmg = assets.find((asset) => asset.name === releaseAsset(version, "latestDmg").name);
   if (versionedDmg.sha256 !== latestDmg.sha256 || versionedDmg.size !== latestDmg.size) {
-    fail("md2png-latest.dmg must be byte-identical to the versioned DMG");
+    fail("the latest DMG alias must be byte-identical to the versioned DMG");
   }
   return {
     schemaVersion,
@@ -171,7 +163,7 @@ function main(argv) {
     allowOnlyOptions(options, ["directory", "version", "build", "commit", "file", "output"]);
     const manifest = createManifest({
       directory,
-      files: required(options, "file"),
+      files: options.file,
       ...identity,
     });
     const output = path.resolve(required(options, "output"));
