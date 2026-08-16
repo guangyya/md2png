@@ -80,10 +80,9 @@ markdown.renderer.rules.image = (tokens, index) => {
   return `<span class="blocked-image">[Image: ${markdown.utils.escapeHtml(alt)}]</span>`;
 };
 
-mermaid.initialize({
+const mermaidLayout = {
   startOnLoad: false,
   securityLevel: "strict",
-  theme: "neutral",
   fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
   flowchart: { htmlLabels: false, useMaxWidth: false },
   sequence: { useMaxWidth: false },
@@ -99,7 +98,116 @@ mermaid.initialize({
     fontSize: 13,
     sectionFontSize: 13
   }
-});
+};
+
+const renderThemes = {
+  cleanLight: {
+    mermaidTheme: "neutral"
+  },
+  warmPaper: {
+    mermaidTheme: "base",
+    mermaid: {
+      background: "#fbf4e3",
+      primaryColor: "#f3e8d4",
+      primaryTextColor: "#3d3428",
+      primaryBorderColor: "#a88f68",
+      secondaryColor: "#e7e5c7",
+      secondaryTextColor: "#3d3428",
+      secondaryBorderColor: "#87925d",
+      tertiaryColor: "#f4d8bc",
+      tertiaryTextColor: "#3d3428",
+      tertiaryBorderColor: "#bd7a4b",
+      lineColor: "#766650",
+      textColor: "#3d3428",
+      noteBkgColor: "#f6e5b8",
+      noteTextColor: "#3d3428",
+      noteBorderColor: "#b58a3c",
+      actorBkg: "#f3e8d4",
+      actorBorder: "#a88f68",
+      actorTextColor: "#3d3428",
+      actorLineColor: "#a88f68",
+      signalColor: "#766650",
+      signalTextColor: "#3d3428",
+      labelBoxBkgColor: "#f3e8d4",
+      labelBoxBorderColor: "#a88f68",
+      labelTextColor: "#3d3428",
+      loopTextColor: "#3d3428",
+      activationBkgColor: "#e7e5c7",
+      activationBorderColor: "#87925d",
+      sequenceNumberColor: "#fbf4e3",
+      sectionBkgColor: "#e7e5c7",
+      altSectionBkgColor: "#f3e8d4",
+      sectionBkgColor2: "#f4d8bc",
+      taskBorderColor: "#87925d",
+      taskBkgColor: "#e7e5c7",
+      taskTextColor: "#3d3428",
+      taskTextDarkColor: "#3d3428",
+      taskTextOutsideColor: "#3d3428",
+      activeTaskBorderColor: "#a56a32",
+      activeTaskBkgColor: "#f4d8bc",
+      doneTaskBkgColor: "#dce4c4",
+      doneTaskBorderColor: "#71804f",
+      critBorderColor: "#a6463d",
+      critBkgColor: "#efd0c5",
+      todayLineColor: "#a6463d",
+      gridColor: "#d8c6a4"
+    }
+  },
+  dark: {
+    mermaidTheme: "base",
+    mermaid: {
+      darkMode: true,
+      background: "#0d1117",
+      primaryColor: "#21262d",
+      primaryTextColor: "#e6edf3",
+      primaryBorderColor: "#6e7681",
+      secondaryColor: "#1f3a5f",
+      secondaryTextColor: "#e6edf3",
+      secondaryBorderColor: "#58a6ff",
+      tertiaryColor: "#4b3a18",
+      tertiaryTextColor: "#e6edf3",
+      tertiaryBorderColor: "#d29922",
+      lineColor: "#8b949e",
+      textColor: "#e6edf3",
+      noteBkgColor: "#4b3a18",
+      noteTextColor: "#f0f6fc",
+      noteBorderColor: "#d29922",
+      actorBkg: "#21262d",
+      actorBorder: "#6e7681",
+      actorTextColor: "#e6edf3",
+      actorLineColor: "#6e7681",
+      signalColor: "#8b949e",
+      signalTextColor: "#e6edf3",
+      labelBoxBkgColor: "#21262d",
+      labelBoxBorderColor: "#6e7681",
+      labelTextColor: "#e6edf3",
+      loopTextColor: "#e6edf3",
+      activationBkgColor: "#1f3a5f",
+      activationBorderColor: "#58a6ff",
+      sequenceNumberColor: "#0d1117",
+      sectionBkgColor: "#1f3a5f",
+      altSectionBkgColor: "#161b22",
+      sectionBkgColor2: "#4b3a18",
+      taskBorderColor: "#58a6ff",
+      taskBkgColor: "#1f3a5f",
+      taskTextColor: "#e6edf3",
+      taskTextDarkColor: "#e6edf3",
+      taskTextOutsideColor: "#e6edf3",
+      activeTaskBorderColor: "#d29922",
+      activeTaskBkgColor: "#4b3a18",
+      doneTaskBkgColor: "#1b4721",
+      doneTaskBorderColor: "#3fb950",
+      critBorderColor: "#f85149",
+      critBkgColor: "#5a1e23",
+      todayLineColor: "#f85149",
+      gridColor: "#30363d"
+    }
+  }
+};
+
+function selectRenderTheme(name) {
+  return Object.hasOwn(renderThemes, name) ? name : "cleanLight";
+}
 
 function measurement() {
   const card = document.getElementById("card");
@@ -109,7 +217,16 @@ function measurement() {
   };
 }
 
-window.renderMarkdown = async (source) => {
+window.renderMarkdown = async (source, requestedTheme) => {
+  const themeName = selectRenderTheme(requestedTheme);
+  const theme = renderThemes[themeName];
+  document.documentElement.dataset.renderTheme = themeName;
+  mermaid.initialize({
+    ...mermaidLayout,
+    theme: theme.mermaidTheme,
+    ...(theme.mermaid ? { themeVariables: theme.mermaid } : {})
+  });
+
   const card = document.getElementById("card");
   card.innerHTML = DOMPurify.sanitize(markdown.render(source), {
     USE_PROFILES: { html: true },

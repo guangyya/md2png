@@ -67,6 +67,8 @@ sending it.
 - Duplicate render entry points disabled while one render is in progress.
 - Compact, Standard, and Wide output-width presets, with the last explicit
   selection remembered locally and Standard preserving the original sizing.
+- Clean Light, Warm Paper, and Dark render themes, with the last explicit
+  selection remembered locally and Clean Light preserving the original look.
 
 ## Width presets
 
@@ -85,6 +87,20 @@ reference images. Click a preview to inspect its PNG.
 |:--:|:--:|:--:|
 | 720 × 1,120 pt<br>1,440 × 2,240 px | 1,120 × 928 pt<br>2,240 × 1,856 px | 1,520 × 880 pt<br>3,040 × 1,760 px |
 | [![Compact width preset render](images/width-preset-compact.png)](images/width-preset-compact.png) | [![Standard width preset render](images/width-preset-standard.png)](images/width-preset-standard.png) | [![Wide width preset render](images/width-preset-wide.png)](images/width-preset-wide.png) |
+
+## Render themes
+
+Clean Light preserves the original renderer and remains the default. Warm Paper
+uses a low-glare cream surface and earth-toned accents. Dark uses an opaque dark
+surface with high-contrast text and syntax colors. Each palette is bundled and
+applies together to Markdown surfaces, borders, syntax highlighting, and Mermaid
+flowcharts, sequence diagrams, and Gantt charts.
+
+Theme selection is explicit and local. The shortcut, menu command, and bundled
+examples capture the currently selected theme when rendering starts, and the
+resulting PNG never changes afterward. Themes do not change fonts, spacing,
+render width, or diagram layout. Arbitrary CSS, custom fonts, a theme editor, and
+System/Auto appearance matching remain outside this phase.
 
 ## Safety and privacy constraints
 

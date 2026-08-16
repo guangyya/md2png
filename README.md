@@ -86,6 +86,7 @@ A GFM table needs a separator row:
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
+| Theme | — | Selects Clean Light, Warm Paper, or Dark for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
@@ -93,9 +94,12 @@ A GFM table needs a separator row:
 
 The top of the menu contains a compact, read-only preview of the current
 clipboard. Standard preserves the original output sizing; Compact wraps prose
-sooner, while Wide gives large tables and diagrams more room. While a render is
-running, additional render commands, width changes, and examples are temporarily
-disabled. Restore Last Markdown becomes available only after a successful render
+sooner, while Wide gives large tables and diagrams more room. Clean Light is the
+default theme; Warm Paper and Dark apply coordinated Markdown, code-highlighting,
+and Mermaid colors without changing typography, spacing, or output width. The
+chosen theme is fixed into an opaque PNG. While a render is running, additional
+render commands, width or theme changes, and examples are temporarily disabled.
+Restore Last Markdown becomes available only after a successful render
 and asks before replacing clipboard content changed by another application. The
 Last Render window opens at a width that reflects the output, within the current
 screen, and identifies the preset and PNG pixel dimensions in its title. Its
@@ -114,7 +118,8 @@ Login…**, shows a trailing alert badge, and opens Login Items settings when
 selected. Disabling it unregisters the login item; no helper or background
 worker is installed.
 See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
-dimensions and same-source reference renders.
+dimensions and same-source reference renders, and the
+[theme notes](docs/PRODUCT.md#render-themes) for the bundled palette boundaries.
 
 ## Samples
 

@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Choose Clean Light, Warm Paper, or Dark for every Markdown render.
+
 ## [0.6.0] - 2026-08-16
 
 ### Added

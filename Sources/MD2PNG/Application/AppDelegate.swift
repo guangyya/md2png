@@ -4,6 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let renderer = MarkdownRenderer()
     private let renderWidthPreference: RenderWidthPreference
+    private let renderThemePreference: RenderThemePreference
     private let hud = HUDController()
     private lazy var previewController = PreviewController(
         onCopied: { [weak self] changeCount in
@@ -75,8 +76,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var examplesMenuItem: NSMenuItem!
     private var renderWidthMenuItem: NSMenuItem!
     private var renderWidthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
+    private var renderThemeMenuItem: NSMenuItem!
+    private var renderThemeMenuItems: [RenderTheme: NSMenuItem] = [:]
     private var launchAtLoginMenuItem: NSMenuItem!
     private var renderWidthPreset: RenderWidthPreset
+    private var renderTheme: RenderTheme
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
     private var currentUpdateStatus = UpdateStatus()
@@ -89,6 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let renderWidthPreference = RenderWidthPreference()
         self.renderWidthPreference = renderWidthPreference
         renderWidthPreset = renderWidthPreference.selectedPreset
+        let renderThemePreference = RenderThemePreference()
+        self.renderThemePreference = renderThemePreference
+        renderTheme = renderThemePreference.selectedTheme
         super.init()
     }
 
@@ -226,6 +233,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateRenderWidthMenuSelection()
         menu.addItem(renderWidthMenuItem)
 
+        let renderThemeTitle = L10n.text("menu.render_theme", defaultValue: "Theme")
+        renderThemeMenuItem = NSMenuItem(
+            title: renderThemeTitle,
+            action: nil,
+            keyEquivalent: ""
+        )
+        let renderThemeMenu = NSMenu(title: renderThemeTitle)
+        for theme in RenderTheme.allCases {
+            let item = renderThemeMenu.addItem(
+                withTitle: theme.menuTitle,
+                action: #selector(selectRenderTheme(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = theme.rawValue
+            item.target = self
+            renderThemeMenuItems[theme] = item
+        }
+        renderThemeMenuItem.submenu = renderThemeMenu
+        updateRenderThemeMenuSelection()
+        menu.addItem(renderThemeMenuItem)
+
         let examplesTitle = L10n.text("menu.examples", defaultValue: "Examples")
         examplesMenuItem = NSMenuItem(title: examplesTitle, action: nil, keyEquivalent: "")
         let examplesMenu = NSMenu(title: examplesTitle)
@@ -362,12 +390,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    @objc private func selectRenderTheme(_ sender: NSMenuItem) {
+        guard !renderActivity.isRendering,
+              let rawValue = sender.representedObject as? String,
+              let theme = RenderTheme(rawValue: rawValue) else { return }
+        renderTheme = theme
+        renderThemePreference.select(theme)
+        updateRenderThemeMenuSelection()
+    }
+
+    private func updateRenderThemeMenuSelection() {
+        for (theme, item) in renderThemeMenuItems {
+            item.state = theme == renderTheme ? .on : .off
+        }
+    }
+
     private func render(
         _ markdown: String,
         showsPreviewOnSuccess: Bool = false
     ) {
         guard renderActivity.begin() else { return }
         let requestedWidthPreset = renderWidthPreset
+        let requestedTheme = renderTheme
         updateRenderingUI(isRendering: true)
         statusItem.button?.image = NSImage(
             systemSymbolName: "hourglass",
@@ -377,7 +421,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         )
 
-        renderer.render(markdown, widthPreset: requestedWidthPreset) { [weak self] result in
+        renderer.render(
+            markdown,
+            widthPreset: requestedWidthPreset,
+            theme: requestedTheme
+        ) { [weak self] result in
             guard let self else { return }
             defer {
                 self.renderActivity.finish()
@@ -425,6 +473,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             : L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
         examplesMenuItem.isEnabled = !isRendering
         renderWidthMenuItem.isEnabled = !isRendering
+        renderThemeMenuItem.isEnabled = !isRendering
         updateLastSourceActionAvailability()
         updateStatusItemAppearance()
     }
