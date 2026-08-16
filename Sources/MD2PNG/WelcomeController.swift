@@ -96,6 +96,7 @@ struct WelcomeWindowPlacement {
 
 private enum WelcomeLayout {
     static let contentSize = NSSize(width: 560, height: 570)
+    static let statusColumnWidth: CGFloat = 116
 }
 
 struct WelcomeCopy {
@@ -611,13 +612,10 @@ private struct WelcomeLaunchAtLoginRow: View {
                 Label(statusText, systemImage: statusSymbol)
                     .font(.callout.weight(.medium))
                     .foregroundStyle(statusColor)
-
-                if state.presentation.canPerformAction {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
+                    .frame(
+                        width: WelcomeLayout.statusColumnWidth,
+                        alignment: .leading
+                    )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -821,7 +819,10 @@ private struct WelcomeShortcutRow: View {
             Label(statusText, systemImage: statusSymbol)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
-                .frame(width: 88, alignment: .leading)
+                .frame(
+                    width: WelcomeLayout.statusColumnWidth,
+                    alignment: .leading
+                )
                 .symbolEffect(.bounce, value: shortcut.verificationCount)
         }
         .padding(.horizontal, 10)
