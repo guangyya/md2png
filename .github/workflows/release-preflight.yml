@@ -48,7 +48,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
           GH_TOKEN: ${{ github.token }}
@@ -136,18 +136,15 @@ jobs:
             exit 1
           fi
 
-          if [[ "$HEAD_REF" = codex/release-v* ]]; then
-            test "$HEAD_REF" = "codex/release-v${version}"
-            test "$PR_TITLE" = "Prepare md2png ${version}"
-            case ",${PR_LABELS}," in
-              *,release,* ) ;;
-              * ) echo "Generated Release PR is missing the release label." >&2; exit 1 ;;
-            esac
-            case ",${PR_LABELS}," in
-              *,release:${bump},* ) ;;
-              * ) echo "Generated Release PR is missing release:${bump}." >&2; exit 1 ;;
-            esac
-          fi
+          test "$HEAD_REF" = "codex/release-v${version}"
+          test "$PR_TITLE" = "Prepare md2png ${version}"
+          node scripts/release-pr-labels.mjs verify \
+            --repository "$GITHUB_REPOSITORY" \
+            --pull-request "$PR_NUMBER" \
+            --head-sha "$HEAD_SHA" \
+            --head-ref "$HEAD_REF" \
+            --version "$version" \
+            --bump "$bump"
 
           echo "is_release=true" >> "$GITHUB_OUTPUT"
           echo "bump=$bump" >> "$GITHUB_OUTPUT"

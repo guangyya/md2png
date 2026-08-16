@@ -14,6 +14,10 @@ on:
         description: Exact existing main commit whose failed release should resume
         required: true
         type: string
+      handoff_run_id:
+        description: Prior Trusted Release run ID when resuming a draft that already has assets
+        required: false
+        type: string
 
 permissions:
   checks: read
@@ -36,6 +40,7 @@ jobs:
       build: ${{ steps.release.outputs.build }}
       pr_number: ${{ steps.release.outputs.pr_number }}
       milestone_plan_sha256: ${{ steps.release.outputs.milestone_plan_sha256 }}
+      recovery_handoff_run_id: ${{ steps.release.outputs.recovery_handoff_run_id }}
     env:
       NODE_VERSION: "24.18.0"
     steps:
@@ -60,6 +65,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PUSH_BEFORE: ${{ github.event.before }}
           REQUESTED_COMMIT: ${{ inputs.commit }}
+          REQUESTED_HANDOFF_RUN_ID: ${{ inputs.handoff_run_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -140,6 +146,34 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$RUNNER_TEMP/latest-release-Info.plist")" = "$latest_version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$RUNNER_TEMP/latest-release-Info.plist")" = "$latest_build"
 
+          draft_releases="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+            jq -sc --arg tag "v${version}" '[.[][] | select(.draft == true and .tag_name == $tag)]')"
+          draft_count="$(jq 'length' <<< "$draft_releases")"
+          if [[ "$draft_count" -gt 1 ]]; then
+            echo "Multiple draft Releases use tag v${version}; refusing ambiguous recovery." >&2
+            exit 1
+          fi
+          draft_asset_count=0
+          if [[ "$draft_count" = "1" ]]; then
+            draft_asset_count="$(jq '.[0].assets | length' <<< "$draft_releases")"
+          fi
+          recovery_handoff_run_id=""
+          if [[ "$already_published" = "true" ]]; then
+            if [[ -n "$REQUESTED_HANDOFF_RUN_ID" ]]; then
+              echo "A published release does not accept a recovery handoff run ID." >&2
+              exit 1
+            fi
+          elif [[ "$draft_asset_count" -gt 0 ]]; then
+            if [[ "$EVENT_NAME" != "workflow_dispatch" || ! "$REQUESTED_HANDOFF_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+              echo "The existing draft has assets. Re-run failed jobs in its originating workflow run, or dispatch with that run's handoff_run_id." >&2
+              exit 1
+            fi
+            recovery_handoff_run_id="$REQUESTED_HANDOFF_RUN_ID"
+          elif [[ -n "$REQUESTED_HANDOFF_RUN_ID" ]]; then
+            echo "handoff_run_id is accepted only when the existing draft already has assets." >&2
+            exit 1
+          fi
+
           pr_json="$(gh api -H 'Accept: application/vnd.github+json' \
             "repos/${GITHUB_REPOSITORY}/commits/${source_commit}/pulls" \
             --jq '[.[] | select(.base.ref == "main" and .merged_at != null)]')"
@@ -195,6 +229,7 @@ jobs:
           echo "build=$build" >> "$GITHUB_OUTPUT"
           echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
           echo "milestone_plan_sha256=$milestone_plan_sha256" >> "$GITHUB_OUTPUT"
+          echo "recovery_handoff_run_id=$recovery_handoff_run_id" >> "$GITHUB_OUTPUT"
           {
             echo "## Authorized release"
             echo
@@ -203,6 +238,9 @@ jobs:
             echo "- Version/build: $version ($build)"
             echo "- Tag: v$version"
             echo "- Already published: $already_published"
+            if [[ -n "$recovery_handoff_run_id" ]]; then
+              echo "- Recovery handoff run: $recovery_handoff_run_id"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   verify-published:
@@ -377,6 +415,7 @@ jobs:
       SOURCE_COMMIT: ${{ needs.detect.outputs.source_commit }}
       VERSION: ${{ needs.detect.outputs.version }}
       BUILD: ${{ needs.detect.outputs.build }}
+      RECOVERY_HANDOFF_RUN_ID: ${{ needs.detect.outputs.recovery_handoff_run_id }}
     steps:
       - name: Check out exact release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -401,13 +440,14 @@ jobs:
           git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
           trusted_dir="$RUNNER_TEMP/release-asset-tooling"
           mkdir -p "$trusted_dir"
-          for file in release-assets.mjs release-assets.json release-manifest.mjs; do
+          for file in release-assets.mjs release-assets.json release-manifest.mjs release-recovery.mjs; do
             git show "${WORKFLOW_COMMIT}:scripts/${file}" > "$trusted_dir/$file"
             test -s "$trusted_dir/$file"
           done
-          chmod +x "$trusted_dir/release-assets.mjs" "$trusted_dir/release-manifest.mjs"
+          chmod +x "$trusted_dir/release-assets.mjs" "$trusted_dir/release-manifest.mjs" "$trusted_dir/release-recovery.mjs"
           printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_dir/release-assets.mjs" >> "$GITHUB_ENV"
           printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_dir/release-manifest.mjs" >> "$GITHUB_ENV"
+          printf 'RELEASE_RECOVERY_SCRIPT=%s\n' "$trusted_dir/release-recovery.mjs" >> "$GITHUB_ENV"
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -417,18 +457,21 @@ jobs:
           package-manager-cache: false
 
       - name: Install pinned renderer dependencies
+        if: needs.detect.outputs.recovery_handoff_run_id == ''
         run: |
           npm install --global "pnpm@$PNPM_VERSION"
           test "$(pnpm --version)" = "$PNPM_VERSION"
           pnpm --dir WebRenderer install --frozen-lockfile
 
       - name: Download verified coverage
+        if: needs.detect.outputs.recovery_handoff_run_id == ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-coverage-${{ needs.detect.outputs.source_commit }}
           path: .build/coverage/
 
       - name: Import, verify, sign, notarize, and assemble handoff
+        if: needs.detect.outputs.recovery_handoff_run_id == ''
         env:
           CERTIFICATE_P12_BASE64: ${{ secrets.RELEASE_CERTIFICATE_P12_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.RELEASE_CERTIFICATE_PASSWORD }}
@@ -521,6 +564,53 @@ jobs:
           node "$RELEASE_MANIFEST_SCRIPT" create \
             --output "$handoff/release-manifest.json" \
             --directory "$handoff" \
+            --version "$VERSION" \
+            --build "$BUILD" \
+            --commit "$SOURCE_COMMIT"
+
+      - name: Resolve exact prior signed handoff
+        if: needs.detect.outputs.recovery_handoff_run_id != ''
+        id: recovery-handoff
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WORKFLOW_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_name="signed-release-${SOURCE_COMMIT}"
+          recovery="$(node "$RELEASE_RECOVERY_SCRIPT" resolve \
+            --repository "$GITHUB_REPOSITORY" \
+            --current-run "$GITHUB_RUN_ID" \
+            --prior-run "$RECOVERY_HANDOFF_RUN_ID" \
+            --source-commit "$SOURCE_COMMIT" \
+            --workflow-commit "$WORKFLOW_COMMIT" \
+            --artifact-name "$artifact_name")"
+          artifact_id="$(jq -er .artifactId <<< "$recovery")"
+          prior_workflow_commit="$(jq -er .priorWorkflowCommit <<< "$recovery")"
+          test "$artifact_id" -gt 0
+          git cat-file -e "${prior_workflow_commit}^{commit}"
+          git merge-base --is-ancestor "$SOURCE_COMMIT" "$prior_workflow_commit"
+          git merge-base --is-ancestor "$prior_workflow_commit" "$WORKFLOW_COMMIT"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact prior signed handoff
+        if: needs.detect.outputs.recovery_handoff_run_id != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.recovery-handoff.outputs.artifact_id }}
+          path: .build/release-handoff/
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.detect.outputs.recovery_handoff_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+
+      - name: Validate recovered signed handoff identity and digests
+        if: needs.detect.outputs.recovery_handoff_run_id != ''
+        run: |
+          node "$RELEASE_MANIFEST_SCRIPT" validate \
+            --manifest .build/release-handoff/release-manifest.json \
+            --directory .build/release-handoff \
             --version "$VERSION" \
             --build "$BUILD" \
             --commit "$SOURCE_COMMIT"

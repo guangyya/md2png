@@ -338,21 +338,45 @@ function validateMilestoneItems(items, plan, { allowMissing }) {
     fail(`${plan.tag} milestone still contains open items: ${openItems.map((item) => `#${item.number}`).join(", ")}`);
   }
   const expected = new Set(plan.issues.map((issue) => issue.number));
+  const expectedByNumber = new Map(plan.issues.map((issue) => [issue.number, issue]));
   if (expected.size !== plan.issues.length) {
     fail("release milestone plan contains duplicate issue numbers");
   }
   const actual = new Set(items.map((item) => item.number));
+  if (actual.size !== items.length) {
+    fail(`${plan.tag} milestone collection contains duplicate issue numbers`);
+  }
   const extra = [...actual].filter((number) => !expected.has(number)).sort((left, right) => left - right);
   const missing = [...expected].filter((number) => !actual.has(number)).sort((left, right) => left - right);
+  const changedTitles = items.filter((item) => expected.has(item.number)
+    && item.title !== expectedByNumber.get(item.number).title);
+  if (changedTitles.length > 0) {
+    fail(`${plan.tag} milestone issue titles changed after review: ${changedTitles.map((item) => `#${item.number}`).join(", ")}`);
+  }
+  const wrongMilestones = items.filter((item) => expected.has(item.number)
+    && item.milestone?.title !== plan.tag);
+  if (wrongMilestones.length > 0) {
+    fail(`${plan.tag} milestone collection contains items assigned elsewhere: ${wrongMilestones.map((item) => `#${item.number}`).join(", ")}`);
+  }
   if (extra.length > 0 || (!allowMissing && missing.length > 0)) {
     const details = [];
     if (missing.length > 0) details.push(`missing ${missing.map((number) => `#${number}`).join(", ")}`);
     if (extra.length > 0) details.push(`extra ${extra.map((number) => `#${number}`).join(", ")}`);
     fail(`${plan.tag} milestone membership differs from the reviewed plan: ${details.join("; ")}`);
   }
+  return { missing };
 }
 
-export async function syncReleaseMilestone(plan, environment = process.env) {
+export async function syncReleaseMilestone(plan, environment = process.env, retryOptions = {}) {
+  const membershipAttempts = retryOptions.membershipAttempts ?? 5;
+  const membershipDelayMs = retryOptions.membershipDelayMs ?? 2_000;
+  const sleep = retryOptions.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
+  if (!Number.isSafeInteger(membershipAttempts) || membershipAttempts < 1 || membershipAttempts > 10) {
+    fail("milestone membership attempts must be between 1 and 10");
+  }
+  if (!Number.isSafeInteger(membershipDelayMs) || membershipDelayMs < 0 || membershipDelayMs > 10_000) {
+    fail("milestone membership delay must be between 0 and 10000 milliseconds");
+  }
   const { token, repository, apiUrl, serverUrl } = normalizedEnvironment(environment);
   const milestones = await paginatedJSON(apiUrl, token, `/repos/${repository}/milestones?state=all`);
   const matches = milestones.filter((milestone) => milestone.title === plan.tag);
@@ -405,12 +429,37 @@ export async function syncReleaseMilestone(plan, environment = process.env) {
     }
   }
 
-  const verifiedItems = await paginatedJSON(
-    apiUrl,
-    token,
-    `/repos/${repository}/issues?state=all&milestone=${milestone.number}`,
-  );
-  validateMilestoneItems(verifiedItems, plan, { allowMissing: false });
+  let missing = [];
+  for (let attempt = 1; attempt <= membershipAttempts; attempt += 1) {
+    const verifiedItems = await paginatedJSON(
+      apiUrl,
+      token,
+      `/repos/${repository}/issues?state=all&milestone=${milestone.number}`,
+    );
+    ({ missing } = validateMilestoneItems(verifiedItems, plan, { allowMissing: true }));
+    if (missing.length === 0) break;
+    for (const number of missing) {
+      const expectedIssue = plan.issues.find((issue) => issue.number === number);
+      const current = await githubJSON(`${apiUrl}/repos/${repository}/issues/${number}`, token);
+      if (current.pull_request) {
+        fail(`planned issue #${number} became a pull request`);
+      }
+      if (current.state !== "closed") {
+        fail(`planned issue #${number} is no longer closed`);
+      }
+      if (current.title !== expectedIssue.title) {
+        fail(`planned issue #${number} title changed after review`);
+      }
+      const currentMilestone = current.milestone?.title ?? null;
+      if (currentMilestone !== plan.tag) {
+        fail(`issue #${number} now belongs to milestone ${currentMilestone ?? "none"}, not ${plan.tag}`);
+      }
+    }
+    if (attempt < membershipAttempts) await sleep(membershipDelayMs);
+  }
+  if (missing.length > 0) {
+    fail(`${plan.tag} milestone membership differs from the reviewed plan after ${membershipAttempts} attempts: missing ${missing.map((number) => `#${number}`).join(", ")}`);
+  }
   if (milestone.state !== "closed") {
     milestone = await githubJSON(`${apiUrl}/repos/${repository}/milestones/${milestone.number}`, token, {
       method: "PATCH",

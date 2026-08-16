@@ -181,6 +181,36 @@ test("pull request code remains read-only and never uses pull_request_target", (
   assert.doesNotMatch(preflight, /contents: write|issues: write/);
 });
 
+test("generated Release PR labels are verified from the live API with exact identity", () => {
+  const prepareWorkflow = parseYaml(workflows["prepare-release-pr.yml"]);
+  const preflightWorkflow = parseYaml(workflows["release-preflight.yml"]);
+  const prepare = prepareWorkflow.jobs.prepare.steps.find(
+    (step) => step.name === "Create focused release branch and pull request",
+  );
+  const preflight = preflightWorkflow.jobs.detect.steps.find(
+    (step) => step.name === "Validate release metadata change",
+  );
+
+  assert.equal(preflight.env.PR_NUMBER, "${{ github.event.pull_request.number }}");
+  assert.equal(Object.hasOwn(preflight.env, "PR_LABELS"), false);
+  assert.doesNotMatch(preflight.run, /if \[\[ "\$HEAD_REF" = codex\/release-v\*/);
+  assert.match(preflight.run, /test "\$HEAD_REF" = "codex\/release-v\$\{version\}"/);
+  assert.match(preflight.run, /test "\$PR_TITLE" = "Prepare md2png \$\{version\}"/);
+  assert.ok(preflight.run.indexOf("release-pr-labels.mjs verify") > preflight.run.indexOf("validate-prepared"));
+  assert.match(preflight.run, /--pull-request "\$PR_NUMBER"/);
+  assert.match(preflight.run, /--head-sha "\$HEAD_SHA"/);
+  assert.match(preflight.run, /--head-ref "\$HEAD_REF"/);
+  assert.match(preflight.run, /--version "\$version"/);
+  assert.match(preflight.run, /--bump "\$bump"/);
+
+  const createIndex = prepare.run.indexOf("gh pr create");
+  const verifyIndex = prepare.run.indexOf("release-pr-labels.mjs verify");
+  assert.ok(createIndex >= 0 && verifyIndex > createIndex);
+  assert.match(prepare.run, /GITHUB_TOKEN="\$APP_TOKEN" node scripts\/release-pr-labels\.mjs verify/);
+  assert.match(prepare.run, /--pull-request "\$pr_number"/);
+  assert.match(prepare.run, /--head-sha "\$\(git rev-parse HEAD\)"/);
+});
+
 test("coverage runs only in the trusted post-merge Release build", () => {
   const preflight = workflows["release-preflight.yml"];
   assert.match(preflight, /verify:\n[\s\S]*?if: needs\.detect\.outputs\.is_release == 'true'/);
@@ -212,6 +242,63 @@ test("validate and sign stage trusted asset tooling before consuming it", () => 
   }
   const signAssembly = jobs.sign.steps.find((step) => step.name === "Import, verify, sign, notarize, and assemble handoff");
   assert.match(signAssembly.run, /node "\$RELEASE_MANIFEST_SCRIPT" create/);
+  const signStage = jobs.sign.steps.find((step) => step.name === "Stage trusted release asset tooling");
+  assert.match(signStage.run, /release-recovery\.mjs/);
+  assert.match(signStage.run, /RELEASE_RECOVERY_SCRIPT/);
+});
+
+test("partial-draft recovery reuses one trusted prior signed handoff", () => {
+  const releaseWorkflow = parseYaml(workflows["release.yml"]);
+  const jobs = releaseWorkflow.jobs;
+  const detect = jobs.detect.steps.find((step) => step.name === "Validate release authorization");
+  const sign = jobs.sign;
+  const resolve = sign.steps.find((step) => step.name === "Resolve exact prior signed handoff");
+  const download = sign.steps.find((step) => step.name === "Download exact prior signed handoff");
+  const validate = sign.steps.find((step) => step.name === "Validate recovered signed handoff identity and digests");
+  const freshStepNames = [
+    "Install pinned renderer dependencies",
+    "Download verified coverage",
+    "Import, verify, sign, notarize, and assemble handoff",
+  ];
+
+  assert.equal(detect.env.REQUESTED_HANDOFF_RUN_ID, "${{ inputs.handoff_run_id }}");
+  assert.equal(jobs.detect.outputs.recovery_handoff_run_id, "${{ steps.release.outputs.recovery_handoff_run_id }}");
+  assert.match(detect.run, /releases\?per_page=100/);
+  assert.match(detect.run, /select\(\.draft == true and \.tag_name == \$tag\)/);
+  assert.match(detect.run, /draft_asset_count/);
+  assert.match(detect.run, /Re-run failed jobs/);
+  assert.match(detect.run, /handoff_run_id is accepted only when the existing draft already has assets/);
+
+  assert.equal(sign.env.RECOVERY_HANDOFF_RUN_ID, "${{ needs.detect.outputs.recovery_handoff_run_id }}");
+  for (const name of freshStepNames) {
+    assert.equal(sign.steps.find((step) => step.name === name).if, "needs.detect.outputs.recovery_handoff_run_id == ''");
+  }
+  assert.equal(resolve.if, "needs.detect.outputs.recovery_handoff_run_id != ''");
+  assert.equal(resolve.env.GITHUB_TOKEN, "${{ github.token }}");
+  assert.equal(resolve.env.WORKFLOW_COMMIT, "${{ github.sha }}");
+  assert.match(resolve.run, /release-recovery\.mjs|\$RELEASE_RECOVERY_SCRIPT/);
+  assert.match(resolve.run, /--current-run "\$GITHUB_RUN_ID"/);
+  assert.match(resolve.run, /--prior-run "\$RECOVERY_HANDOFF_RUN_ID"/);
+  assert.match(resolve.run, /--source-commit "\$SOURCE_COMMIT"/);
+  assert.match(resolve.run, /--workflow-commit "\$WORKFLOW_COMMIT"/);
+  assert.match(resolve.run, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$prior_workflow_commit"/);
+  assert.match(resolve.run, /git merge-base --is-ancestor "\$prior_workflow_commit" "\$WORKFLOW_COMMIT"/);
+
+  assert.equal(download.if, "needs.detect.outputs.recovery_handoff_run_id != ''");
+  assert.equal(download.with["artifact-ids"], "${{ steps.recovery-handoff.outputs.artifact_id }}");
+  assert.equal(download.with["run-id"], "${{ needs.detect.outputs.recovery_handoff_run_id }}");
+  assert.equal(download.with.repository, "${{ github.repository }}");
+  assert.equal(download.with["github-token"], "${{ github.token }}");
+  assert.equal(download.with["merge-multiple"], true);
+  assert.equal(validate.if, "needs.detect.outputs.recovery_handoff_run_id != ''");
+  assert.match(validate.run, /release-manifest\.json/);
+  assert.match(validate.run, /--version "\$VERSION"/);
+  assert.match(validate.run, /--build "\$BUILD"/);
+  assert.match(validate.run, /--commit "\$SOURCE_COMMIT"/);
+
+  const upload = sign.steps.find((step) => step.name === "Upload verified signed handoff");
+  assert.equal(Object.hasOwn(upload, "if"), false);
+  assert.equal(upload.with.name, "signed-release-${{ needs.detect.outputs.source_commit }}");
 });
 
 test("trusted publication tooling can stage from main while a pre-contract source is checked out", (context) => {

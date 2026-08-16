@@ -117,6 +117,10 @@ digest, rejects stale or unrelated edits, runs tests, and verifies an ad-hoc
 release package without secrets or write permission. The publisher recomputes
 the same reviewed issue set before any milestone mutation. Coverage is
 deliberately not collected on the Release PR.
+Generated Release PR labels are verified from the live pull-request API after
+creation and again during preflight. A bounded retry covers the short period in
+which an `opened` event can still expose an incomplete label snapshot; any PR
+identity change or conflicting release label fails immediately.
 The post-merge trusted Release build collects it once on Xcode 26.2. The two
 stable CI jobs and Release preflight are hard publication gates; the explicitly
 experimental Xcode preview job remains informational and cannot block a stable
@@ -146,7 +150,10 @@ extra, missing, or open issue in that milestone, and re-reads every planned issu
 immediately before assignment so an intervening assignment to another milestone
 fails closed. It ignores later same-identifier maintenance PRs for an issue
 already shipped and performs a final exact membership check before closing the
-milestone and making the draft Release public. Historical Release PRs created
+milestone and making the draft Release public. That final read retries only
+missing planned issues for a bounded period after successful assignments, to
+cover GitHub collection-index lag. Extra, open, or pull-request items still fail
+immediately and are never retried away. Historical Release PRs created
 before milestone plan digests were introduced remain recoverable but do not
 retroactively modify milestones.
 Keep the issue identifier at the start of implementation PR titles and use a
@@ -156,8 +163,14 @@ complete version scope. Add `label:enhancement` for features or
 `label:technical-debt` for internal work.
 
 The workflow is serialized and non-canceling. A retry accepts an existing tag
-only when it resolves to the same commit. It resumes a matching draft by
-skipping byte-identical assets and uploading only missing verified assets. If
+only when it resolves to the same commit. Within the originating run, retrying
+the failed publish job reuses the exact signed handoff, skips byte-identical
+assets, and uploads only missing verified assets. A later manual recovery of a
+draft that already has assets must name that originating Trusted Release run;
+the workflow accepts exactly one unexpired handoff from the same repository,
+release workflow, protected-main history, and release source, then revalidates
+its manifest identity and every asset digest before publication. It never
+re-signs a replacement for a partially populated draft. If
 that exact version is already the latest published Release, the workflow skips
 coverage generation, signing, and publication. A read-only macOS job instead
 downloads the existing five assets and verifies their names, labels, sizes,
@@ -169,9 +182,9 @@ contains no private key or account credential and is independently observable
 in every signed public app; update it through a reviewed infrastructure PR when
 rotating the Developer ID certificate, before publishing with the replacement.
 Any mismatch is rejected without replacing the tag, Release, assets, or
-coverage entry. To resume a failed draft, dispatch **Trusted Release** with the
-exact 40-character commit already on `main`; it cannot calculate or introduce
-another version.
+coverage entry. A draft with no uploaded assets may be resumed by dispatching
+**Trusted Release** with only the exact 40-character commit already on `main`;
+it cannot calculate or introduce another version.
 
 If a generated Release PR is abandoned, close it and explicitly delete its
 remote `codex/release-vX.Y.Z` branch. Confirm that neither an open Release PR nor
@@ -181,14 +194,25 @@ prepare a new one instead of updating previously reviewed release content in
 place.
 
 For a failed trusted run, first preserve the exact source commit and, if already
-created, the annotated tag, draft Release, and verified assets for diagnosis. A
-transient failure can be retried without changing the workflow. If the workflow
-itself needs repair, merge the reviewed fix first, then dispatch **Trusted
-Release** from `main` with that same 40-character source commit. The publisher
-resumes only a matching draft and never overwrites an existing asset; after
-publication, the same dispatch takes the read-only verification path. Do not
-delete and recreate the tag or Release, change the release commit, or merge
-another Release PR as a recovery shortcut.
+created, the annotated tag, draft Release, verified assets, and originating run
+ID for diagnosis. For a transient publish failure, open that original run and
+choose **Re-run failed jobs**. Do not start a new dispatch or re-run all jobs;
+the failed-job retry preserves the original signed handoff and is the shortest
+safe recovery path.
+
+If the workflow itself needs repair, merge the reviewed fix first, then
+dispatch **Trusted Release** from `main` with the same 40-character source
+commit. When the matching draft already contains any asset, also enter the
+originating run ID in `handoff_run_id`; the workflow downloads that exact
+handoff instead of signing again. The run, workflow, repository, protected-main
+ancestry, artifact name, expiry, manifest release identity, and file digests
+must all match. If the artifact has expired or any binding differs, recovery
+fails closed. When the matching draft has no assets, leave `handoff_run_id`
+empty and a fresh signed handoff may be produced. After publication, the same
+commit dispatch takes the read-only verification path and does not accept a
+handoff run ID. Do not delete and recreate the tag or Release, overwrite an
+asset, change the release commit, or merge another Release PR as a recovery
+shortcut.
 
 This read-only rerun proves that it cannot mutate publication state and that
 the current remote snapshot remains internally valid. The pinned certificate
