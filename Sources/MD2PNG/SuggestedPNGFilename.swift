@@ -6,6 +6,11 @@ enum SuggestedPNGFilename {
         let length: Int
     }
 
+    private struct LeadingIndent {
+        let columns: Int
+        let characters: Int
+    }
+
     private static let maximumStemLength = 72
     private static let maximumStemUTF8Count = 240
 
@@ -87,9 +92,9 @@ enum SuggestedPNGFilename {
     }
 
     private static func fenceOpening(in line: String) -> Fence? {
-        let leadingSpaces = line.prefix(while: { $0 == " " }).count
-        guard leadingSpaces <= 3 else { return nil }
-        let candidate = line.dropFirst(leadingSpaces)
+        let indent = leadingIndent(in: line)
+        guard indent.columns <= 3 else { return nil }
+        let candidate = line.dropFirst(indent.characters)
         guard let marker = candidate.first, marker == "`" || marker == "~" else {
             return nil
         }
@@ -101,16 +106,33 @@ enum SuggestedPNGFilename {
     }
 
     private static func isFenceClosing(_ line: String, for fence: Fence) -> Bool {
-        let leadingSpaces = line.prefix(while: { $0 == " " }).count
-        guard leadingSpaces <= 3 else { return false }
-        let candidate = line.dropFirst(leadingSpaces)
+        let indent = leadingIndent(in: line)
+        guard indent.columns <= 3 else { return false }
+        let candidate = line.dropFirst(indent.characters)
         let markerLength = candidate.prefix(while: { $0 == fence.marker }).count
         guard markerLength >= fence.length else { return false }
         return candidate.dropFirst(markerLength).allSatisfy(\.isWhitespace)
     }
 
     private static func isIndentedCode(_ line: String) -> Bool {
-        line.hasPrefix("\t") || line.prefix(while: { $0 == " " }).count >= 4
+        leadingIndent(in: line).columns >= 4
+    }
+
+    private static func leadingIndent(in line: String) -> LeadingIndent {
+        var columns = 0
+        var characters = 0
+        for character in line {
+            switch character {
+            case " ":
+                columns += 1
+            case "\t":
+                columns += 4 - columns % 4
+            default:
+                return LeadingIndent(columns: columns, characters: characters)
+            }
+            characters += 1
+        }
+        return LeadingIndent(columns: columns, characters: characters)
     }
 
     private static func atxHeading(in line: String) -> String? {

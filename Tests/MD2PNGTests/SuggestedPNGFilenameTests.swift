@@ -104,6 +104,32 @@ final class SuggestedPNGFilenameTests: XCTestCase {
         )
     }
 
+    func testTabStopIndentedCodeCannotSupplyTheFilename() {
+        for prefix in ["\t", " \t", "  \t", "   \t"] {
+            XCTAssertEqual(
+                SuggestedPNGFilename.make(
+                    from: "\(prefix)# Mixed tab code\n# Actual Title"
+                ),
+                "Actual Title.png",
+                "Failed prefix \(prefix.debugDescription)"
+            )
+        }
+    }
+
+    func testFenceWithUpToThreeLiteralLeadingSpacesRemainsValid() {
+        let markdown = """
+           ```markdown
+        # Not the title
+           ```
+        # Actual Title
+        """
+
+        XCTAssertEqual(
+            SuggestedPNGFilename.make(from: markdown),
+            "Actual Title.png"
+        )
+    }
+
     func testFallsBackToTheFirstMeaningfulBodyLine() {
         let markdown = """
         ---
