@@ -43,6 +43,7 @@ final class RenderWidthPresetTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let markdown = try String(
             contentsOf: repositoryRoot.appendingPathComponent(
                 "Examples/width-presets.md"

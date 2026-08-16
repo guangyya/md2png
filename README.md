@@ -232,11 +232,12 @@ the command.
 ## Project layout
 
 ```text
-Sources/MD2PNG/              Native Swift/AppKit application
-Sources/MD2PNG/Resources/    Localized strings and bundled renderer output
+Sources/MD2PNG/{Application,About,Preview,Rendering,Updates,Welcome}/
+                            Feature-first native Swift/AppKit sources
+Sources/MD2PNG/Resources/   Localized strings and bundled renderer output
+Tests/MD2PNGTests/          Mirrored feature tests and test support
 WebRenderer/                Markdown, sanitization, highlighting, and Mermaid source
 Examples/                   Markdown samples bundled with the app
-Tests/                      Swift and end-to-end rendering tests
 Assets/AppIcon/             Approved app icon source
 docs/                       Product, privacy, troubleshooting, and release documentation
 .github/ISSUE_TEMPLATE/     Structured GitHub feature request entry point

@@ -30,6 +30,7 @@ final class PackagedRenderSelfTestTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let markdownURL = repositoryRoot.appendingPathComponent(
             "Examples/\(PackagedRenderSelfTestResources.markdownFileName)"
         )
