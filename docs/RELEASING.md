@@ -219,6 +219,15 @@ handoff run ID. Do not delete and recreate the tag or Release, overwrite an
 asset, change the release commit, or merge another Release PR as a recovery
 shortcut.
 
+The protected-main workflow injects `MD2PNGUpdateChannel=stable` before signing,
+including when a historical source predates the explicit channel build option.
+Publication requires that exact marker for every contract-aware source. An
+older signed handoff may omit it only when Git ancestry proves that its source
+precedes the immutable channel-contract marker and the packaged App still
+matches the canonical release identity, project URL, source commit, signature,
+architecture, and non-Debug identity. Unknown or non-stable channel values are
+always rejected.
+
 This read-only rerun proves that it cannot mutate publication state and that
 the current remote snapshot remains internally valid. The pinned certificate
 fingerprint independently anchors both app copies and the signed DMG container.

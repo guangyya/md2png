@@ -325,6 +325,8 @@ test("trusted publication tooling can stage from main while a pre-contract sourc
     "release-assets.json",
     "release-manifest.mjs",
     "release-milestone.mjs",
+    "release-update-channel.sh",
+    "release-update-channel-contract-v1",
   ]) {
     fs.copyFileSync(path.join(repoRoot, "scripts", file), path.join(fixture, "scripts", file));
   }
@@ -355,6 +357,7 @@ test("trusted publication tooling can stage from main while a pre-contract sourc
   assert.ok(fs.existsSync(staged.RELEASE_ASSETS_SCRIPT));
   assert.ok(fs.existsSync(staged.RELEASE_MANIFEST_SCRIPT));
   assert.ok(fs.existsSync(staged.RELEASE_MILESTONE_SCRIPT));
+  assert.ok(fs.existsSync(staged.RELEASE_UPDATE_CHANNEL_SCRIPT));
   const rendered = spawnSync(process.execPath, [
     staged.RELEASE_ASSETS_SCRIPT,
     "names",
@@ -547,6 +550,9 @@ test("stable update delivery requires an explicit packaged channel", () => {
     path.join(repoRoot, "scripts/publish-hosted-release.sh"),
     "utf8",
   );
+  const signRelease = release.jobs.sign.steps.find(
+    (step) => step.name === "Import, verify, sign, notarize, and assemble handoff",
+  ).run;
 
   assert.match(makefile, /^UPDATE_CHANNEL \?= disabled$/m);
   assert.match(makefile, /plutil -replace MD2PNGUpdateChannel -string "\$\(UPDATE_CHANNEL\)"/);
@@ -555,10 +561,14 @@ test("stable update delivery requires an explicit packaged channel", () => {
   assert.equal(preflight.jobs.verify.env.UPDATE_CHANNEL, "stable");
   assert.equal(release.jobs.validate.env.UPDATE_CHANNEL, "stable");
   assert.equal(release.jobs.sign.env.UPDATE_CHANNEL, "stable");
+  assert.equal(release.jobs.sign.env.WORKFLOW_COMMIT, "${{ github.sha }}");
   assert.equal(release.jobs.publish.env.UPDATE_CHANNEL, "stable");
+  assert.equal(release.jobs.publish.env.WORKFLOW_COMMIT, "${{ github.sha }}");
   assert.match(localPublisher, /UPDATE_CHANNEL=stable/);
-  assert.match(hostedPublisher, /Print :MD2PNGUpdateChannel/);
-  assert.match(hostedPublisher, /= "stable"/);
+  assert.ok(signRelease.indexOf("prepare-source") < signRelease.indexOf("make notarize"));
+  assert.ok(signRelease.indexOf("validate-app") > signRelease.indexOf("make notarize"));
+  assert.match(hostedPublisher, /RELEASE_UPDATE_CHANNEL_SCRIPT/);
+  assert.match(hostedPublisher, /validate-app/);
 });
 
 test("Release PR previews and trusted publication applies the issue milestone", () => {
