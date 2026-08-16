@@ -10,7 +10,7 @@ to its own license.
 | [markdown-it](https://github.com/markdown-it/markdown-it) | 14.1.0 | MIT |
 | [Mermaid](https://github.com/mermaid-js/mermaid) | 11.9.0 | MIT |
 | [esbuild](https://github.com/evanw/esbuild) | 0.28.2 | MIT |
-| [Sparkle](https://github.com/sparkle-project/Sparkle) | 2.9.5 | MIT |
+| [Sparkle](https://github.com/sparkle-project/Sparkle) | 2.9.5 | [MIT and bundled third-party notices](ThirdPartyLicenses/Sparkle-2.9.5.txt) |
 
 The resolved dependency graphs are recorded in `WebRenderer/pnpm-lock.yaml` and
 `Package.resolved`.

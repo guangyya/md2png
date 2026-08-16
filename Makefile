@@ -30,6 +30,9 @@ endif
 CONTENTS := $(APP_DIR)/Contents
 FRAMEWORKS := $(CONTENTS)/Frameworks
 SPARKLE_FRAMEWORK := $(FRAMEWORKS)/Sparkle.framework
+LEGAL_RESOURCES := $(CONTENTS)/Resources/Legal
+SPARKLE_LICENSE_SOURCE := ThirdPartyLicenses/Sparkle-2.9.5.txt
+SPARKLE_LICENSE := $(LEGAL_RESOURCES)/Sparkle-2.9.5.txt
 # SwiftPM's test runner must be able to load binary-target frameworks before
 # the app packaging step copies them into Contents/Frameworks.
 SPARKLE_TEST_FRAMEWORKS := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
@@ -143,7 +146,7 @@ debug-stop:
 
 app: build icon $(DEBUG_APP_PREREQUISITE)
 	rm -rf "$(APP_DIR)"
-	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(FRAMEWORKS)"
+	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(FRAMEWORKS)" "$(LEGAL_RESOURCES)"
 	cp "$(ARM64_BUILD_DIR)/$(TARGET_NAME)" "$(CONTENTS)/MacOS/$(TARGET_NAME)"
 	ditto "$(ARM64_BUILD_DIR)/Sparkle.framework" "$(SPARKLE_FRAMEWORK)"
 	rm -rf "$(SPARKLE_FRAMEWORK)/Versions/B/XPCServices" \
@@ -211,12 +214,17 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 	./scripts/release-notes.sh "$(VERSION)" ABOUT_CHANGELOG.md >/dev/null
 	cp ABOUT_CHANGELOG.md "$(CONTENTS)/Resources/ABOUT_CHANGELOG.md"
 	cp -R Examples "$(CONTENTS)/Resources/Examples"
+	cp THIRD_PARTY_NOTICES.md "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	cp "$(SPARKLE_LICENSE_SOURCE)" "$(SPARKLE_LICENSE)"
 	codesign $(SIGN_FLAGS) "$(SPARKLE_FRAMEWORK)/Versions/B/Autoupdate"
 	codesign $(SIGN_FLAGS) "$(SPARKLE_FRAMEWORK)/Versions/B/Updater.app"
 	codesign $(SIGN_FLAGS) "$(SPARKLE_FRAMEWORK)"
 	codesign $(SIGN_FLAGS) "$(APP_DIR)"
 
 verify-dist: app
+	cmp -s THIRD_PARTY_NOTICES.md "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	cmp -s "$(SPARKLE_LICENSE_SOURCE)" "$(SPARKLE_LICENSE)"
+	grep -Fq 'EXTERNAL LICENSES' "$(SPARKLE_LICENSE)"
 	test ! -e "$(SPARKLE_FRAMEWORK)/XPCServices"
 	codesign --verify --strict --verbose=2 "$(SPARKLE_FRAMEWORK)/Versions/B/Autoupdate"
 	codesign --verify --strict --verbose=2 "$(SPARKLE_FRAMEWORK)/Versions/B/Updater.app"
