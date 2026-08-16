@@ -73,8 +73,10 @@ final class RenderThemeTests: XCTestCase {
     @MainActor
     func testRendererDefaultsToCleanLight() async throws {
         _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        defer { withExtendedLifetime(renderer) {} }
         let image: NSImage = try await withCheckedThrowingContinuation { continuation in
-            MarkdownRenderer().render("# Default theme") { result in
+            renderer.render("# Default theme") { result in
                 continuation.resume(with: result)
             }
         }
