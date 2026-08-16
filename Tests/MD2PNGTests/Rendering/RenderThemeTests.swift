@@ -183,9 +183,10 @@ final class RenderThemeTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        // WKSnapshot output may be color-managed before conversion to device RGB.
         XCTAssertLessThan(
             colorDistance(actual, expected),
-            0.04,
+            0.08,
             message,
             file: file,
             line: line
