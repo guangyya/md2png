@@ -46,6 +46,44 @@ final class UpdateControllerTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testDisabledChannelAndFixtureNeverContactTheUpdateService() async throws {
+        let requestCount = LockedBox(0)
+        URLProtocolStub.handler = { _ in
+            requestCount.set(requestCount.value + 1)
+            throw URLError(.badServerResponse)
+        }
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let controller = UpdateController(
+            service: UpdateService(session: UpdateTestFixtures.stubbedSession()),
+            channel: { .disabled },
+            installedVersion: { "0.1.0" },
+            defaults: defaults
+        )
+
+        controller.refreshIfNeeded()
+        controller.checkAgain()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, UpdateStatus())
+        XCTAssertFalse(controller.isUpdating)
+        XCTAssertFalse(controller.allowsUpdatePresentation)
+
+        let fixtureStatus = UpdateStatus(
+            phase: .upToDate(version: try XCTUnwrap(SemanticVersion("0.1.0")))
+        )
+        controller.setStatusForTesting(fixtureStatus)
+        controller.refreshIfNeeded()
+        controller.checkAgain()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, fixtureStatus)
+        XCTAssertTrue(controller.allowsUpdatePresentation)
+    }
+
     func testCheckPolicyPersistsReleaseAndAppliesFreshnessAndRequestWindows() throws {
         let defaults = UpdateTestFixtures.makeDefaults()
         defer { UpdateTestFixtures.removeDefaults(defaults) }
@@ -310,8 +348,8 @@ final class UpdateControllerTests: XCTestCase {
                 session: UpdateTestFixtures.stubbedSession(),
                 cacheDirectory: directory
             ),
+            channel: { .stableGitHubReleases(repository: self.repository) },
             installedVersion: { "0.1.0" },
-            repository: { self.repository },
             openFile: {
                 openedURLs.set(openedURLs.value + [$0])
                 return true
@@ -392,8 +430,8 @@ final class UpdateControllerTests: XCTestCase {
     ) -> UpdateController {
         UpdateController(
             service: UpdateService(session: UpdateTestFixtures.stubbedSession()),
+            channel: { .stableGitHubReleases(repository: self.repository) },
             installedVersion: { "0.1.0" },
-            repository: { self.repository },
             defaults: defaults,
             now: now
         )

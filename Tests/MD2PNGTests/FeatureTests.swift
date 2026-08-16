@@ -636,6 +636,25 @@ final class FeatureTests: XCTestCase {
     }
 
     @MainActor
+    func testAboutKeepsProjectLinkButHidesUpdatesForDisabledChannel() {
+        _ = NSApplication.shared
+        let controller = AboutController(updateController: UpdateController(
+            channel: { .disabled }
+        ))
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Debug builds do not use production updates.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        XCTAssertFalse(controller.displayedProjectButtonIsHidden)
+        XCTAssertTrue(controller.displayedUpdateButtonIsHidden)
+    }
+
+    @MainActor
     func testAboutReleaseNotesStartScrolledToTop() {
         _ = NSApplication.shared
         let controller = makeAboutController()

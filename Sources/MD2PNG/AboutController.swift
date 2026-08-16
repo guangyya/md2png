@@ -1,27 +1,5 @@
 import AppKit
 
-enum AppBuildConfiguration: Equatable {
-    case debug
-    case release
-
-    static var current: AppBuildConfiguration {
-#if DEBUG
-        .debug
-#else
-        .release
-#endif
-    }
-
-    func displayName(bundle: Bundle? = nil) -> String {
-        switch self {
-        case .debug:
-            return L10n.text("about.build_debug", defaultValue: "DEBUG", bundle: bundle)
-        case .release:
-            return L10n.text("about.build_release", defaultValue: "RELEASE", bundle: bundle)
-        }
-    }
-}
-
 struct AppMetadata {
     static let sourceCommitInfoDictionaryKey = "MD2PNGSourceCommit"
 
@@ -414,7 +392,7 @@ final class AboutController: NSWindowController {
         projectURL = metadata.projectURL
         updateFeatureAvailable = metadata.projectURL.flatMap(
             GitHubRepository.init(projectURL:)
-        ) != nil
+        ) != nil && updateController.allowsUpdatePresentation
         updateSlot.isHidden = !updateFeatureAvailable
         versionInfo = metadata.versionInfo()
         projectTitle.isHidden = metadata.projectURL == nil

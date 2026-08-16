@@ -125,18 +125,8 @@ make run CONFIGURATION=debug \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 ```
 
-如需测试真实更新而不修改源码版本，可只覆盖测试 App 中的版本：
-
-```sh
-make run CONFIGURATION=debug \
-  PROJECT_URL=https://github.com/guangyya/md2png \
-  TEST_UPDATE_VERSION=0.0.0
-```
-
-`publish-release` 会拒绝 `TEST_UPDATE_VERSION`；公开发布始终使用
-`Info.plist` 中的 `CFBundleShortVersionString`。
-
-Debug 构建还可以在不发送请求的情况下 mock About 更新状态：
+即使打包了 `PROJECT_URL`，Debug 构建也绝不会使用稳定生产更新渠道。需要测试
+About 更新状态时，请使用显式的本地 fixture；它不会发送 Release 元数据请求：
 
 ```sh
 make run CONFIGURATION=debug \
@@ -146,13 +136,16 @@ make run CONFIGURATION=debug \
 ```
 
 `TEST_UPDATE_STATE` 仅允许用于本地 Debug app/run 构建，发布流程会拒绝它。
-下载相关 mock 使用已发布且不可变的 v0.1.0 DMG 元数据，因此重试会走真实校验流程。
-如果缓存 DMG 已被删除，`ready-to-install` 会先显示可恢复的下载失败状态，
-而不会提供一个指向缺失文件的“打开”操作。
+`TEST_UPDATE_VERSION` 只修改打包后的测试 App 版本，`publish-release` 同样会拒绝它；
+公开发布始终使用 `Info.plist` 中的 `CFBundleShortVersionString`。下载相关 mock
+使用已发布且不可变的 v0.1.0 DMG 元数据，因此显式重试会走真实下载校验流程。
+如果缓存 DMG 已被删除，`ready-to-install` 会先显示可恢复的下载失败状态，而不会
+提供一个指向缺失文件的“打开”操作。
 
-`PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与更新控件。
-源码不包含固定仓库地址。`BUNDLE_IDENTIFIER`
-默认读取 `Info.plist` 中的个人标识，也可在构建时覆盖。
+`PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与更新控件。Debug
+构建会保留已配置的项目链接，但隐藏生产更新控件；带有效 GitHub 项目地址的 Release
+构建使用稳定 GitHub Releases 渠道。源码不包含固定仓库地址。
+`BUNDLE_IDENTIFIER` 默认读取 `Info.plist` 中的个人标识，也可在构建时覆盖。
 `make verify-dist` 会重新构建 App，检查签名和 arm64 架构，再通过内置
 Markdown、GFM 表格、高亮 Swift 代码和 Mermaid 图执行离线渲染自测；
 该过程不会读取或修改剪贴板。
