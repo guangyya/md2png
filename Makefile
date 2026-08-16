@@ -31,8 +31,9 @@ CONTENTS := $(APP_DIR)/Contents
 FRAMEWORKS := $(CONTENTS)/Frameworks
 SPARKLE_FRAMEWORK := $(FRAMEWORKS)/Sparkle.framework
 LEGAL_RESOURCES := $(CONTENTS)/Resources/Legal
+THIRD_PARTY_LICENSES := $(LEGAL_RESOURCES)/ThirdPartyLicenses
 SPARKLE_LICENSE_SOURCE := ThirdPartyLicenses/Sparkle-2.9.5.txt
-SPARKLE_LICENSE := $(LEGAL_RESOURCES)/Sparkle-2.9.5.txt
+SPARKLE_LICENSE := $(THIRD_PARTY_LICENSES)/Sparkle-2.9.5.txt
 # SwiftPM's test runner must be able to load binary-target frameworks before
 # the app packaging step copies them into Contents/Frameworks.
 SPARKLE_TEST_FRAMEWORKS := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
@@ -146,7 +147,7 @@ debug-stop:
 
 app: build icon $(DEBUG_APP_PREREQUISITE)
 	rm -rf "$(APP_DIR)"
-	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(FRAMEWORKS)" "$(LEGAL_RESOURCES)"
+	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(FRAMEWORKS)" "$(THIRD_PARTY_LICENSES)"
 	cp "$(ARM64_BUILD_DIR)/$(TARGET_NAME)" "$(CONTENTS)/MacOS/$(TARGET_NAME)"
 	ditto "$(ARM64_BUILD_DIR)/Sparkle.framework" "$(SPARKLE_FRAMEWORK)"
 	rm -rf "$(SPARKLE_FRAMEWORK)/Versions/B/XPCServices" \
@@ -223,6 +224,8 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 
 verify-dist: app
 	cmp -s THIRD_PARTY_NOTICES.md "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	grep -Fq '](ThirdPartyLicenses/Sparkle-2.9.5.txt)' "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	test -f "$(SPARKLE_LICENSE)"
 	cmp -s "$(SPARKLE_LICENSE_SOURCE)" "$(SPARKLE_LICENSE)"
 	grep -Fq 'EXTERNAL LICENSES' "$(SPARKLE_LICENSE)"
 	test ! -e "$(SPARKLE_FRAMEWORK)/XPCServices"
