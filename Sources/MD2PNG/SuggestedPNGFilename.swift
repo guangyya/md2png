@@ -24,8 +24,10 @@ enum SuggestedPNGFilename {
     }
 
     private static func preferredText(from markdown: String) -> String? {
-        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
-            .map(String.init)
+        let lines = markdown
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: "\n")
         var firstMeaningfulLine: String?
         var fenceCharacter: Character?
         let frontMatterRange = yamlFrontMatterRange(in: lines)
