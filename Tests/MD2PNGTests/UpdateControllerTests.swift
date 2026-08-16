@@ -21,7 +21,7 @@ final class UpdateControllerTests: XCTestCase {
         XCTAssertEqual(status.phase, .upToDate(version: SemanticVersion("0.2.0")!))
     }
 
-    func testDebugReadyMockUsesRecoverablePublishedAssetMetadata() throws {
+    func testDebugReadyMockUsesOfflineFixtureMetadata() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "MD2PNGDebugUpdateMockTests-\(UUID().uuidString)",
             isDirectory: true
@@ -39,10 +39,13 @@ final class UpdateControllerTests: XCTestCase {
         let update = try XCTUnwrap(availableUpdate)
         XCTAssertEqual(message, UpdateError.revealFailed.localizedDescription)
         XCTAssertEqual(update.version, SemanticVersion("0.1.0")!)
-        XCTAssertEqual(update.size, 3_312_367)
+        XCTAssertEqual(update.tagName, "debug-fixture")
+        XCTAssertEqual(update.assetName, "md2png-debug-update-fixture.dmg")
+        XCTAssertEqual(update.downloadURL.host, "updates.invalid")
+        XCTAssertEqual(update.size, 3)
         XCTAssertEqual(
             update.sha256,
-            "40fc785583a7cfaf1e476ae8649d2eb4e8461b49680e9a0fddfc35075b79bed7"
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         )
     }
 
@@ -82,6 +85,31 @@ final class UpdateControllerTests: XCTestCase {
         XCTAssertEqual(requestCount.value, 0)
         XCTAssertEqual(controller.status, fixtureStatus)
         XCTAssertTrue(controller.allowsUpdatePresentation)
+        XCTAssertFalse(controller.allowsInteractiveCheck)
+
+        let availableUpdate = UpdateTestFixtures.availableUpdate()
+        let availableStatus = UpdateStatus(phase: .updateAvailable(availableUpdate))
+        controller.setStatusForTesting(availableStatus)
+        controller.downloadAvailableUpdate()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, availableStatus)
+        XCTAssertFalse(controller.canDownload(availableUpdate))
+
+        let failedStatus = UpdateStatus(phase: .failed(
+            message: UpdateError.downloadFailed.localizedDescription,
+            releasesURL: repository.releasesURL,
+            retryAt: nil,
+            availableUpdate: availableUpdate
+        ))
+        controller.setStatusForTesting(failedStatus)
+        controller.downloadAvailableUpdate()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, failedStatus)
+        XCTAssertFalse(controller.isUpdating)
     }
 
     func testCheckPolicyPersistsReleaseAndAppliesFreshnessAndRequestWindows() throws {

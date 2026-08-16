@@ -50,4 +50,31 @@ final class UpdateChannelTests: XCTestCase {
             .disabled
         )
     }
+
+    func testOnlyStableChannelAllowsItsExactReleaseArtifact() throws {
+        let repository = try XCTUnwrap(GitHubRepository(projectURL: projectURL))
+        let update = UpdateTestFixtures.availableUpdate()
+        let stableChannel = UpdateChannel.stableGitHubReleases(repository: repository)
+
+        XCTAssertFalse(UpdateChannel.disabled.allowsDownload(update))
+        XCTAssertTrue(stableChannel.allowsDownload(update))
+
+        let wrongRepository = try XCTUnwrap(GitHubRepository(
+            projectURL: URL(string: "https://github.com/guangyya/another-app")!
+        ))
+        XCTAssertFalse(
+            UpdateChannel.stableGitHubReleases(repository: wrongRepository)
+                .allowsDownload(update)
+        )
+
+        let wrongArtifact = AvailableUpdate(
+            version: update.version,
+            tagName: update.tagName,
+            assetName: "nightly.dmg",
+            downloadURL: update.downloadURL,
+            size: update.size,
+            sha256: update.sha256
+        )
+        XCTAssertFalse(stableChannel.allowsDownload(wrongArtifact))
+    }
 }

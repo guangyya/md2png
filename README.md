@@ -179,10 +179,10 @@ make run CONFIGURATION=debug \
 rejected by the release publisher. `TEST_UPDATE_VERSION` changes only the
 packaged test app version and is also rejected by `publish-release`; public
 releases always use `CFBundleShortVersionString` from `Info.plist`.
-Download-related mocks use the immutable published v0.1.0 DMG metadata so an
-explicit retry runs through real download verification. If that cached DMG has
-been removed, `ready-to-install` starts at the recoverable download failure
-instead of exposing an invalid Open action.
+Download-related mocks use non-routable fixture metadata and cannot start an
+update or artifact request while the Debug update channel is disabled. If the
+fixture file is absent, `ready-to-install` starts at a recoverable display-only
+download failure instead of exposing an invalid Open action.
 
 `make app` creates the default Release bundle at `dist/md2png.app`.
 `make app CONFIGURATION=debug` and `make run CONFIGURATION=debug` use the

@@ -21,7 +21,7 @@ enum UpdateReleaseResolver {
             return .upToDate(installed: installedVersion, latest: latestVersion)
         }
 
-        let expectedName = "md2png-\(latestVersion)-macOS-arm64-developer-id.dmg"
+        let expectedName = expectedAssetName(for: latestVersion)
         let matches = release.assets.filter { $0.name == expectedName }
         guard !matches.isEmpty else { throw UpdateError.missingAsset }
         guard matches.count == 1, let asset = matches.first else {
@@ -63,7 +63,27 @@ enum UpdateReleaseResolver {
         return parts[1].lowercased()
     }
 
-    private static func isExpectedDownloadURL(
+    static func isExpectedStableUpdate(
+        _ update: AvailableUpdate,
+        repository: GitHubRepository
+    ) -> Bool {
+        update.tagName == "v\(update.version)"
+            && update.assetName == expectedAssetName(for: update.version)
+            && update.size > 0
+            && normalizedSHA256("sha256:\(update.sha256)") == update.sha256.lowercased()
+            && isExpectedDownloadURL(
+                update.downloadURL,
+                repository: repository,
+                tagName: update.tagName,
+                assetName: update.assetName
+            )
+    }
+
+    static func expectedAssetName(for version: SemanticVersion) -> String {
+        "md2png-\(version)-macOS-arm64-developer-id.dmg"
+    }
+
+    static func isExpectedDownloadURL(
         _ url: URL,
         repository: GitHubRepository,
         tagName: String,

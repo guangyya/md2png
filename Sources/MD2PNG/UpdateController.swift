@@ -60,11 +60,11 @@ enum DebugUpdateMockState: String {
     case downloadFailed = "download-failed"
     case readyToInstall = "ready-to-install"
 
-    private static let publishedVersion = SemanticVersion("0.1.0")!
-    private static let publishedAssetName = "md2png-0.1.0-macOS-arm64-developer-id.dmg"
-    private static let publishedAssetSize: Int64 = 3_312_367
-    private static let publishedAssetSHA256 =
-        "40fc785583a7cfaf1e476ae8649d2eb4e8461b49680e9a0fddfc35075b79bed7"
+    private static let fixtureVersion = SemanticVersion("0.1.0")!
+    private static let fixtureAssetName = "md2png-debug-update-fixture.dmg"
+    private static let fixtureAssetSize: Int64 = 3
+    private static let fixtureAssetSHA256 =
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
     func status(
         installedVersion: String?,
@@ -85,17 +85,15 @@ enum DebugUpdateMockState: String {
                 availableUpdate: nil
             ))
         case .downloadFailed:
-            guard let repository, let update = publishedUpdate(repository: repository) else {
-                return nil
-            }
+            guard let update = fixtureUpdate() else { return nil }
             return UpdateStatus(phase: .failed(
                 message: UpdateError.digestMismatch.localizedDescription,
-                releasesURL: repository.releasesURL,
+                releasesURL: repository?.releasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))
         case .readyToInstall:
-            guard let repository, let update = publishedUpdate(repository: repository),
+            guard let update = fixtureUpdate(),
                   let directory = updatesDirectory ?? FileManager.default.urls(
                     for: .cachesDirectory,
                     in: .userDomainMask
@@ -110,26 +108,26 @@ enum DebugUpdateMockState: String {
             }
             return UpdateStatus(phase: .failed(
                 message: UpdateError.revealFailed.localizedDescription,
-                releasesURL: repository.releasesURL,
+                releasesURL: repository?.releasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))
         }
     }
 
-    private func publishedUpdate(repository: GitHubRepository) -> AvailableUpdate? {
-        guard let downloadURL = URL(string:
-            "https://github.com/\(repository.owner)/\(repository.name)/releases/download/v0.1.0/\(Self.publishedAssetName)"
+    private func fixtureUpdate() -> AvailableUpdate? {
+        guard let downloadURL = URL(
+            string: "https://updates.invalid/\(Self.fixtureAssetName)"
         ) else {
             return nil
         }
         return AvailableUpdate(
-            version: Self.publishedVersion,
-            tagName: "v0.1.0",
-            assetName: Self.publishedAssetName,
+            version: Self.fixtureVersion,
+            tagName: "debug-fixture",
+            assetName: Self.fixtureAssetName,
             downloadURL: downloadURL,
-            size: Self.publishedAssetSize,
-            sha256: Self.publishedAssetSHA256
+            size: Self.fixtureAssetSize,
+            sha256: Self.fixtureAssetSHA256
         )
     }
 }
@@ -176,6 +174,19 @@ final class UpdateController {
         }
 #endif
         return channel().allowsUpdateChecks
+    }
+
+    var allowsInteractiveCheck: Bool {
+#if DEBUG
+        if usesTestingStatusOverride {
+            return false
+        }
+#endif
+        return channel().allowsUpdateChecks
+    }
+
+    func canDownload(_ update: AvailableUpdate) -> Bool {
+        channel().allowsDownload(update)
     }
 
     init(
@@ -329,7 +340,8 @@ final class UpdateController {
 
     func downloadAvailableUpdate() {
         guard checkTask == nil, downloadTask == nil,
-              let update = status.phase.availableUpdate else {
+              let update = status.phase.availableUpdate,
+              canDownload(update) else {
             return
         }
         status.phase = .downloading(update, progressPercent: 0)

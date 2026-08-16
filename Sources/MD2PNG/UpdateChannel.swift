@@ -57,4 +57,14 @@ enum UpdateChannel: Equatable, Sendable {
     var allowsUpdateChecks: Bool {
         repository != nil
     }
+
+    func allowsDownload(_ update: AvailableUpdate) -> Bool {
+        guard case let .stableGitHubReleases(repository) = self else {
+            return false
+        }
+        return UpdateReleaseResolver.isExpectedStableUpdate(
+            update,
+            repository: repository
+        )
+    }
 }
