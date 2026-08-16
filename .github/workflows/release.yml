@@ -35,6 +35,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       build: ${{ steps.release.outputs.build }}
       pr_number: ${{ steps.release.outputs.pr_number }}
+      milestone_plan_sha256: ${{ steps.release.outputs.milestone_plan_sha256 }}
     env:
       NODE_VERSION: "24.18.0"
     steps:
@@ -156,6 +157,16 @@ jobs:
             exit 1
           fi
 
+          pr_head_message="$(gh api -H 'Accept: application/vnd.github+json' \
+            "repos/${GITHUB_REPOSITORY}/git/commits/${pr_head_sha}" --jq .message)"
+          milestone_plan_sha256="$(sed -n 's/^Release-Milestone-Plan-SHA256: //p' <<< "$pr_head_message")"
+          milestone_digest_count="$(grep -c '^Release-Milestone-Plan-SHA256: ' <<< "$pr_head_message" || true)"
+          if [[ "$milestone_digest_count" -gt 1 \
+            || ( -n "$milestone_plan_sha256" && ! "$milestone_plan_sha256" =~ ^[0-9a-f]{64}$ ) ]]; then
+            echo "The authorizing PR head has invalid release milestone metadata." >&2
+            exit 1
+          fi
+
           checks_json="$(gh api -H 'Accept: application/vnd.github+json' \
             "repos/${GITHUB_REPOSITORY}/commits/${pr_head_sha}/check-runs?per_page=100" \
             --jq '.check_runs')"
@@ -183,6 +194,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "build=$build" >> "$GITHUB_OUTPUT"
           echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "milestone_plan_sha256=$milestone_plan_sha256" >> "$GITHUB_OUTPUT"
           {
             echo "## Authorized release"
             echo
@@ -541,6 +553,7 @@ jobs:
       PROJECT_URL: https://github.com/guangyya/md2png
       BUNDLE_IDENTIFIER: io.github.guangyya.md2png
       SOURCE_COMMIT: ${{ needs.detect.outputs.source_commit }}
+      EXPECTED_MILESTONE_PLAN_SHA256: ${{ needs.detect.outputs.milestone_plan_sha256 }}
       RELEASE_HANDOFF_DIR: ${{ github.workspace }}/.build/release-handoff
     steps:
       - name: Check out exact release source with publication token
@@ -582,18 +595,22 @@ jobs:
           trusted_release_assets="$RUNNER_TEMP/release-assets.mjs"
           trusted_asset_contract="$RUNNER_TEMP/release-assets.json"
           trusted_release_manifest="$RUNNER_TEMP/release-manifest.mjs"
+          trusted_release_milestone="$RUNNER_TEMP/release-milestone.mjs"
           git show "${WORKFLOW_COMMIT}:scripts/publish-hosted-release.sh" > "$trusted_publisher"
           git show "${WORKFLOW_COMMIT}:scripts/release-assets.mjs" > "$trusted_release_assets"
           git show "${WORKFLOW_COMMIT}:scripts/release-assets.json" > "$trusted_asset_contract"
           git show "${WORKFLOW_COMMIT}:scripts/release-manifest.mjs" > "$trusted_release_manifest"
+          git show "${WORKFLOW_COMMIT}:scripts/release-milestone.mjs" > "$trusted_release_milestone"
           chmod +x "$trusted_publisher"
           test -s "$trusted_publisher"
           test -s "$trusted_release_assets"
           test -s "$trusted_asset_contract"
           test -s "$trusted_release_manifest"
+          test -s "$trusted_release_milestone"
           printf 'TRUSTED_PUBLISHER=%s\n' "$trusted_publisher" >> "$GITHUB_ENV"
           printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_release_assets" >> "$GITHUB_ENV"
           printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_release_manifest" >> "$GITHUB_ENV"
+          printf 'RELEASE_MILESTONE_SCRIPT=%s\n' "$trusted_release_milestone" >> "$GITHUB_ENV"
 
       - name: Publish or safely resume exact release
         env:

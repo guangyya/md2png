@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const stableTagPattern = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const fullCommitPattern = /^[0-9a-f]{40}$/;
@@ -129,6 +131,29 @@ export function releaseMilestoneMarkdown(plan) {
     }
   }
   return lines.join("\n");
+}
+
+export function releaseMilestoneReviewDigest(plan) {
+  const reviewedPlan = {
+    schemaVersion: 1,
+    tag: plan.tag,
+    issues: plan.issues.map(({ number, title }) => ({ number, title })),
+  };
+  return createHash("sha256").update(JSON.stringify(reviewedPlan)).digest("hex");
+}
+
+async function mapWithConcurrency(values, limit, mapper) {
+  const results = new Array(values.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(values[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
+  return results;
 }
 
 async function githubRequest(url, token, options = {}) {
@@ -268,7 +293,7 @@ export async function planReleaseMilestone({ tag, sourceCommit }, environment = 
 
   const entries = releaseCommitEntries(repoRoot, previous.tag, sourceCommit);
   const pullRequestEntries = entries.filter((entry) => entry.pullRequestNumber !== null);
-  const pullRequests = await Promise.all(pullRequestEntries.map(async (entry) => {
+  const pullRequests = await mapWithConcurrency(pullRequestEntries, 4, async (entry) => {
     const pullRequest = await pullRequestDetails(
       apiUrl,
       repository,
@@ -279,12 +304,12 @@ export async function planReleaseMilestone({ tag, sourceCommit }, environment = 
       fail(`PR #${pullRequest.number} does not match release-history commit ${entry.sha}`);
     }
     return pullRequest;
-  }));
+  });
   const issueResponses = await paginatedJSON(apiUrl, token, `/repos/${repository}/issues?state=closed`);
   const issues = issueResponses.filter((issue) => !issue.pull_request);
   const selectedIssues = selectReleaseIssues(pullRequests, issues, tag);
   validateIssueMilestones(selectedIssues, tag);
-  return {
+  const plan = {
     tag,
     version: target.version,
     previousTag: previous.tag,
@@ -300,9 +325,34 @@ export async function planReleaseMilestone({ tag, sourceCommit }, environment = 
       milestone: issue.milestone?.title ?? null,
     })),
   };
+  return { ...plan, reviewDigest: releaseMilestoneReviewDigest(plan) };
 }
 
-async function syncReleaseMilestone(plan, environment = process.env) {
+function validateMilestoneItems(items, plan, { allowMissing }) {
+  const pullRequests = items.filter((item) => item.pull_request);
+  if (pullRequests.length > 0) {
+    fail(`${plan.tag} milestone contains pull requests: ${pullRequests.map((item) => `#${item.number}`).join(", ")}`);
+  }
+  const openItems = items.filter((item) => item.state !== "closed");
+  if (openItems.length > 0) {
+    fail(`${plan.tag} milestone still contains open items: ${openItems.map((item) => `#${item.number}`).join(", ")}`);
+  }
+  const expected = new Set(plan.issues.map((issue) => issue.number));
+  if (expected.size !== plan.issues.length) {
+    fail("release milestone plan contains duplicate issue numbers");
+  }
+  const actual = new Set(items.map((item) => item.number));
+  const extra = [...actual].filter((number) => !expected.has(number)).sort((left, right) => left - right);
+  const missing = [...expected].filter((number) => !actual.has(number)).sort((left, right) => left - right);
+  if (extra.length > 0 || (!allowMissing && missing.length > 0)) {
+    const details = [];
+    if (missing.length > 0) details.push(`missing ${missing.map((number) => `#${number}`).join(", ")}`);
+    if (extra.length > 0) details.push(`extra ${extra.map((number) => `#${number}`).join(", ")}`);
+    fail(`${plan.tag} milestone membership differs from the reviewed plan: ${details.join("; ")}`);
+  }
+}
+
+export async function syncReleaseMilestone(plan, environment = process.env) {
   const { token, repository, apiUrl, serverUrl } = normalizedEnvironment(environment);
   const milestones = await paginatedJSON(apiUrl, token, `/repos/${repository}/milestones?state=all`);
   const matches = milestones.filter((milestone) => milestone.title === plan.tag);
@@ -326,19 +376,33 @@ async function syncReleaseMilestone(plan, environment = process.env) {
     token,
     `/repos/${repository}/issues?state=all&milestone=${milestone.number}`,
   );
-  const openItems = milestoneItems.filter((item) => item.state !== "closed");
-  if (openItems.length > 0) {
-    fail(`${plan.tag} milestone still contains open items: ${openItems.map((item) => `#${item.number}`).join(", ")}`);
-  }
+  validateMilestoneItems(milestoneItems, plan, { allowMissing: true });
 
   for (const issue of plan.issues) {
-    if (issue.milestone === plan.tag) {
+    const current = await githubJSON(`${apiUrl}/repos/${repository}/issues/${issue.number}`, token);
+    if (current.pull_request) {
+      fail(`planned issue #${issue.number} is a pull request`);
+    }
+    if (current.state !== "closed") {
+      fail(`planned issue #${issue.number} is no longer closed`);
+    }
+    if (current.title !== issue.title) {
+      fail(`planned issue #${issue.number} title changed after review`);
+    }
+    const currentMilestone = current.milestone?.title ?? null;
+    if (currentMilestone !== null && currentMilestone !== plan.tag) {
+      fail(`issue #${issue.number} now belongs to milestone ${currentMilestone}, not ${plan.tag}`);
+    }
+    if (currentMilestone === plan.tag) {
       continue;
     }
-    await githubJSON(`${apiUrl}/repos/${repository}/issues/${issue.number}`, token, {
+    const updated = await githubJSON(`${apiUrl}/repos/${repository}/issues/${issue.number}`, token, {
       method: "PATCH",
       body: JSON.stringify({ milestone: milestone.number }),
     });
+    if (updated.milestone?.title !== plan.tag) {
+      fail(`issue #${issue.number} was not assigned to milestone ${plan.tag}`);
+    }
   }
 
   const verifiedItems = await paginatedJSON(
@@ -346,17 +410,7 @@ async function syncReleaseMilestone(plan, environment = process.env) {
     token,
     `/repos/${repository}/issues?state=all&milestone=${milestone.number}`,
   );
-  const verifiedIssueNumbers = new Set(
-    verifiedItems.filter((item) => !item.pull_request).map((item) => item.number),
-  );
-  for (const issue of plan.issues) {
-    if (!verifiedIssueNumbers.has(issue.number)) {
-      fail(`issue #${issue.number} was not assigned to milestone ${plan.tag}`);
-    }
-  }
-  if (verifiedItems.some((item) => item.state !== "closed")) {
-    fail(`${plan.tag} milestone cannot close while it contains open items`);
-  }
+  validateMilestoneItems(verifiedItems, plan, { allowMissing: false });
   if (milestone.state !== "closed") {
     milestone = await githubJSON(`${apiUrl}/repos/${repository}/milestones/${milestone.number}`, token, {
       method: "PATCH",
@@ -384,7 +438,7 @@ function parseOptions(argv) {
       fail("options must use --name value pairs");
     }
     const key = name.slice(2);
-    if (!["tag", "source-commit"].includes(key)) {
+    if (!["tag", "source-commit", "expected-review-digest"].includes(key)) {
       fail(`unknown option: ${name}`);
     }
     if (Object.hasOwn(options, key)) {
@@ -395,17 +449,26 @@ function parseOptions(argv) {
   if (!options.tag || !options["source-commit"]) {
     fail("--tag and --source-commit are required");
   }
-  return { command, tag: options.tag, sourceCommit: options["source-commit"] };
+  const expectedReviewDigest = options["expected-review-digest"] ?? null;
+  if (expectedReviewDigest !== null && !/^[0-9a-f]{64}$/.test(expectedReviewDigest)) {
+    fail("--expected-review-digest must be a lowercase SHA-256 digest");
+  }
+  return { command, tag: options.tag, sourceCommit: options["source-commit"], expectedReviewDigest };
 }
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   const plan = await planReleaseMilestone(options);
+  if (options.expectedReviewDigest !== null && plan.reviewDigest !== options.expectedReviewDigest) {
+    fail(`release milestone plan digest ${plan.reviewDigest} does not match reviewed digest ${options.expectedReviewDigest}`);
+  }
   const result = options.command === "sync" ? await syncReleaseMilestone(plan) : plan;
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+const modulePath = realpathSync(fileURLToPath(import.meta.url));
+const invokedPath = process.argv[1] ? realpathSync(process.argv[1]) : null;
+if (invokedPath !== null && modulePath === invokedPath) {
   main().catch((error) => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

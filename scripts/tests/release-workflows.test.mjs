@@ -210,10 +210,10 @@ test("validate and sign stage trusted asset tooling before consuming it", () => 
   assert.match(signAssembly.run, /node "\$RELEASE_MANIFEST_SCRIPT" create/);
 });
 
-test("trusted asset tooling can stage from main while a pre-contract source is checked out", (context) => {
+test("trusted publication tooling can stage from main while a pre-contract source is checked out", (context) => {
   const releaseWorkflow = parseYaml(workflows["release.yml"]);
-  const stage = releaseWorkflow.jobs.validate.steps.find(
-    (step) => step.name === "Stage trusted release asset tooling",
+  const stage = releaseWorkflow.jobs.publish.steps.find(
+    (step) => step.name === "Stage trusted publication implementation",
   );
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "md2png-historical-recovery-"));
   const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "md2png-trusted-tooling-"));
@@ -228,7 +228,13 @@ test("trusted asset tooling can stage from main while a pre-contract source is c
   git("commit", "-m", "Historical source");
   const sourceCommit = git("rev-parse", "HEAD");
   fs.mkdirSync(path.join(fixture, "scripts"));
-  for (const file of ["release-assets.mjs", "release-assets.json", "release-manifest.mjs"]) {
+  for (const file of [
+    "publish-hosted-release.sh",
+    "release-assets.mjs",
+    "release-assets.json",
+    "release-manifest.mjs",
+    "release-milestone.mjs",
+  ]) {
     fs.copyFileSync(path.join(repoRoot, "scripts", file), path.join(fixture, "scripts", file));
   }
   git("add", "scripts");
@@ -237,6 +243,7 @@ test("trusted asset tooling can stage from main while a pre-contract source is c
   git("remote", "add", "origin", fixture);
   git("checkout", "--detach", sourceCommit);
   assert.equal(fs.existsSync(path.join(fixture, "scripts/release-assets.mjs")), false);
+  assert.equal(fs.existsSync(path.join(fixture, "scripts/release-milestone.mjs")), false);
 
   const githubEnv = path.join(runnerTemp, "github-env");
   const result = spawnSync("/bin/bash", ["-c", stage.run], {
@@ -256,6 +263,7 @@ test("trusted asset tooling can stage from main while a pre-contract source is c
     .map((line) => line.split(/=(.*)/s).slice(0, 2)));
   assert.ok(fs.existsSync(staged.RELEASE_ASSETS_SCRIPT));
   assert.ok(fs.existsSync(staged.RELEASE_MANIFEST_SCRIPT));
+  assert.ok(fs.existsSync(staged.RELEASE_MILESTONE_SCRIPT));
   const rendered = spawnSync(process.execPath, [
     staged.RELEASE_ASSETS_SCRIPT,
     "names",
@@ -264,6 +272,11 @@ test("trusted asset tooling can stage from main while a pre-contract source is c
   ], { encoding: "utf8" });
   assert.equal(rendered.status, 0, rendered.stderr);
   assert.equal(rendered.stdout.trim().split("\n").length, 5, rendered.stdout);
+  const milestoneInvocation = spawnSync(process.execPath, [staged.RELEASE_MILESTONE_SCRIPT, "invalid"], {
+    encoding: "utf8",
+  });
+  assert.equal(milestoneInvocation.status, 1, milestoneInvocation.stderr);
+  assert.match(milestoneInvocation.stderr, /command must be plan or sync/);
 });
 
 test("preparation App token has only branch and pull request write permissions", () => {
@@ -396,8 +409,10 @@ test("trusted publication updates coverage history in the originating workflow",
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-assets\.mjs"/);
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-assets\.json"/);
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-manifest\.mjs"/);
+  assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-milestone\.mjs"/);
   assert.match(release, /RELEASE_ASSETS_SCRIPT/);
   assert.match(release, /RELEASE_MANIFEST_SCRIPT/);
+  assert.match(release, /RELEASE_MILESTONE_SCRIPT/);
   assert.match(release, /run: REPO_ROOT="\$GITHUB_WORKSPACE" "\$TRUSTED_PUBLISHER"/);
 });
 
@@ -408,7 +423,7 @@ test("release remains draft until every uploaded asset has been verified", () =>
   const createDraft = publisher.indexOf("--draft");
   const upload = publisher.indexOf("gh release upload");
   const exactAssetSet = publisher.indexOf('if [[ "$published_names" != "$expected_names_text" ]]');
-  const milestone = publisher.indexOf("scripts/release-milestone.mjs sync");
+  const milestone = publisher.indexOf('"$release_milestone_script" sync');
   const publish = publisher.indexOf('--draft=false --latest');
 
   assert.ok(resolveReleaseId >= 0, "draft Releases must be resolved through gh release view");
@@ -432,8 +447,43 @@ test("Release PR previews and trusted publication applies the issue milestone", 
   const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");
 
   assert.match(prepare, /release-milestone\.mjs plan/);
+  assert.match(prepare, /Release-Milestone-Plan-SHA256:/);
+  assert.match(workflows["release-preflight.yml"], /release-milestone\.mjs plan/);
+  assert.match(workflows["release-preflight.yml"], /Release-Milestone-Plan-SHA256:/);
+  assert.match(workflows["release.yml"], /milestone_plan_sha256/);
   assert.match(prepare, /Planned .* issue milestone/);
-  assert.match(publisher, /release-milestone\.mjs sync/);
+  assert.match(publisher, /"\$release_milestone_script" sync/);
+  assert.match(publisher, /--expected-review-digest "\$expected_milestone_plan_sha256"/);
   assert.match(publisher, /--tag "\$tag"/);
   assert.match(publisher, /--source-commit "\$source_commit"/);
+});
+
+test("the reviewed milestone digest is bound from preparation through publication", () => {
+  const prepareWorkflow = parseYaml(workflows["prepare-release-pr.yml"]);
+  const preflightWorkflow = parseYaml(workflows["release-preflight.yml"]);
+  const releaseWorkflow = parseYaml(workflows["release.yml"]);
+  const prepare = prepareWorkflow.jobs.prepare.steps.find(
+    (step) => step.name === "Create focused release branch and pull request",
+  ).run;
+  const preflight = preflightWorkflow.jobs.detect.steps.find(
+    (step) => step.name === "Validate release metadata change",
+  ).run;
+  const authorize = releaseWorkflow.jobs.detect.steps.find(
+    (step) => step.name === "Validate release authorization",
+  ).run;
+  const publish = releaseWorkflow.jobs.publish;
+
+  assert.ok(prepare.indexOf("release-milestone.mjs plan") < prepare.indexOf("git commit"));
+  assert.match(prepare, /Release-Base: \$\{BASE_SHA\}/);
+  assert.match(prepare, /Release-Milestone-Plan-SHA256: \$\{milestone_plan_sha256\}/);
+  assert.match(preflight, /test "\$release_base" = "\$BASE_SHA"/);
+  assert.match(preflight, /git rev-parse "\$\{HEAD_SHA\}\^1"/);
+  assert.match(preflight, /git rev-list --count "\$\{BASE_SHA\}\.\.\$\{HEAD_SHA\}"/);
+  assert.match(preflight, /release-milestone\.mjs plan[\s\S]*?\.reviewDigest[\s\S]*?milestone_plan_sha256/);
+  assert.match(authorize, /git\/commits\/\$\{pr_head_sha\}/);
+  assert.match(authorize, /Release-Milestone-Plan-SHA256:/);
+  assert.equal(
+    publish.env.EXPECTED_MILESTONE_PLAN_SHA256,
+    "${{ needs.detect.outputs.milestone_plan_sha256 }}",
+  );
 });

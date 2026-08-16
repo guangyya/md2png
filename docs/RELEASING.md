@@ -104,15 +104,19 @@ To release:
    `CHANGELOG.md`, and `ABOUT_CHANGELOG.md`, increments the build by one, and
    moves both `Unreleased` sections to the same Asia/Shanghai release date. Its
    body also previews the closed `FEAT-*` and `TD-*` issues that will be grouped
-   under the release milestone.
+   under the release milestone. The generated commit records the exact base and
+   a SHA-256 digest of that reviewed plan.
 4. Wait for normal CI and Release preflight, then merge the PR through the
    protected branch. The preparation workflow cannot approve or merge it.
 5. Watch **Trusted Release** validate, sign, notarize, publish, verify the five
    assets, and update coverage history for that exact merge commit.
 
-Release preflight derives the bump independently, rejects stale or unrelated
-edits, runs tests, and verifies an ad-hoc release package without secrets or
-write permission. Coverage is deliberately not collected on the Release PR.
+Release preflight derives the bump independently, requires the generated commit
+to remain the single commit on its recorded base, recomputes the milestone plan
+digest, rejects stale or unrelated edits, runs tests, and verifies an ad-hoc
+release package without secrets or write permission. The publisher recomputes
+the same reviewed issue set before any milestone mutation. Coverage is
+deliberately not collected on the Release PR.
 The post-merge trusted Release build collects it once on Xcode 26.2. The two
 stable CI jobs and Release preflight are hard publication gates; the explicitly
 experimental Xcode preview job remains informational and cannot block a stable
@@ -137,11 +141,14 @@ release commit. For each merged PR in that first-parent range, it includes
 closed `FEAT-*` and `TD-*` issues referenced with GitHub closing keywords. It
 also matches a leading identifier in the PR title, such as `FEAT-003`, so an
 already completed issue remains discoverable even when it was closed manually.
-It creates or reuses the exact `vX.Y.Z` milestone, refuses to overwrite an issue
-explicitly closed by a PR into another version, ignores later same-identifier
-maintenance PRs for an issue already shipped, refuses to close a milestone
-containing open work, and closes the milestone before the draft Release becomes
-public.
+It creates or reuses the exact `vX.Y.Z` milestone, rejects pull requests and any
+extra, missing, or open issue in that milestone, and re-reads every planned issue
+immediately before assignment so an intervening assignment to another milestone
+fails closed. It ignores later same-identifier maintenance PRs for an issue
+already shipped and performs a final exact membership check before closing the
+milestone and making the draft Release public. Historical Release PRs created
+before milestone plan digests were introduced remain recoverable but do not
+retroactively modify milestones.
 Keep the issue identifier at the start of implementation PR titles and use a
 closing reference such as `Closes #3` in the PR body whenever possible.
 After publication, use `is:issue milestone:vX.Y.Z` in GitHub Issues to see the
