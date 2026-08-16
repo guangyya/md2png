@@ -350,9 +350,19 @@ function validateMilestoneItems(items, plan, { allowMissing }) {
     if (extra.length > 0) details.push(`extra ${extra.map((number) => `#${number}`).join(", ")}`);
     fail(`${plan.tag} milestone membership differs from the reviewed plan: ${details.join("; ")}`);
   }
+  return { missing };
 }
 
-export async function syncReleaseMilestone(plan, environment = process.env) {
+export async function syncReleaseMilestone(plan, environment = process.env, retryOptions = {}) {
+  const membershipAttempts = retryOptions.membershipAttempts ?? 5;
+  const membershipDelayMs = retryOptions.membershipDelayMs ?? 2_000;
+  const sleep = retryOptions.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
+  if (!Number.isSafeInteger(membershipAttempts) || membershipAttempts < 1 || membershipAttempts > 10) {
+    fail("milestone membership attempts must be between 1 and 10");
+  }
+  if (!Number.isSafeInteger(membershipDelayMs) || membershipDelayMs < 0 || membershipDelayMs > 10_000) {
+    fail("milestone membership delay must be between 0 and 10000 milliseconds");
+  }
   const { token, repository, apiUrl, serverUrl } = normalizedEnvironment(environment);
   const milestones = await paginatedJSON(apiUrl, token, `/repos/${repository}/milestones?state=all`);
   const matches = milestones.filter((milestone) => milestone.title === plan.tag);
@@ -405,12 +415,20 @@ export async function syncReleaseMilestone(plan, environment = process.env) {
     }
   }
 
-  const verifiedItems = await paginatedJSON(
-    apiUrl,
-    token,
-    `/repos/${repository}/issues?state=all&milestone=${milestone.number}`,
-  );
-  validateMilestoneItems(verifiedItems, plan, { allowMissing: false });
+  let missing = [];
+  for (let attempt = 1; attempt <= membershipAttempts; attempt += 1) {
+    const verifiedItems = await paginatedJSON(
+      apiUrl,
+      token,
+      `/repos/${repository}/issues?state=all&milestone=${milestone.number}`,
+    );
+    ({ missing } = validateMilestoneItems(verifiedItems, plan, { allowMissing: true }));
+    if (missing.length === 0) break;
+    if (attempt < membershipAttempts) await sleep(membershipDelayMs);
+  }
+  if (missing.length > 0) {
+    fail(`${plan.tag} milestone membership differs from the reviewed plan after ${membershipAttempts} attempts: missing ${missing.map((number) => `#${number}`).join(", ")}`);
+  }
   if (milestone.state !== "closed") {
     milestone = await githubJSON(`${apiUrl}/repos/${repository}/milestones/${milestone.number}`, token, {
       method: "PATCH",

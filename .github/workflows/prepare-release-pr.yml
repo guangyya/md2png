@@ -220,6 +220,15 @@ jobs:
             --body-file "$body_file" \
             --label release \
             --label "release:${REQUESTED_BUMP}")"
+          pr_number="${pr_url##*/}"
+          [[ "$pr_number" =~ ^[1-9][0-9]*$ ]]
+          GITHUB_TOKEN="$APP_TOKEN" node scripts/release-pr-labels.mjs verify \
+            --repository "$GITHUB_REPOSITORY" \
+            --pull-request "$pr_number" \
+            --head-sha "$(git rev-parse HEAD)" \
+            --head-ref "$BRANCH" \
+            --version "$VERSION" \
+            --bump "$REQUESTED_BUMP"
           {
             echo "## Release PR created"
             echo
