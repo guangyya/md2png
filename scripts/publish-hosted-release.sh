@@ -6,6 +6,7 @@ cd "$repo_root"
 
 node_binary="${NODE:-node}"
 release_assets_script="${RELEASE_ASSETS_SCRIPT:-scripts/release-assets.mjs}"
+release_manifest_script="${RELEASE_MANIFEST_SCRIPT:-scripts/release-manifest.mjs}"
 gh_host="${GH_HOST:-github.com}"
 gh_repo="${GH_REPO:-}"
 handoff_dir="${RELEASE_HANDOFF_DIR:-}"
@@ -54,7 +55,7 @@ coverage_markdown_name="$(asset_value_by_key coverageMarkdown name)"
 manifest_path="${handoff_dir}/release-manifest.json"
 notes_file="$RUNNER_TEMP/release-notes-${version}.md"
 
-"$node_binary" scripts/release-manifest.mjs validate \
+"$node_binary" "$release_manifest_script" validate \
   --manifest "$manifest_path" \
   --directory "$handoff_dir" \
   --version "$version" \
@@ -171,8 +172,7 @@ for name in "${expected_names[@]}"; do
   local_path="${handoff_dir}/${name}"
   local_size="$(stat -f %z "$local_path")"
   local_digest="sha256:$(shasum -a 256 "$local_path" | awk '{print $1}')"
-  asset_json="$(gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq ".assets[] | select(.name == \"${name}\")")"
+  asset_json="$(jq -c --arg name "$name" '.assets[] | select(.name == $name)' <<< "$release_json")"
   if [[ -z "$asset_json" ]]; then
     if [[ "$release_is_draft" != "true" ]]; then
       echo "Published Release is missing a verified asset: $name" >&2
@@ -180,11 +180,10 @@ for name in "${expected_names[@]}"; do
     fi
     label="$(asset_value_by_name "$name" label)"
     gh release upload "$tag" "${local_path}#${label}" --repo "$repo_ref"
-    asset_json="$(gh api --hostname "$gh_host" "$release_endpoint" \
-      --jq ".assets[] | select(.name == \"${name}\")")"
+    release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
+    asset_json="$(jq -c --arg name "$name" '.assets[] | select(.name == $name)' <<< "$release_json")"
   fi
-  remote_count="$(gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq "[.assets[] | select(.name == \"${name}\")] | length")"
+  remote_count="$(jq --arg name "$name" '[.assets[] | select(.name == $name)] | length' <<< "$release_json")"
   test "$remote_count" = "1"
   remote_size="$(jq -r .size <<< "$asset_json")"
   remote_digest="$(jq -r .digest <<< "$asset_json")"
@@ -201,7 +200,8 @@ for name in "${expected_names[@]}"; do
   fi
 done
 
-published_names="$(gh api --hostname "$gh_host" "$release_endpoint" --jq '.assets[].name' | LC_ALL=C sort)"
+release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
+published_names="$(jq -r '.assets[].name' <<< "$release_json" | LC_ALL=C sort)"
 expected_names_text="$(printf '%s\n' "${expected_names[@]}" | LC_ALL=C sort)"
 if [[ "$published_names" != "$expected_names_text" ]]; then
   echo "Published Release has unexpected or missing assets." >&2

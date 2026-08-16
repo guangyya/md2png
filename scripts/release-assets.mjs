@@ -7,13 +7,6 @@ import { fileURLToPath } from "node:url";
 
 const contractPath = fileURLToPath(new URL("./release-assets.json", import.meta.url));
 const stableVersionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
-const requiredAssetKeys = [
-  "releaseZip",
-  "releaseDmg",
-  "latestDmg",
-  "coverageJson",
-  "coverageMarkdown",
-];
 const assetFields = ["key", "name", "label", "contentType", "sourcePath"];
 
 function fail(message) {
@@ -54,6 +47,9 @@ export function validateReleaseAssetContract(contract) {
   if (!Array.isArray(contract.assets)) {
     fail("release asset contract assets must be an array");
   }
+  if (contract.assets.length === 0) {
+    fail("release asset contract must define at least one asset");
+  }
   const keys = contract.assets.map((asset, index) => {
     exactKeys(asset, assetFields, `release asset ${index}`);
     if (typeof asset.key !== "string" || !/^[a-z][A-Za-z0-9]*$/.test(asset.key)) {
@@ -69,9 +65,6 @@ export function validateReleaseAssetContract(contract) {
   });
   if (new Set(keys).size !== keys.length) {
     fail("release asset keys must be unique");
-  }
-  if (JSON.stringify(keys) !== JSON.stringify(requiredAssetKeys)) {
-    fail(`release asset keys must be exactly: ${requiredAssetKeys.join(", ")}`);
   }
   return contract;
 }
@@ -96,7 +89,7 @@ export function releaseAssets(version, contract = readReleaseAssetContract()) {
   validateReleaseAssetContract(contract);
   const assets = contract.assets.map((asset) => {
     const name = renderTemplate(asset.name, { version });
-    if (name !== path.basename(name) || name === "." || name === "..") {
+    if (name !== path.basename(name) || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
       fail(`${asset.key} renders an unsafe asset name`);
     }
     const sourcePath = renderTemplate(asset.sourcePath, { version, name });
@@ -165,30 +158,41 @@ function parseArgs(argv) {
     }
     options[key] = value;
   }
-  const unknown = Object.keys(options).filter((name) => name !== "version");
+  const allowed = command === "field" ? ["version", "key", "field"] : ["version"];
+  const unknown = Object.keys(options).filter((name) => !allowed.includes(name));
   if (unknown.length > 0) {
     fail(`unknown option: --${unknown[0]}`);
   }
   if (!options.version) {
     fail("--version is required");
   }
-  return { command, version: options.version };
+  return { command, options };
 }
 
 function main(argv) {
-  const { command, version } = parseArgs(argv);
+  const { command, options } = parseArgs(argv);
+  const { version } = options;
   const assets = releaseAssets(version);
   if (command === "json") {
     process.stdout.write(`${JSON.stringify({ schemaVersion: 1, version, assets }, null, 2)}\n`);
   } else if (command === "names") {
     process.stdout.write(`${assets.map((asset) => asset.name).join("\n")}\n`);
+  } else if (command === "field") {
+    if (!options.key || !options.field) {
+      fail("field requires --key and --field");
+    }
+    const asset = releaseAsset(version, options.key);
+    if (!Object.hasOwn(asset, options.field)) {
+      fail(`unknown release asset field: ${options.field}`);
+    }
+    process.stdout.write(`${asset[options.field]}\n`);
   } else {
-    fail("usage: release-assets.mjs json|names --version VERSION");
+    fail("usage: release-assets.mjs json|names|field --version VERSION [--key KEY --field FIELD]");
   }
 }
 
-const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
-if (invokedPath === fileURLToPath(import.meta.url)) {
+const invokedPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : "";
+if (invokedPath === fs.realpathSync(fileURLToPath(import.meta.url))) {
   try {
     main(process.argv.slice(2));
   } catch (error) {

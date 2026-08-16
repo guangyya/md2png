@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -184,6 +185,87 @@ test("coverage runs only in the trusted post-merge Release build", () => {
   assert.match(workflows["release.yml"], /make coverage SOURCE_COMMIT=/);
 });
 
+test("validate and sign stage trusted asset tooling before consuming it", () => {
+  const releaseWorkflow = parseYaml(workflows["release.yml"]);
+  const jobs = releaseWorkflow.jobs;
+  for (const jobName of ["validate", "sign"]) {
+    const job = jobs[jobName];
+    const stageIndex = job.steps.findIndex((step) => step.name === "Stage trusted release asset tooling");
+    assert.ok(stageIndex > 0, `${jobName} must stage tooling after checkout`);
+    const stage = job.steps[stageIndex];
+    assert.deepEqual(stage.env, {
+      WORKFLOW_COMMIT: "${{ github.sha }}",
+      WORKFLOW_REF: "${{ github.ref }}",
+    });
+    assert.match(stage.run, /\[\[ "\$WORKFLOW_REF" != "refs\/heads\/main" \]\]/);
+    assert.match(stage.run, /git fetch origin main:refs\/remotes\/origin\/main/);
+    assert.match(stage.run, /git merge-base --is-ancestor "\$WORKFLOW_COMMIT" refs\/remotes\/origin\/main/);
+    assert.match(stage.run, /git merge-base --is-ancestor "\$SOURCE_COMMIT" "\$WORKFLOW_COMMIT"/);
+    assert.match(stage.run, /for file in release-assets\.mjs release-assets\.json release-manifest\.mjs/);
+    assert.match(stage.run, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/\$\{file\}" > "\$trusted_dir\/\$file"/);
+    const consumerIndex = job.steps.findIndex((step) => step.run?.includes("$RELEASE_ASSETS_SCRIPT"));
+    assert.ok(consumerIndex > stageIndex, `${jobName} must consume only the previously staged helper`);
+  }
+  const signAssembly = jobs.sign.steps.find((step) => step.name === "Import, verify, sign, notarize, and assemble handoff");
+  assert.match(signAssembly.run, /node "\$RELEASE_MANIFEST_SCRIPT" create/);
+});
+
+test("trusted asset tooling can stage from main while a pre-contract source is checked out", (context) => {
+  const releaseWorkflow = parseYaml(workflows["release.yml"]);
+  const stage = releaseWorkflow.jobs.validate.steps.find(
+    (step) => step.name === "Stage trusted release asset tooling",
+  );
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "md2png-historical-recovery-"));
+  const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), "md2png-trusted-tooling-"));
+  context.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  context.after(() => fs.rmSync(runnerTemp, { recursive: true, force: true }));
+  const git = (...args) => execFileSync("git", args, { cwd: fixture, encoding: "utf8" }).trim();
+  git("init", "-b", "main");
+  git("config", "user.name", "Release Test");
+  git("config", "user.email", "release-test@example.invalid");
+  fs.writeFileSync(path.join(fixture, "README.md"), "historical source without asset tooling\n");
+  git("add", "README.md");
+  git("commit", "-m", "Historical source");
+  const sourceCommit = git("rev-parse", "HEAD");
+  fs.mkdirSync(path.join(fixture, "scripts"));
+  for (const file of ["release-assets.mjs", "release-assets.json", "release-manifest.mjs"]) {
+    fs.copyFileSync(path.join(repoRoot, "scripts", file), path.join(fixture, "scripts", file));
+  }
+  git("add", "scripts");
+  git("commit", "-m", "Add trusted asset tooling");
+  const workflowCommit = git("rev-parse", "HEAD");
+  git("remote", "add", "origin", fixture);
+  git("checkout", "--detach", sourceCommit);
+  assert.equal(fs.existsSync(path.join(fixture, "scripts/release-assets.mjs")), false);
+
+  const githubEnv = path.join(runnerTemp, "github-env");
+  const result = spawnSync("/bin/bash", ["-c", stage.run], {
+    cwd: fixture,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      GITHUB_ENV: githubEnv,
+      RUNNER_TEMP: runnerTemp,
+      SOURCE_COMMIT: sourceCommit,
+      WORKFLOW_COMMIT: workflowCommit,
+      WORKFLOW_REF: "refs/heads/main",
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const staged = Object.fromEntries(fs.readFileSync(githubEnv, "utf8").trim().split("\n")
+    .map((line) => line.split(/=(.*)/s).slice(0, 2)));
+  assert.ok(fs.existsSync(staged.RELEASE_ASSETS_SCRIPT));
+  assert.ok(fs.existsSync(staged.RELEASE_MANIFEST_SCRIPT));
+  const rendered = spawnSync(process.execPath, [
+    staged.RELEASE_ASSETS_SCRIPT,
+    "names",
+    "--version",
+    "0.4.0",
+  ], { encoding: "utf8" });
+  assert.equal(rendered.status, 0, rendered.stderr);
+  assert.equal(rendered.stdout.trim().split("\n").length, 5, rendered.stdout);
+});
+
 test("preparation App token has only branch and pull request write permissions", () => {
   const prepare = workflows["prepare-release-pr.yml"];
   assert.match(prepare, /permission-contents: write\n          permission-pull-requests: write/);
@@ -313,7 +395,9 @@ test("trusted publication updates coverage history in the originating workflow",
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/publish-hosted-release\.sh"/);
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-assets\.mjs"/);
   assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-assets\.json"/);
+  assert.match(release, /git show "\$\{WORKFLOW_COMMIT\}:scripts\/release-manifest\.mjs"/);
   assert.match(release, /RELEASE_ASSETS_SCRIPT/);
+  assert.match(release, /RELEASE_MANIFEST_SCRIPT/);
   assert.match(release, /run: REPO_ROOT="\$GITHUB_WORKSPACE" "\$TRUSTED_PUBLISHER"/);
 });
 
@@ -334,6 +418,8 @@ test("release remains draft until every uploaded asset has been verified", () =>
   assert.ok(exactAssetSet > upload, "the complete asset set must be verified after upload");
   assert.ok(publish > exactAssetSet, "the draft must publish only after asset verification");
   assert.match(publisher, /Published Release is missing a verified asset/);
+  assert.match(publisher, /jq -c --arg name "\$name"/);
+  assert.doesNotMatch(publisher, /select\(\.name == \\"\$\{name\}/);
   assert.match(publisher, /published_release_json=.*"\$release_endpoint"/);
   assert.match(publisher, /\.draft <<< "\$published_release_json"\)" = "false"/);
 });

@@ -269,6 +269,31 @@ jobs:
           ref: ${{ needs.detect.outputs.source_commit }}
           persist-credentials: false
 
+      - name: Stage trusted release asset tooling
+        env:
+          WORKFLOW_COMMIT: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$WORKFLOW_REF" != "refs/heads/main" ]]; then
+            echo "Release asset tooling must come from refs/heads/main." >&2
+            exit 1
+          fi
+          git fetch origin main:refs/remotes/origin/main
+          git cat-file -e "${WORKFLOW_COMMIT}^{commit}"
+          git merge-base --is-ancestor "$WORKFLOW_COMMIT" refs/remotes/origin/main
+          git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
+          trusted_dir="$RUNNER_TEMP/release-asset-tooling"
+          mkdir -p "$trusted_dir"
+          for file in release-assets.mjs release-assets.json release-manifest.mjs; do
+            git show "${WORKFLOW_COMMIT}:scripts/${file}" > "$trusted_dir/$file"
+            test -s "$trusted_dir/$file"
+          done
+          chmod +x "$trusted_dir/release-assets.mjs" "$trusted_dir/release-manifest.mjs"
+          printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_dir/release-assets.mjs" >> "$GITHUB_ENV"
+          printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_dir/release-manifest.mjs" >> "$GITHUB_ENV"
+
       - name: Verify canonical toolchain
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
@@ -304,7 +329,7 @@ jobs:
       - name: Stage normalized coverage handoff
         run: |
           mkdir -p .build/coverage-handoff
-          asset_contract="$(node scripts/release-assets.mjs json --version "$VERSION")"
+          asset_contract="$(node "$RELEASE_ASSETS_SCRIPT" json --version "$VERSION")"
           for key in coverageJson coverageMarkdown; do
             source_path="$(jq -er --arg key "$key" '.assets[] | select(.key == $key) | .sourcePath' <<< "$asset_contract")"
             cp "$source_path" .build/coverage-handoff/
@@ -346,6 +371,31 @@ jobs:
         with:
           ref: ${{ needs.detect.outputs.source_commit }}
           persist-credentials: false
+
+      - name: Stage trusted release asset tooling
+        env:
+          WORKFLOW_COMMIT: ${{ github.sha }}
+          WORKFLOW_REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$WORKFLOW_REF" != "refs/heads/main" ]]; then
+            echo "Release asset tooling must come from refs/heads/main." >&2
+            exit 1
+          fi
+          git fetch origin main:refs/remotes/origin/main
+          git cat-file -e "${WORKFLOW_COMMIT}^{commit}"
+          git merge-base --is-ancestor "$WORKFLOW_COMMIT" refs/remotes/origin/main
+          git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
+          trusted_dir="$RUNNER_TEMP/release-asset-tooling"
+          mkdir -p "$trusted_dir"
+          for file in release-assets.mjs release-assets.json release-manifest.mjs; do
+            git show "${WORKFLOW_COMMIT}:scripts/${file}" > "$trusted_dir/$file"
+            test -s "$trusted_dir/$file"
+          done
+          chmod +x "$trusted_dir/release-assets.mjs" "$trusted_dir/release-manifest.mjs"
+          printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_dir/release-assets.mjs" >> "$GITHUB_ENV"
+          printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_dir/release-manifest.mjs" >> "$GITHUB_ENV"
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -428,7 +478,7 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --keychain "$keychain"
 
-          asset_contract="$(node scripts/release-assets.mjs json --version "$VERSION")"
+          asset_contract="$(node "$RELEASE_ASSETS_SCRIPT" json --version "$VERSION")"
           coverage_json_path="$(jq -er '.assets[] | select(.key == "coverageJson") | .sourcePath' <<< "$asset_contract")"
           node scripts/coverage-report.mjs validate \
             --report "$coverage_json_path" \
@@ -456,7 +506,7 @@ jobs:
             fi
             cp "$source_path" "$handoff/$name"
           done < <(jq -c '.assets[]' <<< "$asset_contract")
-          node scripts/release-manifest.mjs create \
+          node "$RELEASE_MANIFEST_SCRIPT" create \
             --output "$handoff/release-manifest.json" \
             --directory "$handoff" \
             --version "$VERSION" \
@@ -531,15 +581,19 @@ jobs:
           trusted_publisher="$RUNNER_TEMP/publish-hosted-release.sh"
           trusted_release_assets="$RUNNER_TEMP/release-assets.mjs"
           trusted_asset_contract="$RUNNER_TEMP/release-assets.json"
+          trusted_release_manifest="$RUNNER_TEMP/release-manifest.mjs"
           git show "${WORKFLOW_COMMIT}:scripts/publish-hosted-release.sh" > "$trusted_publisher"
           git show "${WORKFLOW_COMMIT}:scripts/release-assets.mjs" > "$trusted_release_assets"
           git show "${WORKFLOW_COMMIT}:scripts/release-assets.json" > "$trusted_asset_contract"
+          git show "${WORKFLOW_COMMIT}:scripts/release-manifest.mjs" > "$trusted_release_manifest"
           chmod +x "$trusted_publisher"
           test -s "$trusted_publisher"
           test -s "$trusted_release_assets"
           test -s "$trusted_asset_contract"
+          test -s "$trusted_release_manifest"
           printf 'TRUSTED_PUBLISHER=%s\n' "$trusted_publisher" >> "$GITHUB_ENV"
           printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_release_assets" >> "$GITHUB_ENV"
+          printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_release_manifest" >> "$GITHUB_ENV"
 
       - name: Publish or safely resume exact release
         env:

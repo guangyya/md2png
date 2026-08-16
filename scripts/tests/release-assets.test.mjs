@@ -62,18 +62,15 @@ test("renders the reviewed release asset contract exactly", () => {
   assert.deepEqual(releaseAsset(version, "coverageJson"), expected[3]);
 });
 
-test("rejects missing, extra, reordered, duplicate, and malformed contract entries", () => {
+test("treats JSON membership as authoritative and rejects malformed contract entries", () => {
   const contract = readReleaseAssetContract();
   const clone = () => structuredClone(contract);
-  const missing = clone();
-  missing.assets.pop();
-  assert.throws(() => validateReleaseAssetContract(missing), /keys must be exactly/);
-  const extra = clone();
-  extra.assets.push({ ...extra.assets[0], key: "extraAsset" });
-  assert.throws(() => validateReleaseAssetContract(extra), /keys must be exactly/);
   const reordered = clone();
   [reordered.assets[0], reordered.assets[1]] = [reordered.assets[1], reordered.assets[0]];
-  assert.throws(() => validateReleaseAssetContract(reordered), /keys must be exactly/);
+  assert.equal(validateReleaseAssetContract(reordered), reordered);
+  const empty = clone();
+  empty.assets = [];
+  assert.throws(() => validateReleaseAssetContract(empty), /at least one asset/);
   const duplicate = clone();
   duplicate.assets[1].key = duplicate.assets[0].key;
   assert.throws(() => validateReleaseAssetContract(duplicate), /keys must be unique/);
@@ -86,6 +83,11 @@ test("rejects missing, extra, reordered, duplicate, and malformed contract entri
   const unsafePath = clone();
   unsafePath.assets[0].sourcePath = "../{name}";
   assert.throws(() => releaseAssets(version, unsafePath), /unsafe or mismatched sourcePath/);
+  const unsafeName = clone();
+  unsafeName.assets[0].name = 'bad"name.zip';
+  unsafeName.assets[0].sourcePath = "dist/{name}";
+  assert.throws(() => releaseAssets(version, unsafeName), /unsafe asset name/);
+  assert.throws(() => releaseAsset(version, "missing"), /unknown release asset key/);
 });
 
 test("rejects missing, extra, renamed, mislabeled, and mistyped published sets", () => {
@@ -113,6 +115,11 @@ test("CLI emits JSON and names from the same contract", () => {
   const invalid = spawnSync(process.execPath, [scriptPath, "json", "--version", "0.4.0-beta.1"], { encoding: "utf8" });
   assert.equal(invalid.status, 1);
   assert.match(invalid.stderr, /stable semantic version/);
+  const field = spawnSync(process.execPath, [
+    scriptPath, "field", "--version", version, "--key", "releaseDmg", "--field", "sourcePath",
+  ], { encoding: "utf8" });
+  assert.equal(field.status, 0, field.stderr);
+  assert.equal(field.stdout.trim(), expected[1].sourcePath);
 });
 
 test("release tooling consumes the contract instead of redefining canonical asset metadata", () => {
@@ -125,6 +132,7 @@ test("release tooling consumes the contract instead of redefining canonical asse
     "scripts/verify-published-release.sh",
     ".github/workflows/release.yml",
     ".github/workflows/release-preflight.yml",
+    "Makefile",
   ];
   for (const relativePath of consumers) {
     const content = fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
@@ -135,4 +143,19 @@ test("release tooling consumes the contract instead of redefining canonical asse
       assert.doesNotMatch(content, /application\/x-apple-diskimage|application\/octet-stream/, `${relativePath} redefines an asset content type`);
     }
   }
+});
+
+test("Makefile producers resolve canonical release paths from the contract", () => {
+  const result = spawnSync("make", [
+    "--no-print-directory",
+    "-s",
+    "release-asset-paths",
+    `NODE=${process.execPath}`,
+    "RELEASE_SUFFIX=developer-id",
+  ], { cwd: repoRoot, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  const actual = Object.fromEntries(result.stdout.trim().split("\n").map((line) => line.split("=")));
+  assert.deepEqual(actual, Object.fromEntries(expected
+    .filter((asset) => asset.key !== "latestDmg")
+    .map((asset) => [asset.key, asset.sourcePath])));
 });
