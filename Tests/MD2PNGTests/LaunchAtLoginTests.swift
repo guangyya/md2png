@@ -22,11 +22,17 @@ final class LaunchAtLoginTests: XCTestCase {
         XCTAssertTrue(requiresApproval.showsSystemSettingsAction)
         XCTAssertFalse(requiresApproval.showsUnavailableStatus)
 
-        let unavailable = LaunchAtLoginPresentation(status: .unavailable)
-        XCTAssertEqual(unavailable.toggleState, .off)
-        XCTAssertFalse(unavailable.canToggle)
-        XCTAssertFalse(unavailable.showsSystemSettingsAction)
-        XCTAssertTrue(unavailable.showsUnavailableStatus)
+        let notFound = LaunchAtLoginPresentation(status: .notFound)
+        XCTAssertEqual(notFound.toggleState, .off)
+        XCTAssertTrue(notFound.canToggle)
+        XCTAssertFalse(notFound.showsSystemSettingsAction)
+        XCTAssertFalse(notFound.showsUnavailableStatus)
+
+        let unknown = LaunchAtLoginPresentation(status: .unknown)
+        XCTAssertEqual(unknown.toggleState, .off)
+        XCTAssertFalse(unknown.canToggle)
+        XCTAssertFalse(unknown.showsSystemSettingsAction)
+        XCTAssertTrue(unknown.showsUnavailableStatus)
     }
 
     func testToggleRegistersAnUnregisteredMainApp() throws {
@@ -47,6 +53,15 @@ final class LaunchAtLoginTests: XCTestCase {
         XCTAssertEqual(service.operations, [.unregister])
     }
 
+    func testToggleAttemptsRegistrationWhenNativeStatusIsNotFound() throws {
+        let service = LaunchAtLoginServiceStub(status: .notFound)
+        service.statusAfterRegister = .enabled
+        let controller = LaunchAtLoginController(service: service)
+
+        XCTAssertEqual(try controller.toggle(), .enabled)
+        XCTAssertEqual(service.operations, [.register])
+    }
+
     func testToggleUnregistersARegistrationThatRequiresApproval() throws {
         let service = LaunchAtLoginServiceStub(status: .requiresApproval)
         service.statusAfterUnregister = .notRegistered
@@ -57,7 +72,7 @@ final class LaunchAtLoginTests: XCTestCase {
     }
 
     func testToggleReportsUnavailableWithoutCallingTheSystemService() {
-        let service = LaunchAtLoginServiceStub(status: .unavailable)
+        let service = LaunchAtLoginServiceStub(status: .unknown)
         let controller = LaunchAtLoginController(service: service)
 
         XCTAssertThrowsError(try controller.toggle()) { error in

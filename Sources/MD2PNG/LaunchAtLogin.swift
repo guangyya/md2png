@@ -5,7 +5,8 @@ enum LaunchAtLoginStatus: Equatable {
     case notRegistered
     case enabled
     case requiresApproval
-    case unavailable
+    case notFound
+    case unknown
 }
 
 enum LaunchAtLoginToggleState: Equatable {
@@ -37,7 +38,12 @@ struct LaunchAtLoginPresentation: Equatable {
             canToggle = true
             showsSystemSettingsAction = true
             showsUnavailableStatus = false
-        case .unavailable:
+        case .notFound:
+            toggleState = .off
+            canToggle = true
+            showsSystemSettingsAction = false
+            showsUnavailableStatus = false
+        case .unknown:
             toggleState = .off
             canToggle = false
             showsSystemSettingsAction = false
@@ -71,9 +77,9 @@ final class SystemLaunchAtLoginService: LaunchAtLoginServicing {
         case .requiresApproval:
             return .requiresApproval
         case .notFound:
-            return .unavailable
+            return .notFound
         @unknown default:
-            return .unavailable
+            return .unknown
         }
     }
 
@@ -123,11 +129,11 @@ final class LaunchAtLoginController {
     @discardableResult
     func toggle() throws -> LaunchAtLoginStatus {
         switch status {
-        case .notRegistered:
+        case .notRegistered, .notFound:
             try service.register()
         case .enabled, .requiresApproval:
             try service.unregister()
-        case .unavailable:
+        case .unknown:
             throw LaunchAtLoginError.unavailable
         }
         return status
