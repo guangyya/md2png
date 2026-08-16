@@ -1,6 +1,11 @@
 import Foundation
 
 enum SuggestedPNGFilename {
+    private struct Fence {
+        let marker: Character
+        let length: Int
+    }
+
     private static let maximumStemLength = 72
     private static let maximumStemUTF8Count = 240
 
@@ -29,7 +34,7 @@ enum SuggestedPNGFilename {
             .replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n")
         var firstMeaningfulLine: String?
-        var fenceCharacter: Character?
+        var openFence: Fence?
         let frontMatterRange = yamlFrontMatterRange(in: lines)
 
         for index in lines.indices {
@@ -37,15 +42,17 @@ enum SuggestedPNGFilename {
             let line = lines[index]
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            if let marker = fenceMarker(in: trimmed) {
-                if fenceCharacter == nil {
-                    fenceCharacter = marker
-                } else if fenceCharacter == marker {
-                    fenceCharacter = nil
+            if let fence = openFence {
+                if isFenceClosing(line, for: fence) {
+                    openFence = nil
                 }
                 continue
             }
-            guard fenceCharacter == nil else { continue }
+            if let fence = fenceOpening(in: line) {
+                openFence = fence
+                continue
+            }
+            guard !isIndentedCode(line) else { continue }
 
             if let heading = atxHeading(in: trimmed) {
                 return heading
@@ -79,11 +86,31 @@ enum SuggestedPNGFilename {
         return start...end
     }
 
-    private static func fenceMarker(in line: String) -> Character? {
-        guard let character = line.first, character == "`" || character == "~" else {
+    private static func fenceOpening(in line: String) -> Fence? {
+        let leadingSpaces = line.prefix(while: { $0 == " " }).count
+        guard leadingSpaces <= 3 else { return nil }
+        let candidate = line.dropFirst(leadingSpaces)
+        guard let marker = candidate.first, marker == "`" || marker == "~" else {
             return nil
         }
-        return line.prefix(while: { $0 == character }).count >= 3 ? character : nil
+        let length = candidate.prefix(while: { $0 == marker }).count
+        guard length >= 3 else { return nil }
+        let trailingContent = candidate.dropFirst(length)
+        if marker == "`", trailingContent.contains("`") { return nil }
+        return Fence(marker: marker, length: length)
+    }
+
+    private static func isFenceClosing(_ line: String, for fence: Fence) -> Bool {
+        let leadingSpaces = line.prefix(while: { $0 == " " }).count
+        guard leadingSpaces <= 3 else { return false }
+        let candidate = line.dropFirst(leadingSpaces)
+        let markerLength = candidate.prefix(while: { $0 == fence.marker }).count
+        guard markerLength >= fence.length else { return false }
+        return candidate.dropFirst(markerLength).allSatisfy(\.isWhitespace)
+    }
+
+    private static func isIndentedCode(_ line: String) -> Bool {
+        line.hasPrefix("\t") || line.prefix(while: { $0 == " " }).count >= 4
     }
 
     private static func atxHeading(in line: String) -> String? {
@@ -168,6 +195,11 @@ enum SuggestedPNGFilename {
         if value.lowercased().hasSuffix(".png") {
             value.removeLast(4)
         }
+        value = value.replacingOccurrences(
+            of: #"^[.\s-]+"#,
+            with: "",
+            options: .regularExpression
+        )
         var limitedStem = ""
         for character in value {
             let candidate = limitedStem + String(character)

@@ -41,17 +41,66 @@ final class SuggestedPNGFilenameTests: XCTestCase {
     }
 
     func testIgnoresYAMLFrontMatterAndCleansDecodedReservedCharacters() {
-        let markdown = """
-        ---
-        title: Internal Metadata
-        ---
-
-        # Shipping &lt;Plan&gt;
-        """
+        let markdown = "---\r\ntitle: Internal Metadata\r\n---\r\n\r\n# Shipping &lt;Plan&gt;"
 
         XCTAssertEqual(
             SuggestedPNGFilename.make(from: markdown),
             "Shipping Plan.png"
+        )
+    }
+
+    func testCRLFFencedCodeCannotSupplyTheFilename() {
+        let markdown = "```markdown\r\n# Not the title\r\n```\r\n\r\n# Actual Title"
+
+        XCTAssertEqual(
+            SuggestedPNGFilename.make(from: markdown),
+            "Actual Title.png"
+        )
+    }
+
+    func testShorterFenceAndTrailingContentCannotCloseAFence() {
+        let markdown = """
+        ````markdown
+        # Not the title
+        ```
+        ## Still inside the four-backtick fence
+        ````not-a-closing-fence
+        ### Also still inside
+        ````
+        # Actual Title
+        """
+
+        XCTAssertEqual(
+            SuggestedPNGFilename.make(from: markdown),
+            "Actual Title.png"
+        )
+    }
+
+    func testTildeAndBacktickFencesRemainIndependent() {
+        let markdown = """
+        ~~~markdown
+        ```
+        # Still inside the tilde fence
+        ~~~
+        ## Actual Title
+        """
+
+        XCTAssertEqual(
+            SuggestedPNGFilename.make(from: markdown),
+            "Actual Title.png"
+        )
+    }
+
+    func testIndentedCodeHeadingCannotSupplyTheFilename() {
+        let markdown = """
+            # Not the title
+
+        # Actual Title
+        """
+
+        XCTAssertEqual(
+            SuggestedPNGFilename.make(from: markdown),
+            "Actual Title.png"
         )
     }
 
@@ -95,5 +144,12 @@ final class SuggestedPNGFilenameTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(filename.utf8.count, 244)
         XCTAssertTrue(filename.hasSuffix(".png"))
+    }
+
+    func testRemovesLeadingDotsToAvoidHiddenSuggestedFiles() {
+        XCTAssertEqual(
+            SuggestedPNGFilename.make(from: "# ...hidden report"),
+            "hidden report.png"
+        )
     }
 }
