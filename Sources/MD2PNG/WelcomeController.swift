@@ -303,7 +303,7 @@ final class WelcomeLaunchAtLoginState: ObservableObject {
         do {
             let result = try controller.performPrimaryAction()
             if result == .statusChanged(.requiresApproval) {
-                _ = try controller.performPrimaryAction()
+                controller.openSystemSettings()
             }
         } catch {
             onError(error)

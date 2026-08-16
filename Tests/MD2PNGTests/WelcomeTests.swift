@@ -145,6 +145,23 @@ final class WelcomeTests: XCTestCase {
     }
 
     @MainActor
+    func testWelcomeOpensSettingsWithoutReevaluatingPrimaryActionAfterRegistration() {
+        let service = SequencedWelcomeLaunchAtLoginServiceStub(statuses: [
+            .notRegistered,
+            .notRegistered,
+            .requiresApproval,
+            .enabled
+        ])
+        let state = WelcomeLaunchAtLoginState(
+            controller: LaunchAtLoginController(service: service)
+        )
+
+        state.performPrimaryAction()
+
+        XCTAssertEqual(service.operations, [.register, .openSystemSettings])
+    }
+
+    @MainActor
     func testWelcomeShortcutVerificationSuppressesActionsAndResetsEveryOpening() throws {
         _ = NSApplication.shared
         let (defaults, suiteName) = try makeDefaults()
@@ -517,6 +534,37 @@ private final class WelcomeLaunchAtLoginServiceStub: LaunchAtLoginServicing {
         if let statusAfterUnregister {
             status = statusAfterUnregister
         }
+    }
+
+    func openSystemSettings() {
+        operations.append(.openSystemSettings)
+    }
+}
+
+@MainActor
+private final class SequencedWelcomeLaunchAtLoginServiceStub: LaunchAtLoginServicing {
+    private var statuses: [LaunchAtLoginStatus]
+    private var lastStatus: LaunchAtLoginStatus
+    private(set) var operations: [WelcomeLaunchAtLoginServiceStub.Operation] = []
+
+    init(statuses: [LaunchAtLoginStatus]) {
+        precondition(!statuses.isEmpty)
+        self.statuses = statuses
+        lastStatus = statuses[0]
+    }
+
+    var status: LaunchAtLoginStatus {
+        guard !statuses.isEmpty else { return lastStatus }
+        lastStatus = statuses.removeFirst()
+        return lastStatus
+    }
+
+    func register() throws {
+        operations.append(.register)
+    }
+
+    func unregister() throws {
+        operations.append(.unregister)
     }
 
     func openSystemSettings() {

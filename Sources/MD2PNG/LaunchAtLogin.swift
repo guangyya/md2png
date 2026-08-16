@@ -127,10 +127,14 @@ final class LaunchAtLoginController {
             try service.unregister()
             return .statusChanged(status)
         case .requiresApproval:
-            service.openSystemSettings()
+            openSystemSettings()
             return .openedSystemSettings
         case .unknown:
             throw LaunchAtLoginError.unavailable
         }
+    }
+
+    func openSystemSettings() {
+        service.openSystemSettings()
     }
 }
