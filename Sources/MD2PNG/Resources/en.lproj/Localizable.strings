@@ -95,13 +95,11 @@
 "welcome.shortcut_verified_announcement" = "%@ shortcut works.";
 "welcome.launch_at_login.title" = "Launch at Login";
 "welcome.launch_at_login.optional" = "Optional";
-"welcome.launch_at_login.enable" = "Enable";
-"welcome.launch_at_login.disable" = "Disable";
 "welcome.launch_at_login.open_settings" = "Open Settings…";
 "welcome.launch_at_login.unavailable" = "Unavailable";
 "welcome.launch_at_login.approval_help" = "Approval is required in Login Items.";
-"welcome.privacy_note" = "md2png never pastes, sends, or uploads your content automatically.";
-"welcome.reopen_hint" = "If this window gets hidden, choose Show Welcome from the md2png menu bar.";
+"welcome.privacy_note" = "Private and local. Nothing is uploaded automatically.";
+"welcome.reopen_hint" = "Reopen from Show Welcome in the menu.";
 "welcome.try_sample" = "Try a Short Sample";
 "welcome.try_sample_help" = "Open Examples and choose Short Sample to render it.";
 "welcome.sample_guide.title" = "Find Examples in the md2png menu";

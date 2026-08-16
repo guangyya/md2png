@@ -95,13 +95,11 @@
 "welcome.shortcut_verified_announcement" = "“%@”快捷键已生效。";
 "welcome.launch_at_login.title" = "登录时启动";
 "welcome.launch_at_login.optional" = "可选";
-"welcome.launch_at_login.enable" = "启用";
-"welcome.launch_at_login.disable" = "关闭";
 "welcome.launch_at_login.open_settings" = "打开设置…";
 "welcome.launch_at_login.unavailable" = "不可用";
 "welcome.launch_at_login.approval_help" = "需要在“登录项”中批准。";
-"welcome.privacy_note" = "md2png 绝不会自动粘贴、发送或上传你的内容。";
-"welcome.reopen_hint" = "如果窗口被遮住，可从 md2png 菜单栏选择“显示欢迎指南”重新打开。";
+"welcome.privacy_note" = "内容仅在本机处理，不会自动上传。";
+"welcome.reopen_hint" = "可从菜单中的“显示欢迎指南”重新打开。";
 "welcome.try_sample" = "试试简短示例";
 "welcome.try_sample_help" = "打开“示例”菜单，选择“简短示例”后再渲染。";
 "welcome.sample_guide.title" = "在 md2png 菜单中找到“示例”";

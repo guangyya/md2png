@@ -79,7 +79,7 @@ final class WelcomeTests: XCTestCase {
             ),
             "“将剪贴板渲染为图片”快捷键已生效。"
         )
-        XCTAssertTrue(chinese.privacyNote.contains("绝不会"))
+        XCTAssertTrue(chinese.privacyNote.contains("本机处理"))
         XCTAssertTrue(chinese.reopenHint.contains("显示欢迎指南"))
         XCTAssertEqual(
             L10n.text("menu.show_welcome", defaultValue: "", bundle: englishBundle),
@@ -452,7 +452,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(controller.showIfNeeded(shortcuts: shortcuts))
         XCTAssertEqual(controller.window?.title, "Welcome to md2png")
-        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 560, height: 620))
+        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 560, height: 570))
         XCTAssertEqual(controller.displayedShortcutStatuses, shortcuts)
         XCTAssertEqual(controller.window?.isVisible, true)
         XCTAssertEqual(controller.window?.level, .normal)

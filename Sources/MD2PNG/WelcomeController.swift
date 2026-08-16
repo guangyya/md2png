@@ -95,7 +95,7 @@ struct WelcomeWindowPlacement {
 }
 
 private enum WelcomeLayout {
-    static let contentSize = NSSize(width: 560, height: 620)
+    static let contentSize = NSSize(width: 560, height: 570)
 }
 
 struct WelcomeCopy {
@@ -118,8 +118,6 @@ struct WelcomeCopy {
     let shortcutVerifiedAnnouncementFormat: String
     let launchAtLoginTitle: String
     let launchAtLoginOptional: String
-    let launchAtLoginEnable: String
-    let launchAtLoginDisable: String
     let launchAtLoginOpenSettings: String
     let launchAtLoginUnavailable: String
     let launchAtLoginApprovalHelp: String
@@ -225,16 +223,6 @@ struct WelcomeCopy {
             defaultValue: "Optional",
             bundle: localizationBundle
         )
-        launchAtLoginEnable = L10n.text(
-            "welcome.launch_at_login.enable",
-            defaultValue: "Enable",
-            bundle: localizationBundle
-        )
-        launchAtLoginDisable = L10n.text(
-            "welcome.launch_at_login.disable",
-            defaultValue: "Disable",
-            bundle: localizationBundle
-        )
         launchAtLoginOpenSettings = L10n.text(
             "welcome.launch_at_login.open_settings",
             defaultValue: "Open Settings…",
@@ -252,12 +240,12 @@ struct WelcomeCopy {
         )
         privacyNote = L10n.text(
             "welcome.privacy_note",
-            defaultValue: "md2png never pastes, sends, or uploads your content automatically.",
+            defaultValue: "Private and local. Nothing is uploaded automatically.",
             bundle: localizationBundle
         )
         reopenHint = L10n.text(
             "welcome.reopen_hint",
-            defaultValue: "If this window gets hidden, choose Show Welcome from the md2png menu bar.",
+            defaultValue: "Reopen from Show Welcome in the menu.",
             bundle: localizationBundle
         )
         trySample = L10n.text(
@@ -478,121 +466,104 @@ private struct WelcomeView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 13) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .padding(7)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                Color.cyan.opacity(0.2),
-                                Color.purple.opacity(0.16)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.cyan.opacity(0.5), Color.purple.opacity(0.4)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.8
-                            )
-                    }
-                    .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(copy.title)
-                        .font(.system(size: 23, weight: .semibold))
-                        .foregroundStyle(
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 13) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 44, height: 44)
+                        .padding(7)
+                        .background(
                             LinearGradient(
-                                colors: [Color.primary, Color.purple.opacity(0.9)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                                colors: [
+                                    Color.cyan.opacity(0.2),
+                                    Color.purple.opacity(0.16)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                         )
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(copy.subtitle)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.cyan.opacity(0.5),
+                                            Color.purple.opacity(0.4)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.8
+                                )
+                        }
+                        .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(copy.title)
+                            .font(.system(size: 23, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.primary, Color.purple.opacity(0.9)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(copy.subtitle)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-            }
 
-            WelcomeWorkflowDemo(copy: copy)
+                WelcomeWorkflowDemo(copy: copy)
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text(copy.shortcutsTitle)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(copy.shortcutsTitle)
+                        .font(.headline)
 
-                Text(copy.shortcutVerificationHelp)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                ForEach(shortcutVerificationState.shortcuts) { shortcut in
-                    WelcomeShortcutRow(shortcut: shortcut, copy: copy)
-                }
-
-                if hasShortcutConflict {
-                    Label(copy.shortcutConflictHelp, systemImage: "info.circle")
+                    Text(copy.shortcutVerificationHelp)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
 
-            WelcomeLaunchAtLoginRow(
+                    ForEach(shortcutVerificationState.shortcuts) { shortcut in
+                        WelcomeShortcutRow(shortcut: shortcut, copy: copy)
+                    }
+
+                    if hasShortcutConflict {
+                        Label(copy.shortcutConflictHelp, systemImage: "info.circle")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                WelcomeLaunchAtLoginRow(
+                    copy: copy,
+                    state: launchAtLoginState
+                )
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+
+            Divider()
+
+            WelcomeFooter(
                 copy: copy,
-                state: launchAtLoginState
+                onTrySample: onTrySample,
+                onDone: onDone
             )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Label(copy.privacyNote, systemImage: "lock.shield")
-                Label(copy.reopenHint, systemImage: "menubar.rectangle")
-            }
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color.cyan.opacity(0.06),
-                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(Color.cyan.opacity(0.18), lineWidth: 0.6)
-            }
-
-            Spacer(minLength: 0)
-
-            HStack {
-                Button(action: onTrySample) {
-                    Label(copy.trySample, systemImage: "sparkles")
-                }
-                .help(copy.trySampleHelp)
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-
-                Spacer()
-
-                Button(copy.done, action: onDone)
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
-            }
         }
-        .padding(22)
         .frame(
             width: WelcomeLayout.contentSize.width,
             height: WelcomeLayout.contentSize.height
@@ -609,29 +580,24 @@ private struct WelcomeLaunchAtLoginRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            Image(systemName: "power")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            Text(copy.launchAtLoginTitle)
-                .font(.callout.weight(.medium))
-
-            Text(copy.launchAtLoginOptional)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Toggle(isOn: isEnabled) {
+                HStack(spacing: 6) {
+                    Text(copy.launchAtLoginTitle)
+                        .font(.callout.weight(.medium))
+                    Text(copy.launchAtLoginOptional)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.checkbox)
+            .disabled(!canToggle)
 
             Spacer()
 
             switch state.presentation.menuAction {
-            case .enable:
-                actionButton(copy.launchAtLoginEnable)
-            case .disable:
-                actionButton(copy.launchAtLoginDisable)
+            case .enable, .disable:
+                EmptyView()
             case .allowInSystemSettings:
-                Image(systemName: "exclamationmark.circle")
-                    .foregroundStyle(.orange)
-                    .help(copy.launchAtLoginApprovalHelp)
-                    .accessibilityLabel(copy.launchAtLoginApprovalHelp)
                 actionButton(copy.launchAtLoginOpenSettings)
             case .unavailable:
                 Text(copy.launchAtLoginUnavailable)
@@ -653,12 +619,62 @@ private struct WelcomeLaunchAtLoginRow: View {
         .accessibilityElement(children: .contain)
     }
 
+    private var isEnabled: Binding<Bool> {
+        Binding(
+            get: { state.presentation.menuAction == .disable },
+            set: { _ in state.performPrimaryAction() }
+        )
+    }
+
+    private var canToggle: Bool {
+        switch state.presentation.menuAction {
+        case .enable, .disable:
+            true
+        case .allowInSystemSettings, .unavailable:
+            false
+        }
+    }
+
     private func actionButton(_ title: String) -> some View {
         Button(title) {
             state.performPrimaryAction()
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
+        .help(copy.launchAtLoginApprovalHelp)
+    }
+}
+
+private struct WelcomeFooter: View {
+    let copy: WelcomeCopy
+    let onTrySample: () -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Label(copy.privacyNote, systemImage: "lock.shield")
+                Label(copy.reopenHint, systemImage: "menubar.rectangle")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 12)
+
+            Button(copy.trySample, action: onTrySample)
+                .help(copy.trySampleHelp)
+                .buttonStyle(.borderless)
+                .controlSize(.regular)
+
+            Button(copy.done, action: onDone)
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 11)
+        .background(.regularMaterial)
     }
 }
 
