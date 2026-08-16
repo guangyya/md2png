@@ -30,6 +30,10 @@ endif
 CONTENTS := $(APP_DIR)/Contents
 FRAMEWORKS := $(CONTENTS)/Frameworks
 SPARKLE_FRAMEWORK := $(FRAMEWORKS)/Sparkle.framework
+# SwiftPM's test runner must be able to load binary-target frameworks before
+# the app packaging step copies them into Contents/Frameworks.
+SPARKLE_TEST_FRAMEWORKS := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
+SWIFT_TEST_ENV = DYLD_FRAMEWORK_PATH="$(SPARKLE_TEST_FRAMEWORKS)$${DYLD_FRAMEWORK_PATH:+:$${DYLD_FRAMEWORK_PATH}}"
 ICON_SOURCE := Assets/AppIcon/AppIcon.png
 ICONSET_DIR := .build/AppIcon.iconset
 APP_ICON := .build/AppIcon.icns
@@ -85,8 +89,8 @@ coverage-tool-test:
 	$(NODE) --test scripts/tests/*.test.mjs
 
 coverage: renderer coverage-tool-test
-	swift test --enable-code-coverage
-	@coverage_source="$$(swift test --show-codecov-path | tail -n 1)"; \
+	$(SWIFT_TEST_ENV) swift test --enable-code-coverage
+	@coverage_source="$$( $(SWIFT_TEST_ENV) swift test --show-codecov-path | tail -n 1)"; \
 		test -s "$$coverage_source" || { echo "SwiftPM coverage JSON is missing or empty: $$coverage_source"; exit 1; }; \
 		swift_version="$$(swift --version | sed -n '1p')"; \
 		xcode_version="$$(xcodebuild -version | paste -s -d ' ' -)"; \
@@ -126,7 +130,7 @@ validate-release-preparation:
 		--repo-root "$(CURDIR)"
 
 test: renderer coverage-tool-test
-	swift test
+	$(SWIFT_TEST_ENV) swift test
 
 build: renderer
 	swift build -c $(CONFIGURATION) --triple $(ARM64_TRIPLE)
