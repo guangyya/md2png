@@ -145,6 +145,7 @@ jobs:
           REQUESTED_BUMP: ${{ inputs.bump }}
           TAG: ${{ steps.plan.outputs.tag }}
           VERSION: ${{ steps.plan.outputs.version }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -158,11 +159,18 @@ jobs:
           expected_files="$(printf '%s\n' ABOUT_CHANGELOG.md CHANGELOG.md Info.plist | LC_ALL=C sort)"
           test "$actual_files" = "$expected_files"
 
+          node scripts/release-milestone.mjs plan \
+            --tag "$TAG" \
+            --source-commit "$BASE_SHA" > "$RUNNER_TEMP/release-milestone-plan.json"
+          milestone_plan_sha256="$(jq -er .reviewDigest "$RUNNER_TEMP/release-milestone-plan.json")"
+          [[ "$milestone_plan_sha256" =~ ^[0-9a-f]{64}$ ]]
+
           git switch -c "$BRANCH"
           git config user.name "md2png-release-prep[bot]"
           git config user.email "md2png-release-prep[bot]@users.noreply.github.com"
           git add -- ABOUT_CHANGELOG.md CHANGELOG.md Info.plist
-          git commit -m "Prepare md2png ${VERSION}"
+          git commit -m "Prepare md2png ${VERSION}" \
+            -m "Release-Base: ${BASE_SHA}"$'\n'"Release-Milestone-Plan-SHA256: ${milestone_plan_sha256}"
           git fetch origin main
           test "$(git rev-parse origin/main)" = "$BASE_SHA"
           auth_header="$(printf 'x-access-token:%s' "$APP_TOKEN" | base64 | tr -d '\n')"
@@ -176,6 +184,7 @@ jobs:
             echo "## Release identity"
             echo
             echo "- Base: $BASE_SHA"
+            echo "- Milestone plan SHA-256: $milestone_plan_sha256"
             echo "- Version: $OLD_VERSION → $VERSION ($REQUESTED_BUMP)"
             echo "- Build: $OLD_BUILD → $BUILD"
             echo "- Tag: $TAG"
@@ -188,6 +197,15 @@ jobs:
             echo "## Release-note preview"
             echo
             cat "$RUNNER_TEMP/release-notes.md"
+            echo
+            jq -r '
+              "## Planned " + .tag + " issue milestone\n\n" +
+              (if (.issues | length) == 0 then
+                "No closed FEAT/TD issue is associated with this release."
+              else
+                (.issues | map("- #\(.number) — \(.title)") | join("\n"))
+              end)
+            ' "$RUNNER_TEMP/release-milestone-plan.json"
             echo
             echo "## Review contract"
             echo

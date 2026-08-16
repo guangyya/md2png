@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
   pull-requests: read
 
 concurrency:
@@ -51,6 +52,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
           GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -78,6 +80,16 @@ jobs:
             echo "The Release PR base is stale; re-prepare it from current main." >&2
             exit 1
           fi
+          commit_message="$(git show -s --format=%B "$HEAD_SHA")"
+          release_base="$(sed -n 's/^Release-Base: //p' <<< "$commit_message")"
+          milestone_plan_sha256="$(sed -n 's/^Release-Milestone-Plan-SHA256: //p' <<< "$commit_message")"
+          test "$(grep -c '^Release-Base: ' <<< "$commit_message" || true)" = "1"
+          test "$(grep -c '^Release-Milestone-Plan-SHA256: ' <<< "$commit_message" || true)" = "1"
+          [[ "$release_base" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$milestone_plan_sha256" =~ ^[0-9a-f]{64}$ ]]
+          test "$release_base" = "$BASE_SHA"
+          test "$(git rev-parse "${HEAD_SHA}^1")" = "$BASE_SHA"
+          test "$(git rev-list --count "${BASE_SHA}..${HEAD_SHA}")" = "1"
           if [[ "$base_version" = "$head_version" || "$base_build" = "$head_build" ]]; then
             echo "Both version keys must change together." >&2
             exit 1
@@ -102,6 +114,12 @@ jobs:
           release_date="$(jq -r .date "$plan_file")"
           expected_date="$(node scripts/release-automation.mjs date --instant "$PR_CREATED_AT" | jq -r .date)"
           test "$release_date" = "$expected_date"
+
+          milestone_plan_file="$RUNNER_TEMP/release-milestone-plan.json"
+          node scripts/release-milestone.mjs plan \
+            --tag "$tag" \
+            --source-commit "$BASE_SHA" > "$milestone_plan_file"
+          test "$(jq -er .reviewDigest "$milestone_plan_file")" = "$milestone_plan_sha256"
 
           latest_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
           test "$latest_tag" = "v${base_version}"
@@ -145,6 +163,7 @@ jobs:
             echo "- Version: $base_version → $version ($bump)"
             echo "- Build: $base_build → $build"
             echo "- Tag: $tag"
+            echo "- Reviewed milestone plan: $milestone_plan_sha256"
           } >> "$GITHUB_STEP_SUMMARY"
 
   verify:

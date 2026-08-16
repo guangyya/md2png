@@ -7,12 +7,14 @@ cd "$repo_root"
 node_binary="${NODE:-node}"
 release_assets_script="${RELEASE_ASSETS_SCRIPT:-scripts/release-assets.mjs}"
 release_manifest_script="${RELEASE_MANIFEST_SCRIPT:-scripts/release-manifest.mjs}"
+release_milestone_script="${RELEASE_MILESTONE_SCRIPT:-scripts/release-milestone.mjs}"
 gh_host="${GH_HOST:-github.com}"
 gh_repo="${GH_REPO:-}"
 handoff_dir="${RELEASE_HANDOFF_DIR:-}"
 source_commit="${SOURCE_COMMIT:-}"
 project_url="${PROJECT_URL:-}"
 bundle_identifier="${BUNDLE_IDENTIFIER:-}"
+expected_milestone_plan_sha256="${EXPECTED_MILESTONE_PLAN_SHA256:-}"
 
 if [[ ! "$gh_repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   echo "GH_REPO is required in OWNER/REPOSITORY form." >&2
@@ -207,6 +209,20 @@ if [[ "$published_names" != "$expected_names_text" ]]; then
   echo "Published Release has unexpected or missing assets." >&2
   diff -u <(printf '%s\n' "$expected_names_text") <(printf '%s\n' "$published_names") >&2 || true
   exit 1
+fi
+
+if [[ -n "$expected_milestone_plan_sha256" ]]; then
+  if [[ ! "$expected_milestone_plan_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "EXPECTED_MILESTONE_PLAN_SHA256 must be a lowercase SHA-256 digest." >&2
+    exit 1
+  fi
+  GITHUB_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN is required}" \
+    "$node_binary" "$release_milestone_script" sync \
+      --tag "$tag" \
+      --source-commit "$source_commit" \
+      --expected-review-digest "$expected_milestone_plan_sha256"
+else
+  echo "Authorizing historical Release PR predates milestone plans; leaving milestones unchanged."
 fi
 
 if [[ "$release_is_draft" = "true" ]]; then
