@@ -10,7 +10,8 @@
 "menu.show_last_render" = "显示上次渲染";
 "menu.render_width" = "输出宽度";
 "menu.examples" = "示例";
-"menu.launch_at_login" = "登录时启动";
+"menu.enable_launch_at_login" = "启用登录时启动";
+"menu.disable_launch_at_login" = "关闭登录时启动";
 "menu.open_login_items_settings" = "打开登录项设置…";
 "menu.launch_at_login_unavailable" = "登录时启动不可用";
 "menu.show_welcome" = "显示欢迎指南";

@@ -10,7 +10,8 @@
 "menu.show_last_render" = "Show Last Render";
 "menu.render_width" = "Output Width";
 "menu.examples" = "Examples";
-"menu.launch_at_login" = "Launch at Login";
+"menu.enable_launch_at_login" = "Enable Launch at Login";
+"menu.disable_launch_at_login" = "Disable Launch at Login";
 "menu.open_login_items_settings" = "Open Login Items Settings…";
 "menu.launch_at_login_unavailable" = "Launch at Login Unavailable";
 "menu.show_welcome" = "Show Welcome";

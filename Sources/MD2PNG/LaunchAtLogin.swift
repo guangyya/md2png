@@ -9,45 +9,35 @@ enum LaunchAtLoginStatus: Equatable {
     case unknown
 }
 
-enum LaunchAtLoginToggleState: Equatable {
-    case off
-    case on
-    case mixed
+enum LaunchAtLoginMenuAction: Equatable {
+    case enable
+    case disable
+    case unavailable
 }
 
 struct LaunchAtLoginPresentation: Equatable {
-    let toggleState: LaunchAtLoginToggleState
+    let menuAction: LaunchAtLoginMenuAction
     let canToggle: Bool
     let showsSystemSettingsAction: Bool
-    let showsUnavailableStatus: Bool
 
     init(status: LaunchAtLoginStatus) {
         switch status {
-        case .notRegistered:
-            toggleState = .off
+        case .notRegistered, .notFound:
+            menuAction = .enable
             canToggle = true
             showsSystemSettingsAction = false
-            showsUnavailableStatus = false
         case .enabled:
-            toggleState = .on
+            menuAction = .disable
             canToggle = true
             showsSystemSettingsAction = false
-            showsUnavailableStatus = false
         case .requiresApproval:
-            toggleState = .mixed
+            menuAction = .disable
             canToggle = true
             showsSystemSettingsAction = true
-            showsUnavailableStatus = false
-        case .notFound:
-            toggleState = .off
-            canToggle = true
-            showsSystemSettingsAction = false
-            showsUnavailableStatus = false
         case .unknown:
-            toggleState = .off
+            menuAction = .unavailable
             canToggle = false
             showsSystemSettingsAction = false
-            showsUnavailableStatus = true
         }
     }
 }

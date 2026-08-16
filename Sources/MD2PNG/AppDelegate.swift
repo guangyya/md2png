@@ -69,7 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var renderWidthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
     private var launchAtLoginMenuItem: NSMenuItem!
     private var loginItemsSettingsMenuItem: NSMenuItem!
-    private var launchAtLoginUnavailableMenuItem: NSMenuItem!
     private var renderWidthPreset: RenderWidthPreset
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
@@ -234,8 +233,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         launchAtLoginMenuItem = menu.addItem(
             withTitle: L10n.text(
-                "menu.launch_at_login",
-                defaultValue: "Launch at Login"
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login"
             ),
             action: #selector(toggleLaunchAtLogin),
             keyEquivalent: ""
@@ -251,17 +250,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             keyEquivalent: ""
         )
         loginItemsSettingsMenuItem.target = self
-
-        launchAtLoginUnavailableMenuItem = NSMenuItem(
-            title: L10n.text(
-                "menu.launch_at_login_unavailable",
-                defaultValue: "Launch at Login Unavailable"
-            ),
-            action: nil,
-            keyEquivalent: ""
-        )
-        launchAtLoginUnavailableMenuItem.isEnabled = false
-        menu.addItem(launchAtLoginUnavailableMenuItem)
         updateLaunchAtLoginMenu()
 
         menu.addItem(.separator())
@@ -511,14 +499,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateLaunchAtLoginMenu() {
         let presentation = launchAtLoginController.presentation
-        launchAtLoginMenuItem.state = switch presentation.toggleState {
-        case .off: .off
-        case .on: .on
-        case .mixed: .mixed
+        launchAtLoginMenuItem.title = switch presentation.menuAction {
+        case .enable:
+            L10n.text(
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login"
+            )
+        case .disable:
+            L10n.text(
+                "menu.disable_launch_at_login",
+                defaultValue: "Disable Launch at Login"
+            )
+        case .unavailable:
+            L10n.text(
+                "menu.launch_at_login_unavailable",
+                defaultValue: "Launch at Login Unavailable"
+            )
         }
         launchAtLoginMenuItem.isEnabled = presentation.canToggle
         loginItemsSettingsMenuItem.isHidden = !presentation.showsSystemSettingsAction
-        launchAtLoginUnavailableMenuItem.isHidden = !presentation.showsUnavailableStatus
     }
 
     private func showSampleGuide() {

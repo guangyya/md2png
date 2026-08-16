@@ -5,34 +5,29 @@ import XCTest
 final class LaunchAtLoginTests: XCTestCase {
     func testPresentationReflectsEveryEffectiveSystemStatus() {
         let notRegistered = LaunchAtLoginPresentation(status: .notRegistered)
-        XCTAssertEqual(notRegistered.toggleState, .off)
+        XCTAssertEqual(notRegistered.menuAction, .enable)
         XCTAssertTrue(notRegistered.canToggle)
         XCTAssertFalse(notRegistered.showsSystemSettingsAction)
-        XCTAssertFalse(notRegistered.showsUnavailableStatus)
 
         let enabled = LaunchAtLoginPresentation(status: .enabled)
-        XCTAssertEqual(enabled.toggleState, .on)
+        XCTAssertEqual(enabled.menuAction, .disable)
         XCTAssertTrue(enabled.canToggle)
         XCTAssertFalse(enabled.showsSystemSettingsAction)
-        XCTAssertFalse(enabled.showsUnavailableStatus)
 
         let requiresApproval = LaunchAtLoginPresentation(status: .requiresApproval)
-        XCTAssertEqual(requiresApproval.toggleState, .mixed)
+        XCTAssertEqual(requiresApproval.menuAction, .disable)
         XCTAssertTrue(requiresApproval.canToggle)
         XCTAssertTrue(requiresApproval.showsSystemSettingsAction)
-        XCTAssertFalse(requiresApproval.showsUnavailableStatus)
 
         let notFound = LaunchAtLoginPresentation(status: .notFound)
-        XCTAssertEqual(notFound.toggleState, .off)
+        XCTAssertEqual(notFound.menuAction, .enable)
         XCTAssertTrue(notFound.canToggle)
         XCTAssertFalse(notFound.showsSystemSettingsAction)
-        XCTAssertFalse(notFound.showsUnavailableStatus)
 
         let unknown = LaunchAtLoginPresentation(status: .unknown)
-        XCTAssertEqual(unknown.toggleState, .off)
+        XCTAssertEqual(unknown.menuAction, .unavailable)
         XCTAssertFalse(unknown.canToggle)
         XCTAssertFalse(unknown.showsSystemSettingsAction)
-        XCTAssertTrue(unknown.showsUnavailableStatus)
     }
 
     func testToggleRegistersAnUnregisteredMainApp() throws {
@@ -84,11 +79,11 @@ final class LaunchAtLoginTests: XCTestCase {
     func testPresentationReadsAnExternallyChangedStatus() {
         let service = LaunchAtLoginServiceStub(status: .notRegistered)
         let controller = LaunchAtLoginController(service: service)
-        XCTAssertEqual(controller.presentation.toggleState, .off)
+        XCTAssertEqual(controller.presentation.menuAction, .enable)
 
         service.status = .requiresApproval
 
-        XCTAssertEqual(controller.presentation.toggleState, .mixed)
+        XCTAssertEqual(controller.presentation.menuAction, .disable)
         XCTAssertTrue(controller.presentation.showsSystemSettingsAction)
     }
 
@@ -106,12 +101,16 @@ final class LaunchAtLoginTests: XCTestCase {
         let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
 
         XCTAssertEqual(
-            L10n.text("menu.launch_at_login", defaultValue: "", bundle: english),
-            "Launch at Login"
+            L10n.text("menu.enable_launch_at_login", defaultValue: "", bundle: english),
+            "Enable Launch at Login"
         )
         XCTAssertEqual(
-            L10n.text("menu.launch_at_login", defaultValue: "", bundle: chinese),
-            "登录时启动"
+            L10n.text("menu.disable_launch_at_login", defaultValue: "", bundle: english),
+            "Disable Launch at Login"
+        )
+        XCTAssertEqual(
+            L10n.text("menu.enable_launch_at_login", defaultValue: "", bundle: chinese),
+            "启用登录时启动"
         )
         XCTAssertEqual(
             L10n.text("menu.open_login_items_settings", defaultValue: "", bundle: chinese),
