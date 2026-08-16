@@ -139,6 +139,7 @@ final class FeatureTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let renderer = MarkdownRenderer()
 
         for kind in ExampleKind.allCases where kind != .long {
@@ -165,6 +166,7 @@ final class FeatureTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let markdown = try String(
             contentsOf: repositoryRoot.appendingPathComponent("Examples/code-blocks.md"),
             encoding: .utf8
@@ -179,6 +181,7 @@ final class FeatureTests: XCTestCase {
     func testCodeSampleRendersWithSyntaxHighlightColors() async throws {
         _ = NSApplication.shared
         let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()

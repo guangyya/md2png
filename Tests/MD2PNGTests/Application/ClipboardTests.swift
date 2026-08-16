@@ -327,6 +327,7 @@ final class ClipboardTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let markdownURL = repositoryRoot.appendingPathComponent("Examples/long-project-update.md")
         let markdown = try String(contentsOf: markdownURL, encoding: .utf8)
         let renderer = MarkdownRenderer()

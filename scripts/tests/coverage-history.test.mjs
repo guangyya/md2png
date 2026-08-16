@@ -24,7 +24,7 @@ function report(version, commit, coveredLines, coverableLines) {
     },
     totals: { coveredLines, coverableLines, percentage },
     files: [{
-      path: "Sources/MD2PNG/AppDelegate.swift",
+      path: "Sources/MD2PNG/Application/AppDelegate.swift",
       coveredLines,
       coverableLines,
       percentage,

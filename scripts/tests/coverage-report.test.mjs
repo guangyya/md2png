@@ -42,7 +42,7 @@ function sampleReport() {
       llvmFile(`${repoRoot}/Sources/MD2PNG/Zebra.swift`, 1, 3),
       llvmFile(`${repoRoot}/Tests/MD2PNGTests/ZebraTests.swift`, 10, 10),
       llvmFile(`${repoRoot}/.build/debug/MD2PNG.build/DerivedSources/resource_bundle_accessor.swift`, 2, 2),
-      llvmFile(`${repoRoot}/Sources/MD2PNG/AppDelegate.swift`, 2, 3),
+      llvmFile(`${repoRoot}/Sources/MD2PNG/Application/AppDelegate.swift`, 2, 3),
     ]),
     metadata,
   );
@@ -50,8 +50,8 @@ function sampleReport() {
 
 test("normalizes only repository app source paths", () => {
   assert.equal(
-    normalizeSourcePath(`${repoRoot}/Sources/MD2PNG/AppDelegate.swift`, repoRoot),
-    "Sources/MD2PNG/AppDelegate.swift",
+    normalizeSourcePath(`${repoRoot}/Sources/MD2PNG/Application/AppDelegate.swift`, repoRoot),
+    "Sources/MD2PNG/Application/AppDelegate.swift",
   );
   assert.equal(
     normalizeSourcePath("Sources/MD2PNG/Feature/Controller.swift", repoRoot),
@@ -68,7 +68,7 @@ test("filters sources, sorts paths, and calculates totals", () => {
 
   assert.deepEqual(
     report.files.map((file) => file.path),
-    ["Sources/MD2PNG/AppDelegate.swift", "Sources/MD2PNG/Zebra.swift"],
+    ["Sources/MD2PNG/Application/AppDelegate.swift", "Sources/MD2PNG/Zebra.swift"],
   );
   assert.deepEqual(report.totals, {
     coveredLines: 3,
@@ -135,7 +135,7 @@ test("renders a compact per-file summary", () => {
   const markdown = coverageMarkdown(report);
 
   assert.match(markdown, /Line coverage \| \*\*50\.00%\*\*/);
-  assert.match(markdown, /Sources\/MD2PNG\/AppDelegate\.swift/);
+  assert.match(markdown, /Sources\/MD2PNG\/Application\/AppDelegate\.swift/);
   assert.equal(markdown.includes(repoRoot), false);
 });
 
