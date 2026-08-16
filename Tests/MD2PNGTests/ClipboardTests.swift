@@ -73,6 +73,7 @@ final class ClipboardTests: XCTestCase {
         XCTAssertFalse(window.isVisible)
     }
 
+    @MainActor
     func testPreviewWindowMapsActionAndZoomShortcuts() throws {
         func event(_ characters: String, modifiers: NSEvent.ModifierFlags = .command) throws -> NSEvent {
             try XCTUnwrap(NSEvent.keyEvent(

@@ -67,7 +67,6 @@
 "preview.zoom_in" = "放大";
 "preview.zoom_out" = "缩小";
 "preview.zoom_level" = "预览缩放";
-"preview.zoom_fit_status" = "适合 · %ld%%";
 "preview.zoom_percent" = "%ld%%";
 
 "welcome.window_title" = "欢迎使用 md2png";

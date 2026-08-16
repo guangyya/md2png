@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         },
         onError: { [weak self] error in
             self?.show(error)
+        },
+        onVisibilityChange: { [weak self] isVisible in
+            self?.setPreviewWindowVisible(isVisible)
         }
     )
     private let updateController = UpdateController()
@@ -26,8 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
-        onVisibilityChange: { isVisible in
-            NSApp.setActivationPolicy(isVisible ? .regular : .accessory)
+        onVisibilityChange: { [weak self] isVisible in
+            self?.setWelcomeWindowVisible(isVisible)
         },
         onTrySample: { [weak self] in self?.showSampleGuide() }
     )
@@ -68,6 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isPresentingClipboardConfirmation = false
     private var currentUpdateStatus = UpdateStatus()
     private var updateStatusObserverID: UUID?
+    private var isPreviewWindowVisible = false
+    private var isWelcomeWindowVisible = false
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
 
     override init() {
@@ -75,6 +80,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.renderWidthPreference = renderWidthPreference
         renderWidthPreset = renderWidthPreference.selectedPreset
         super.init()
+    }
+
+    private func setPreviewWindowVisible(_ isVisible: Bool) {
+        isPreviewWindowVisible = isVisible
+        updateWindowedActivationPolicy()
+    }
+
+    private func setWelcomeWindowVisible(_ isVisible: Bool) {
+        isWelcomeWindowVisible = isVisible
+        updateWindowedActivationPolicy()
+    }
+
+    private func updateWindowedActivationPolicy() {
+        NSApp.setActivationPolicy(
+            isPreviewWindowVisible || isWelcomeWindowVisible ? .regular : .accessory
+        )
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

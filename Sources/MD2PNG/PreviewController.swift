@@ -1,11 +1,31 @@
 import AppKit
 import UniformTypeIdentifiers
 
-typealias PreviewFileOpenCompletion = @MainActor (Bool) -> Void
+typealias PreviewFileOpenCompletion = @Sendable (Bool) -> Void
 typealias PreviewFileOpener = @MainActor (
     URL,
     @escaping PreviewFileOpenCompletion
 ) throws -> Void
+
+enum PreviewWorkspaceOpener {
+    static func open(
+        _ url: URL,
+        completion: @escaping PreviewFileOpenCompletion
+    ) throws {
+        guard let previewURL = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: "com.apple.Preview"
+        ) else {
+            throw AppError.previewOpenFailed
+        }
+        NSWorkspace.shared.open(
+            [url],
+            withApplicationAt: previewURL,
+            configuration: NSWorkspace.OpenConfiguration()
+        ) { _, error in
+            completion(error == nil)
+        }
+    }
+}
 
 enum PreviewZoomMode: Equatable {
     case fit
@@ -38,7 +58,7 @@ struct PreviewLayout {
             height: imagePixelSize.height / safeBackingScale
         )
         let availableWidth = max(1, viewportSize.width - padding * 2)
-        let fitFactor = min(1, availableWidth / actualSize.width)
+        let fitFactor = min(maximumZoomFactor, availableWidth / actualSize.width)
         let zoomFactor = switch zoomMode {
         case .fit:
             fitFactor
@@ -121,6 +141,12 @@ final class PreviewCanvasView: NSView {
     override var isFlipped: Bool { true }
 }
 
+final class PreviewZoomStatusView: NSView {
+    static let preferredSize = NSSize(width: 64, height: 22)
+
+    override var intrinsicContentSize: NSSize { Self.preferredSize }
+}
+
 final class PreviewWindow: NSWindow {
     enum Command: Equatable {
         case close
@@ -184,23 +210,25 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     private let imageView = NSImageView()
     private let canvasView = PreviewCanvasView()
     private let scrollView = NSScrollView()
-    private let zoomStatusLabel = NSTextField(labelWithString: "")
+    private let zoomStatusButton = NSButton()
+    private let zoomStatusContainer = PreviewZoomStatusView(
+        frame: NSRect(origin: .zero, size: PreviewZoomStatusView.preferredSize)
+    )
     private let copyImage: (NSImage) throws -> Int
     private let onCopied: (Int) -> Void
     private let onError: (Error) -> Void
+    private let onVisibilityChange: (Bool) -> Void
     private let temporaryImageStore: PreviewTemporaryImageStore
     private let openFileInPreview: PreviewFileOpener
     private var zoomMode: PreviewZoomMode = .fit
     private var currentZoomFactor: CGFloat = 1
 
     private static let zoomSteps: [CGFloat] = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4]
-
     private enum ToolbarIdentifier {
         static let copyAgain = NSToolbarItem.Identifier("preview.copy-again")
         static let savePNG = NSToolbarItem.Identifier("preview.save-png")
         static let openInPreview = NSToolbarItem.Identifier("preview.open-in-preview")
         static let fit = NSToolbarItem.Identifier("preview.fit")
-        static let actualSize = NSToolbarItem.Identifier("preview.actual-size")
         static let zoomOut = NSToolbarItem.Identifier("preview.zoom-out")
         static let zoomStatus = NSToolbarItem.Identifier("preview.zoom-status")
         static let zoomIn = NSToolbarItem.Identifier("preview.zoom-in")
@@ -220,14 +248,24 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     var previewZoomFactor: CGFloat { currentZoomFactor }
     var previewWindowTitle: String? { window?.title }
     var previewHasHorizontalScroller: Bool { scrollView.hasHorizontalScroller }
-    var previewZoomStatus: String { zoomStatusLabel.stringValue }
+    var previewScrollerStyle: NSScroller.Style { scrollView.scrollerStyle }
+    var previewZoomStatus: String { zoomStatusButton.title }
+    var previewZoomStatusContainerSize: NSSize { zoomStatusContainer.frame.size }
+    var previewToolbarStyle: NSWindow.ToolbarStyle? { window?.toolbarStyle }
+    var previewSelectedToolbarIdentifier: NSToolbarItem.Identifier? {
+        window?.toolbar?.selectedItemIdentifier
+    }
     var previewToolbarLabels: [String] {
         window?.toolbar?.items.map(\.label).filter { !$0.isEmpty } ?? []
+    }
+    var previewToolbarIconSizes: [NSSize] {
+        window?.toolbar?.items.compactMap { $0.image?.size } ?? []
     }
     func selectFitForTesting() { selectFit(nil) }
     func selectActualSizeForTesting() { selectActualSize(nil) }
     func zoomInForTesting() { zoomIn(nil) }
     func zoomOutForTesting() { zoomOut(nil) }
+    func clickZoomStatusForTesting() { zoomStatusButton.performClick(nil) }
     func openInPreviewForTesting() { openInPreview(nil) }
     func renderedImageSnapshot() -> NSBitmapImageRep? {
         imageView.displayIfNeeded()
@@ -243,28 +281,16 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         copyImage: @escaping (NSImage) throws -> Int = { try Clipboard.write(image: $0) },
         onCopied: @escaping (Int) -> Void = { _ in },
         onError: @escaping (Error) -> Void = { _ in },
+        onVisibilityChange: @escaping (Bool) -> Void = { _ in },
         temporaryImageStore: PreviewTemporaryImageStore = PreviewTemporaryImageStore(),
         openFileInPreview: @escaping PreviewFileOpener = { url, completion in
-            guard let previewURL = NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.apple.Preview"
-            ) else {
-                throw AppError.previewOpenFailed
-            }
-            NSWorkspace.shared.open(
-                [url],
-                withApplicationAt: previewURL,
-                configuration: NSWorkspace.OpenConfiguration()
-            ) { _, error in
-                let succeeded = error == nil
-                DispatchQueue.main.async {
-                    completion(succeeded)
-                }
-            }
+            try PreviewWorkspaceOpener.open(url, completion: completion)
         }
     ) {
         self.copyImage = copyImage
         self.onCopied = onCopied
         self.onError = onError
+        self.onVisibilityChange = onVisibilityChange
         self.temporaryImageStore = temporaryImageStore
         self.openFileInPreview = openFileInPreview
         let window = PreviewWindow(
@@ -293,6 +319,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         scrollView.autoresizingMask = [.width, .height]
         scrollView.drawsBackground = false
         scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.documentView = canvasView
@@ -303,6 +330,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         window.toolbar = toolbar
+        window.toolbarStyle = .expanded
     }
 
     required init?(coder: NSCoder) {
@@ -313,6 +341,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         image: NSImage,
         widthPreset: RenderWidthPreset? = nil
     ) {
+        let isBecomingVisible = window?.isVisible != true
         if imageView.image !== image {
             temporaryImageStore.clear()
         }
@@ -321,6 +350,9 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         updateWindowTitle(image: image, widthPreset: widthPreset)
         if window?.isVisible != true {
             resizeWindowToReflectImageWidth(image)
+        }
+        if isBecomingVisible {
+            onVisibilityChange(true)
         }
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -339,6 +371,10 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
 
     func windowDidChangeScreen(_ notification: Notification) {
         updateLayout(scrollToTop: false, preserveAnchor: true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onVisibilityChange(false)
     }
 
     private func updateWindowTitle(
@@ -438,23 +474,20 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     }
 
     private func updateZoomStatus() {
-        if zoomMode == .fit {
-            zoomStatusLabel.stringValue = L10n.format(
-                "preview.zoom_fit_status",
-                defaultValue: "Fit · %ld%%",
-                Int((currentZoomFactor * 100).rounded())
-            )
-        } else {
-            zoomStatusLabel.stringValue = L10n.format(
-                "preview.zoom_percent",
-                defaultValue: "%ld%%",
-                Int((currentZoomFactor * 100).rounded())
-            )
+        zoomStatusButton.title = L10n.format(
+            "preview.zoom_percent",
+            defaultValue: "%ld%%",
+            Int((currentZoomFactor * 100).rounded())
+        )
+        switch zoomMode {
+        case .fit:
+            window?.toolbar?.selectedItemIdentifier = ToolbarIdentifier.fit
+        case .actualSize, .custom:
+            window?.toolbar?.selectedItemIdentifier = nil
         }
-        zoomStatusLabel.alignment = .center
-        zoomStatusLabel.setAccessibilityLabel(L10n.text(
-            "preview.zoom_level",
-            defaultValue: "Preview zoom"
+        zoomStatusButton.setAccessibilityLabel(L10n.text(
+            "preview.actual_size",
+            defaultValue: "Actual Size"
         ))
     }
 
@@ -507,9 +540,12 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         do {
             let url = try temporaryImageStore.replace(with: image)
             try openFileInPreview(url) { [weak self] succeeded in
-                guard !succeeded, let self else { return }
-                guard self.temporaryImageStore.clear(ifCurrentFileURL: url) else { return }
-                self.onError(AppError.previewOpenFailed)
+                guard !succeeded else { return }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    guard self.temporaryImageStore.clear(ifCurrentFileURL: url) else { return }
+                    self.onError(AppError.previewOpenFailed)
+                }
             }
         } catch AppError.pngEncodingFailed {
             temporaryImageStore.clear()
@@ -521,11 +557,13 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     }
 
     @objc private func selectFit(_ sender: Any?) {
+        guard zoomMode != .fit else { return }
         zoomMode = .fit
         updateLayout(scrollToTop: true)
     }
 
     @objc private func selectActualSize(_ sender: Any?) {
+        guard zoomMode != .actualSize else { return }
         zoomMode = .actualSize
         updateLayout(scrollToTop: false, preserveAnchor: true)
     }
@@ -551,10 +589,8 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
             ToolbarIdentifier.copyAgain,
             ToolbarIdentifier.savePNG,
             ToolbarIdentifier.openInPreview,
-            .space,
             .flexibleSpace,
             ToolbarIdentifier.fit,
-            ToolbarIdentifier.actualSize,
             ToolbarIdentifier.zoomOut,
             ToolbarIdentifier.zoomStatus,
             ToolbarIdentifier.zoomIn
@@ -568,11 +604,14 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
             ToolbarIdentifier.openInPreview,
             .flexibleSpace,
             ToolbarIdentifier.fit,
-            ToolbarIdentifier.actualSize,
             ToolbarIdentifier.zoomOut,
             ToolbarIdentifier.zoomStatus,
             ToolbarIdentifier.zoomIn
         ]
+    }
+
+    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [ToolbarIdentifier.fit]
     }
 
     func toolbar(
@@ -586,7 +625,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
                 identifier: itemIdentifier,
                 labelKey: "preview.copy_again",
                 label: "Copy Again",
-                symbol: "doc.on.doc",
+                symbol: "square.on.square",
                 action: #selector(copyAgain(_:))
             )
         case ToolbarIdentifier.savePNG:
@@ -602,7 +641,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
                 identifier: itemIdentifier,
                 labelKey: "preview.open_in_preview",
                 label: "Open in Preview",
-                symbol: "arrow.up.forward.app",
+                symbol: "arrow.up.forward.square",
                 action: #selector(openInPreview(_:))
             )
         case ToolbarIdentifier.fit:
@@ -612,14 +651,6 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
                 label: "Fit to Window",
                 symbol: "arrow.down.right.and.arrow.up.left",
                 action: #selector(selectFit(_:))
-            )
-        case ToolbarIdentifier.actualSize:
-            return toolbarItem(
-                identifier: itemIdentifier,
-                labelKey: "preview.actual_size",
-                label: "Actual Size",
-                symbol: "1.magnifyingglass",
-                action: #selector(selectActualSize(_:))
             )
         case ToolbarIdentifier.zoomOut:
             return toolbarItem(
@@ -632,8 +663,23 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         case ToolbarIdentifier.zoomStatus:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
             item.label = L10n.text("preview.zoom_level", defaultValue: "Preview zoom")
-            zoomStatusLabel.frame = NSRect(x: 0, y: 0, width: 72, height: 22)
-            item.view = zoomStatusLabel
+            zoomStatusButton.frame = zoomStatusContainer.bounds
+            zoomStatusButton.autoresizingMask = [.width, .height]
+            zoomStatusButton.bezelStyle = .inline
+            zoomStatusButton.font = NSFont.monospacedDigitSystemFont(
+                ofSize: NSFont.smallSystemFontSize,
+                weight: .regular
+            )
+            zoomStatusButton.target = self
+            zoomStatusButton.action = #selector(selectActualSize(_:))
+            zoomStatusButton.toolTip = L10n.text(
+                "preview.actual_size",
+                defaultValue: "Actual Size"
+            )
+            if zoomStatusButton.superview !== zoomStatusContainer {
+                zoomStatusContainer.addSubview(zoomStatusButton)
+            }
+            item.view = zoomStatusContainer
             return item
         case ToolbarIdentifier.zoomIn:
             return toolbarItem(
@@ -672,9 +718,27 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         item.label = localizedLabel
         item.paletteLabel = localizedLabel
         item.toolTip = localizedLabel
-        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: localizedLabel)
+        item.image = toolbarSymbol(named: symbol, accessibilityDescription: localizedLabel)
         item.target = self
         item.action = action
         return item
+    }
+
+    private func toolbarSymbol(
+        named name: String,
+        accessibilityDescription: String
+    ) -> NSImage? {
+        guard let symbol = NSImage(
+            systemSymbolName: name,
+            accessibilityDescription: accessibilityDescription
+        ) else {
+            return nil
+        }
+        let configuration = NSImage.SymbolConfiguration(
+            pointSize: 14,
+            weight: .regular,
+            scale: .medium
+        )
+        return symbol.withSymbolConfiguration(configuration) ?? symbol
     }
 }
