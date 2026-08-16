@@ -10,6 +10,9 @@
 "menu.show_last_render" = "显示上次渲染";
 "menu.render_width" = "输出宽度";
 "menu.examples" = "示例";
+"menu.launch_at_login" = "登录时启动";
+"menu.open_login_items_settings" = "打开登录项设置…";
+"menu.launch_at_login_unavailable" = "登录时启动不可用";
 "menu.show_welcome" = "显示欢迎指南";
 "menu.about" = "关于 md2png";
 "menu.quit" = "退出 md2png";
@@ -40,6 +43,7 @@
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
 "hud.png_copied_again" = "PNG 已再次复制——请按 Command-V 粘贴";
 "hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
+"hud.launch_at_login_requires_approval" = "请在“登录项”中允许 md2png 自动启动";
 
 "confirmation.clipboard_changed.title" = "剪贴板已更改";
 "confirmation.clipboard_changed.restore" = "其他应用已更改剪贴板。是否用上次的 Markdown 替换当前内容？";
@@ -55,6 +59,7 @@
 "error.preview_open_failed" = "无法在“预览”中打开渲染图片。";
 "error.clipboard_write_failed" = "无法更新剪贴板。";
 "error.example_unavailable" = "无法加载“%@”Markdown 文件。";
+"error.launch_at_login_unavailable" = "此 md2png 副本无法使用“登录时启动”。";
 
 "preview.window_title" = "上次渲染";
 "preview.window_title_with_dimensions" = "上次渲染 — %ld × %ld px";

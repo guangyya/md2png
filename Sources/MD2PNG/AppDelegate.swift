@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let updateController = UpdateController()
     private lazy var aboutController = AboutController(updateController: updateController)
+    private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
@@ -66,6 +67,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var examplesMenuItem: NSMenuItem!
     private var renderWidthMenuItem: NSMenuItem!
     private var renderWidthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
+    private var launchAtLoginMenuItem: NSMenuItem!
+    private var loginItemsSettingsMenuItem: NSMenuItem!
+    private var launchAtLoginUnavailableMenuItem: NSMenuItem!
     private var renderWidthPreset: RenderWidthPreset
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
@@ -228,6 +232,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(examplesMenuItem)
 
         menu.addItem(.separator())
+        launchAtLoginMenuItem = menu.addItem(
+            withTitle: L10n.text(
+                "menu.launch_at_login",
+                defaultValue: "Launch at Login"
+            ),
+            action: #selector(toggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        launchAtLoginMenuItem.target = self
+
+        loginItemsSettingsMenuItem = menu.addItem(
+            withTitle: L10n.text(
+                "menu.open_login_items_settings",
+                defaultValue: "Open Login Items Settings…"
+            ),
+            action: #selector(openLoginItemsSettings),
+            keyEquivalent: ""
+        )
+        loginItemsSettingsMenuItem.target = self
+
+        launchAtLoginUnavailableMenuItem = NSMenuItem(
+            title: L10n.text(
+                "menu.launch_at_login_unavailable",
+                defaultValue: "Launch at Login Unavailable"
+            ),
+            action: nil,
+            keyEquivalent: ""
+        )
+        launchAtLoginUnavailableMenuItem.isEnabled = false
+        menu.addItem(launchAtLoginUnavailableMenuItem)
+        updateLaunchAtLoginMenu()
+
+        menu.addItem(.separator())
         let welcomeItem = menu.addItem(
             withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome"),
             action: #selector(showWelcome),
@@ -259,6 +296,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         sampleGuideController.dismiss()
         clipboardPreviewView.update(Clipboard.menuPreview(includeLabel: false))
+        updateLaunchAtLoginMenu()
     }
 
     @objc private func renderClipboard() {
@@ -445,6 +483,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showWelcome() {
         welcomeController.show(shortcuts: welcomeShortcutStatuses)
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            let status = try launchAtLoginController.toggle()
+            updateLaunchAtLoginMenu()
+            if status == .requiresApproval {
+                hud.show(
+                    L10n.text(
+                        "hud.launch_at_login_requires_approval",
+                        defaultValue: "Allow md2png in Login Items to launch it automatically"
+                    ),
+                    symbol: "gear.badge",
+                    isError: true
+                )
+            }
+        } catch {
+            updateLaunchAtLoginMenu()
+            show(error)
+        }
+    }
+
+    @objc private func openLoginItemsSettings() {
+        launchAtLoginController.openSystemSettings()
+    }
+
+    private func updateLaunchAtLoginMenu() {
+        let presentation = launchAtLoginController.presentation
+        launchAtLoginMenuItem.state = switch presentation.toggleState {
+        case .off: .off
+        case .on: .on
+        case .mixed: .mixed
+        }
+        launchAtLoginMenuItem.isEnabled = presentation.canToggle
+        loginItemsSettingsMenuItem.isHidden = !presentation.showsSystemSettingsAction
+        launchAtLoginUnavailableMenuItem.isHidden = !presentation.showsUnavailableStatus
     }
 
     private func showSampleGuide() {

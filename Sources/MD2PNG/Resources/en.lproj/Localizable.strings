@@ -10,6 +10,9 @@
 "menu.show_last_render" = "Show Last Render";
 "menu.render_width" = "Output Width";
 "menu.examples" = "Examples";
+"menu.launch_at_login" = "Launch at Login";
+"menu.open_login_items_settings" = "Open Login Items Settings…";
+"menu.launch_at_login_unavailable" = "Launch at Login Unavailable";
 "menu.show_welcome" = "Show Welcome";
 "menu.about" = "About md2png";
 "menu.quit" = "Quit md2png";
@@ -40,6 +43,7 @@
 "hud.png_copied" = "PNG copied — paste with Command-V";
 "hud.png_copied_again" = "PNG copied again — paste with Command-V";
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
+"hud.launch_at_login_requires_approval" = "Allow md2png in Login Items to launch it automatically";
 
 "confirmation.clipboard_changed.title" = "Clipboard Changed";
 "confirmation.clipboard_changed.restore" = "Another app changed the clipboard. Replace it with the last Markdown?";
@@ -55,6 +59,7 @@
 "error.preview_open_failed" = "The rendered image could not be opened in Preview.";
 "error.clipboard_write_failed" = "The clipboard could not be updated.";
 "error.example_unavailable" = "The %@ Markdown file could not be loaded.";
+"error.launch_at_login_unavailable" = "Launch at Login is unavailable for this copy of md2png.";
 
 "preview.window_title" = "Last Render";
 "preview.window_title_with_dimensions" = "Last Render — %ld × %ld px";

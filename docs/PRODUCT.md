@@ -54,6 +54,8 @@ sending it.
 - Short, long, formatting, code, checklist, table, flowchart, sequence, and
   Gantt samples that render immediately when selected.
 - English and Simplified Chinese UI selected from macOS language settings.
+- An off-by-default Launch at Login menu toggle backed by the native macOS
+  main-app login service, with effective-state refresh and an approval route.
 - About window with Debug/Release identification, version/build/source commit,
   release notes, project link, update action, and copyable diagnostics.
 - Silent update discovery in About, backed by a 24-hour successful-result cache

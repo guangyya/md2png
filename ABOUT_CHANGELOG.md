@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Optionally launch md2png when you log in to your Mac.
+
 ## [0.5.0] - 2026-08-16
 
 ### Added

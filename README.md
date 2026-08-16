@@ -87,6 +87,7 @@ A GFM table needs a separator row:
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
+| Launch at Login | — | Opts the main app into the native macOS login service; off by default |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
 | About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
 
@@ -106,6 +107,10 @@ its sample button opens a status-item menu guide that first shows the main menu,
 then reveals Examples; rendering starts only after the user chooses a sample. While the guide is
 open, md2png appears in Command-Tab so the window cannot become unreachable;
 closing the guide returns the app to its menu bar-only mode.
+Launch at Login always reflects the effective macOS state. If approval is
+required, the menu shows a mixed state and an explicit **Open Login Items
+Settings…** action. Disabling it unregisters the login item; no helper or
+background worker is installed.
 See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
 dimensions and same-source reference renders.
 
