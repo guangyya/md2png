@@ -34,12 +34,18 @@ VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 COVERAGE_DIR ?= .build/coverage
-COVERAGE_JSON := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.json
-COVERAGE_MARKDOWN := $(COVERAGE_DIR)/md2png-$(VERSION)-coverage.md
+release_asset_field = $(shell "$(NODE)" scripts/release-assets.mjs field --version "$(VERSION)" --key "$(1)" --field "$(2)")
+COVERAGE_JSON := $(COVERAGE_DIR)/$(call release_asset_field,coverageJson,name)
+COVERAGE_MARKDOWN := $(COVERAGE_DIR)/$(call release_asset_field,coverageMarkdown,name)
 RELEASE_QUALIFIER := $(if $(strip $(RELEASE_SUFFIX)),-$(strip $(RELEASE_SUFFIX)),)
 ARTIFACT_BASENAME := md2png-$(VERSION)-macOS-arm64$(RELEASE_QUALIFIER)
+ifeq ($(strip $(RELEASE_SUFFIX)),developer-id)
+RELEASE_ZIP := $(call release_asset_field,releaseZip,sourcePath)
+RELEASE_DMG := $(call release_asset_field,releaseDmg,sourcePath)
+else
 RELEASE_ZIP := dist/$(ARTIFACT_BASENAME).zip
 RELEASE_DMG := dist/$(ARTIFACT_BASENAME).dmg
+endif
 DMG_DIR := .build/dmg-root
 
 SIGN_FLAGS := --force --sign "$(SIGN_IDENTITY)"
@@ -48,7 +54,7 @@ ifneq ($(SIGN_IDENTITY),-)
 SIGN_FLAGS += --options runtime --timestamp
 endif
 
-.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate prepare-release validate-release-preparation test build debug-stop app verify-dist release package-dmg dmg notarize publish-release run clean
+.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate release-asset-paths prepare-release validate-release-preparation test build debug-stop app verify-dist release package-dmg dmg notarize publish-release run clean
 
 bootstrap:
 	cd WebRenderer && $(PNPM) install --frozen-lockfile=false
@@ -96,6 +102,12 @@ coverage-validate:
 		--report "$(COVERAGE_JSON)" \
 		--app-version "$(VERSION)" \
 		--commit "$(SOURCE_COMMIT)"
+
+release-asset-paths:
+	@printf 'coverageJson=%s\n' "$(COVERAGE_JSON)"
+	@printf 'coverageMarkdown=%s\n' "$(COVERAGE_MARKDOWN)"
+	@printf 'releaseZip=%s\n' "$(RELEASE_ZIP)"
+	@printf 'releaseDmg=%s\n' "$(RELEASE_DMG)"
 
 prepare-release:
 	$(NODE) scripts/release-automation.mjs prepare \

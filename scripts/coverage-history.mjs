@@ -3,6 +3,7 @@
 import { pathToFileURL } from "node:url";
 
 import { validateCoverageReport } from "./coverage-report.mjs";
+import { releaseAsset } from "./release-assets.mjs";
 
 export const HISTORY_START_MARKER = "<!-- coverage-history:start -->";
 export const HISTORY_END_MARKER = "<!-- coverage-history:end -->";
@@ -242,7 +243,7 @@ export async function updateCoverageHistory(environment = process.env) {
     if (release.draft || release.prerelease || parsedTag === null) {
       continue;
     }
-    const expectedAssetName = `md2png-${parsedTag.version}-coverage.json`;
+    const expectedAssetName = releaseAsset(parsedTag.version, "coverageJson").name;
     const matchingAssets = Array.isArray(release.assets)
       ? release.assets.filter((asset) => asset.name === expectedAssetName)
       : [];

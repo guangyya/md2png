@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
+node_binary="${NODE:-node}"
 sign_identity="${SIGN_IDENTITY:-}"
 notary_profile="${NOTARY_PROFILE:-MDPNGNotary}"
 gh_host="${GH_HOST:-github.com}"
@@ -13,13 +14,21 @@ bundle_identifier="${BUNDLE_IDENTIFIER:-$(/usr/libexec/PlistBuddy -c 'Print :CFB
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Info.plist)"
 tag="v${version}"
-artifact_base="md2png-${version}-macOS-arm64-developer-id"
-release_zip="dist/${artifact_base}.zip"
-release_dmg="dist/${artifact_base}.dmg"
-latest_dmg="dist/md2png-latest.dmg"
+asset_contract_json="$("$node_binary" scripts/release-assets.mjs json --version "$version")"
+asset_value_by_key() {
+  jq -er --arg key "$1" --arg field "$2" \
+    '.assets[] | select(.key == $key) | .[$field]' <<< "$asset_contract_json"
+}
+asset_value_by_name() {
+  jq -er --arg name "$1" --arg field "$2" \
+    '.assets[] | select(.name == $name) | .[$field]' <<< "$asset_contract_json"
+}
+release_zip="$(asset_value_by_key releaseZip sourcePath)"
+release_dmg="$(asset_value_by_key releaseDmg sourcePath)"
+latest_dmg="$(asset_value_by_key latestDmg sourcePath)"
 notes_file=".build/release-notes-${version}.md"
-coverage_json=".build/coverage/md2png-${version}-coverage.json"
-coverage_markdown=".build/coverage/md2png-${version}-coverage.md"
+coverage_json="$(asset_value_by_key coverageJson sourcePath)"
+coverage_markdown="$(asset_value_by_key coverageMarkdown sourcePath)"
 
 if [[ -n "${TEST_UPDATE_VERSION:-}" || -n "${TEST_UPDATE_STATE:-}" ]]; then
   echo "TEST_UPDATE_VERSION and TEST_UPDATE_STATE are only for local app/run builds." >&2
@@ -147,12 +156,14 @@ if ! git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
 fi
 
 git push origin "$tag"
+release_uploads=()
+while IFS= read -r asset; do
+  source_path="$(jq -r .sourcePath <<< "$asset")"
+  label="$(jq -r .label <<< "$asset")"
+  release_uploads+=("${source_path}#${label}")
+done < <(jq -c '.assets[]' <<< "$asset_contract_json")
 gh release create "$tag" \
-  "${release_zip}#md2png ${version} — macOS app archive (Apple silicon)" \
-  "${release_dmg}#md2png ${version} — macOS installer (Apple silicon)" \
-  "${latest_dmg}#md2png — latest macOS installer (Apple silicon)" \
-  "${coverage_json}#md2png ${version} — normalized source-line coverage (JSON)" \
-  "${coverage_markdown}#md2png ${version} — source-line coverage summary (Markdown)" \
+  "${release_uploads[@]}" \
   --repo "$repo_ref" \
   --title "md2png ${version}" \
   --notes-file "$notes_file" \
@@ -160,28 +171,24 @@ gh release create "$tag" \
   --latest \
   --fail-on-no-commits
 
-uploaded_assets="$(
-  gh release view "$tag" --repo "$repo_ref" --json assets --jq '.assets[].name'
-)"
-expected_assets=(
-  "$(basename "$release_zip")"
-  "$(basename "$release_dmg")"
-  "$(basename "$latest_dmg")"
-  "$(basename "$coverage_json")"
-  "$(basename "$coverage_markdown")"
-)
-for expected_asset in "${expected_assets[@]}"; do
-  if ! grep -Fxq "$expected_asset" <<< "$uploaded_assets"; then
-    echo "Published release is missing asset: ${expected_asset}" >&2
-    exit 1
-  fi
-done
-
-versioned_dmg_name="$(basename "$release_dmg")"
 release_endpoint="repos/${gh_repo}/releases/tags/${tag}"
+release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
+published_names="$(jq -r '.assets[].name' <<< "$release_json" | LC_ALL=C sort)"
+expected_names="$(jq -r '.assets[].name' <<< "$asset_contract_json" | LC_ALL=C sort)"
+if [[ "$published_names" != "$expected_names" ]]; then
+  echo "Published Release has unexpected or missing assets." >&2
+  diff -u <(printf '%s\n' "$expected_names") <(printf '%s\n' "$published_names") >&2 || true
+  exit 1
+fi
+while IFS= read -r name; do
+  asset_json="$(jq -c --arg name "$name" '.assets[] | select(.name == $name)' <<< "$release_json")"
+  test "$(jq -r .label <<< "$asset_json")" = "$(asset_value_by_name "$name" label)"
+  test "$(jq -r .content_type <<< "$asset_json")" = "$(asset_value_by_name "$name" contentType)"
+done < <(jq -r '.assets[].name' <<< "$asset_contract_json")
+
+versioned_dmg_name="$(asset_value_by_key releaseDmg name)"
 versioned_dmg_count="$(
-  gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq "[.assets[] | select(.name == \"${versioned_dmg_name}\")] | length"
+  jq --arg name "$versioned_dmg_name" '[.assets[] | select(.name == $name)] | length' <<< "$release_json"
 )"
 if [[ "$versioned_dmg_count" != "1" ]]; then
   echo "Published release must contain exactly one versioned DMG asset." >&2
@@ -189,18 +196,15 @@ if [[ "$versioned_dmg_count" != "1" ]]; then
 fi
 
 versioned_dmg_type="$(
-  gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq ".assets[] | select(.name == \"${versioned_dmg_name}\") | .content_type"
+  jq -r --arg name "$versioned_dmg_name" '.assets[] | select(.name == $name) | .content_type' <<< "$release_json"
 )"
 versioned_dmg_size="$(
-  gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq ".assets[] | select(.name == \"${versioned_dmg_name}\") | .size"
+  jq -r --arg name "$versioned_dmg_name" '.assets[] | select(.name == $name) | .size' <<< "$release_json"
 )"
 versioned_dmg_digest="$(
-  gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq ".assets[] | select(.name == \"${versioned_dmg_name}\") | .digest"
+  jq -r --arg name "$versioned_dmg_name" '.assets[] | select(.name == $name) | .digest' <<< "$release_json"
 )"
-if [[ "$versioned_dmg_type" != "application/x-apple-diskimage" ]]; then
+if [[ "$versioned_dmg_type" != "$(asset_value_by_key releaseDmg contentType)" ]]; then
   echo "Published versioned DMG has unexpected content type: ${versioned_dmg_type}" >&2
   exit 1
 fi
@@ -222,5 +226,5 @@ if [[ "$latest_release_tag" != "$tag" ]]; then
 fi
 
 release_url="$(gh release view "$tag" --repo "$repo_ref" --json url --jq .url)"
-stable_dmg_url="${project_url}/releases/latest/download/$(basename "$latest_dmg")"
+stable_dmg_url="${project_url}/releases/latest/download/$(asset_value_by_key latestDmg name)"
 printf 'Release: %s\nLatest DMG: %s\n' "$release_url" "$stable_dmg_url"

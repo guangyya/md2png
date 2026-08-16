@@ -5,6 +5,7 @@ repo_root="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$repo_root"
 
 node_binary="${NODE:-node}"
+release_assets_script="${RELEASE_ASSETS_SCRIPT:-scripts/release-assets.mjs}"
 gh_host="${GH_HOST:-github.com}"
 gh_repo="${GH_REPO:-}"
 source_commit="${SOURCE_COMMIT:-}"
@@ -95,39 +96,24 @@ expected_notes="$(cat "$notes_file")"
 actual_notes="$(jq -r .body <<< "$release_json")"
 test "$actual_notes" = "$expected_notes"
 
-release_zip_name="md2png-${version}-macOS-arm64-developer-id.zip"
-release_dmg_name="md2png-${version}-macOS-arm64-developer-id.dmg"
-latest_dmg_name="md2png-latest.dmg"
-coverage_json_name="md2png-${version}-coverage.json"
-coverage_markdown_name="md2png-${version}-coverage.md"
-expected_names=(
-  "$release_zip_name"
-  "$release_dmg_name"
-  "$latest_dmg_name"
-  "$coverage_json_name"
-  "$coverage_markdown_name"
-)
-
-asset_label() {
-  case "$1" in
-    "$release_zip_name") printf 'md2png %s — macOS app archive (Apple silicon)' "$version" ;;
-    "$release_dmg_name") printf 'md2png %s — macOS installer (Apple silicon)' "$version" ;;
-    "$latest_dmg_name") printf 'md2png — latest macOS installer (Apple silicon)' ;;
-    "$coverage_json_name") printf 'md2png %s — normalized source-line coverage (JSON)' "$version" ;;
-    "$coverage_markdown_name") printf 'md2png %s — source-line coverage summary (Markdown)' "$version" ;;
-    *) return 1 ;;
-  esac
+asset_contract_json="$("$node_binary" "$release_assets_script" json --version "$version")"
+asset_value_by_key() {
+  jq -er --arg key "$1" --arg field "$2" \
+    '.assets[] | select(.key == $key) | .[$field]' <<< "$asset_contract_json"
 }
-
-asset_content_type() {
-  case "$1" in
-    "$release_zip_name") printf 'application/zip' ;;
-    "$release_dmg_name"|"$latest_dmg_name") printf 'application/x-apple-diskimage' ;;
-    "$coverage_json_name") printf 'application/json' ;;
-    "$coverage_markdown_name") printf 'application/octet-stream' ;;
-    *) return 1 ;;
-  esac
+asset_value_by_name() {
+  jq -er --arg name "$1" --arg field "$2" \
+    '.assets[] | select(.name == $name) | .[$field]' <<< "$asset_contract_json"
 }
+release_zip_name="$(asset_value_by_key releaseZip name)"
+release_dmg_name="$(asset_value_by_key releaseDmg name)"
+latest_dmg_name="$(asset_value_by_key latestDmg name)"
+coverage_json_name="$(asset_value_by_key coverageJson name)"
+coverage_markdown_name="$(asset_value_by_key coverageMarkdown name)"
+expected_names=()
+while IFS= read -r name; do
+  expected_names+=("$name")
+done < <(jq -r '.assets[].name' <<< "$asset_contract_json")
 
 assets_dir="$verify_dir/assets"
 mkdir -p "$assets_dir"
@@ -154,8 +140,8 @@ for name in "${expected_names[@]}"; do
   [[ "$remote_size" =~ ^[1-9][0-9]*$ ]]
   test "$(stat -f %z "$local_path")" = "$remote_size"
   test "sha256:$(shasum -a 256 "$local_path" | awk '{print $1}')" = "$remote_digest"
-  test "$remote_content_type" = "$(asset_content_type "$name")"
-  test "$remote_label" = "$(asset_label "$name")"
+  test "$remote_content_type" = "$(asset_value_by_name "$name" contentType)"
+  test "$remote_label" = "$(asset_value_by_name "$name" label)"
 done
 
 cmp -s "${assets_dir}/${release_dmg_name}" "${assets_dir}/${latest_dmg_name}"

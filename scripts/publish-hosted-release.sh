@@ -5,6 +5,8 @@ repo_root="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$repo_root"
 
 node_binary="${NODE:-node}"
+release_assets_script="${RELEASE_ASSETS_SCRIPT:-scripts/release-assets.mjs}"
+release_manifest_script="${RELEASE_MANIFEST_SCRIPT:-scripts/release-manifest.mjs}"
 gh_host="${GH_HOST:-github.com}"
 gh_repo="${GH_REPO:-}"
 handoff_dir="${RELEASE_HANDOFF_DIR:-}"
@@ -36,15 +38,24 @@ fi
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Info.plist)"
 tag="v${version}"
-release_zip_name="md2png-${version}-macOS-arm64-developer-id.zip"
-release_dmg_name="md2png-${version}-macOS-arm64-developer-id.dmg"
-latest_dmg_name="md2png-latest.dmg"
-coverage_json_name="md2png-${version}-coverage.json"
-coverage_markdown_name="md2png-${version}-coverage.md"
+asset_contract_json="$("$node_binary" "$release_assets_script" json --version "$version")"
+asset_value_by_key() {
+  jq -er --arg key "$1" --arg field "$2" \
+    '.assets[] | select(.key == $key) | .[$field]' <<< "$asset_contract_json"
+}
+asset_value_by_name() {
+  jq -er --arg name "$1" --arg field "$2" \
+    '.assets[] | select(.name == $name) | .[$field]' <<< "$asset_contract_json"
+}
+release_zip_name="$(asset_value_by_key releaseZip name)"
+release_dmg_name="$(asset_value_by_key releaseDmg name)"
+latest_dmg_name="$(asset_value_by_key latestDmg name)"
+coverage_json_name="$(asset_value_by_key coverageJson name)"
+coverage_markdown_name="$(asset_value_by_key coverageMarkdown name)"
 manifest_path="${handoff_dir}/release-manifest.json"
 notes_file="$RUNNER_TEMP/release-notes-${version}.md"
 
-"$node_binary" scripts/release-manifest.mjs validate \
+"$node_binary" "$release_manifest_script" validate \
   --manifest "$manifest_path" \
   --directory "$handoff_dir" \
   --version "$version" \
@@ -153,66 +164,44 @@ if [[ "$actual_notes" != "$expected_notes" ]]; then
   exit 1
 fi
 
-asset_label() {
-  case "$1" in
-    "$release_zip_name") printf 'md2png %s — macOS app archive (Apple silicon)' "$version" ;;
-    "$release_dmg_name") printf 'md2png %s — macOS installer (Apple silicon)' "$version" ;;
-    "$latest_dmg_name") printf 'md2png — latest macOS installer (Apple silicon)' ;;
-    "$coverage_json_name") printf 'md2png %s — normalized source-line coverage (JSON)' "$version" ;;
-    "$coverage_markdown_name") printf 'md2png %s — source-line coverage summary (Markdown)' "$version" ;;
-    *) return 1 ;;
-  esac
-}
-
-asset_content_type() {
-  case "$1" in
-    "$release_zip_name") printf 'application/zip' ;;
-    "$release_dmg_name"|"$latest_dmg_name") printf 'application/x-apple-diskimage' ;;
-    "$coverage_json_name") printf 'application/json' ;;
-    "$coverage_markdown_name") printf 'application/octet-stream' ;;
-    *) return 1 ;;
-  esac
-}
-
-expected_names=(
-  "$release_zip_name"
-  "$release_dmg_name"
-  "$latest_dmg_name"
-  "$coverage_json_name"
-  "$coverage_markdown_name"
-)
+expected_names=()
+while IFS= read -r name; do
+  expected_names+=("$name")
+done < <(jq -r '.assets[].name' <<< "$asset_contract_json")
 for name in "${expected_names[@]}"; do
   local_path="${handoff_dir}/${name}"
   local_size="$(stat -f %z "$local_path")"
   local_digest="sha256:$(shasum -a 256 "$local_path" | awk '{print $1}')"
-  asset_json="$(gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq ".assets[] | select(.name == \"${name}\")")"
+  asset_json="$(jq -c --arg name "$name" '.assets[] | select(.name == $name)' <<< "$release_json")"
   if [[ -z "$asset_json" ]]; then
     if [[ "$release_is_draft" != "true" ]]; then
       echo "Published Release is missing a verified asset: $name" >&2
       exit 1
     fi
-    label="$(asset_label "$name")"
+    label="$(asset_value_by_name "$name" label)"
     gh release upload "$tag" "${local_path}#${label}" --repo "$repo_ref"
-    asset_json="$(gh api --hostname "$gh_host" "$release_endpoint" \
-      --jq ".assets[] | select(.name == \"${name}\")")"
+    release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
+    asset_json="$(jq -c --arg name "$name" '.assets[] | select(.name == $name)' <<< "$release_json")"
   fi
-  remote_count="$(gh api --hostname "$gh_host" "$release_endpoint" \
-    --jq "[.assets[] | select(.name == \"${name}\")] | length")"
+  remote_count="$(jq --arg name "$name" '[.assets[] | select(.name == $name)] | length' <<< "$release_json")"
   test "$remote_count" = "1"
   remote_size="$(jq -r .size <<< "$asset_json")"
   remote_digest="$(jq -r .digest <<< "$asset_json")"
   remote_content_type="$(jq -r .content_type <<< "$asset_json")"
-  expected_content_type="$(asset_content_type "$name")"
+  remote_label="$(jq -r .label <<< "$asset_json")"
+  expected_content_type="$(asset_value_by_name "$name" contentType)"
+  expected_label="$(asset_value_by_name "$name" label)"
   if [[ "$remote_size" != "$local_size" \
     || "$remote_digest" != "$local_digest" \
-    || "$remote_content_type" != "$expected_content_type" ]]; then
+    || "$remote_content_type" != "$expected_content_type" \
+    || "$remote_label" != "$expected_label" ]]; then
     echo "Published asset differs from the verified handoff: $name" >&2
     exit 1
   fi
 done
 
-published_names="$(gh api --hostname "$gh_host" "$release_endpoint" --jq '.assets[].name' | LC_ALL=C sort)"
+release_json="$(gh api --hostname "$gh_host" "$release_endpoint")"
+published_names="$(jq -r '.assets[].name' <<< "$release_json" | LC_ALL=C sort)"
 expected_names_text="$(printf '%s\n' "${expected_names[@]}" | LC_ALL=C sort)"
 if [[ "$published_names" != "$expected_names_text" ]]; then
   echo "Published Release has unexpected or missing assets." >&2

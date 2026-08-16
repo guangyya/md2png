@@ -352,6 +352,13 @@ then builds and notarizes the arm64 ZIP and DMG, creates and pushes the
 annotated version tag, and publishes five assets using the matching changelog
 section as the Release Notes:
 
+The required asset membership, rendered names, labels, content types, and
+local source paths are defined once in `scripts/release-assets.json` and
+validated/rendered by `scripts/release-assets.mjs`. Release planning, both
+publishers, handoff manifests, workflows, coverage history, and published
+release verification consume that contract. Publishing authorization and
+signing remain separate for the local and hosted paths.
+
 - the versioned ZIP archive, labeled `md2png <version> — macOS app archive
   (Apple silicon)`;
 - the versioned DMG, labeled `md2png <version> — macOS installer (Apple

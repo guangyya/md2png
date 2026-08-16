@@ -16,6 +16,7 @@ import {
   releaseDateForInstant,
   validatePreparedRelease,
 } from "../release-automation.mjs";
+import { releaseAssetNames } from "../release-assets.mjs";
 
 const scriptPath = fileURLToPath(new URL("../release-automation.mjs", import.meta.url));
 
@@ -106,6 +107,7 @@ test("plans without modifying release files", (context) => {
   const before = fs.readFileSync(path.join(root, "Info.plist"), "utf8");
   const plan = planRelease({ repoRoot: root, bump: "patch", date: "2026-08-15" });
   assert.equal(plan.version, "0.3.1");
+  assert.deepEqual(plan.artifacts, releaseAssetNames("0.3.1"));
   assert.equal(fs.readFileSync(path.join(root, "Info.plist"), "utf8"), before);
 });
 

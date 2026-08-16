@@ -5,6 +5,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { releaseAssetNames } from "./release-assets.mjs";
+
 export const RELEASE_FILES = ["Info.plist", "CHANGELOG.md", "ABOUT_CHANGELOG.md"];
 export const BUMP_TYPES = ["patch", "minor", "major"];
 
@@ -208,13 +210,7 @@ function releasePlan(oldVersion, oldBuild, bump, date) {
     title: `Prepare md2png ${version}`,
     commitTitle: `Prepare md2png ${version}`,
     releaseTitle: `md2png ${version}`,
-    artifacts: [
-      `md2png-${version}-macOS-arm64-developer-id.zip`,
-      `md2png-${version}-macOS-arm64-developer-id.dmg`,
-      "md2png-latest.dmg",
-      `md2png-${version}-coverage.json`,
-      `md2png-${version}-coverage.md`,
-    ],
+    artifacts: releaseAssetNames(version),
   };
 }
 
