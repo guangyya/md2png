@@ -49,12 +49,15 @@ final class WelcomeTests: XCTestCase {
         let chinese = WelcomeCopy(localizationBundle: chineseBundle)
 
         XCTAssertEqual(english.windowTitle, "Welcome to md2png")
-        XCTAssertEqual(english.trySample, "Try a Short Sample")
-        XCTAssertTrue(english.trySampleHelp.contains("Examples"))
+        XCTAssertEqual(english.trySample, "Try an Example")
+        XCTAssertTrue(english.trySampleHelp.contains("example"))
         XCTAssertEqual(english.shortcutDetected, "Detected")
         XCTAssertEqual(english.shortcutVerified, "Works")
         XCTAssertEqual(english.launchAtLoginTitle, "Launch at Login")
         XCTAssertEqual(english.launchAtLoginOptional, "Optional")
+        XCTAssertEqual(english.launchAtLoginOn, "On")
+        XCTAssertEqual(english.launchAtLoginOff, "Off")
+        XCTAssertEqual(english.launchAtLoginApprovalRequired, "Approval Needed")
         XCTAssertEqual(english.launchAtLoginOpenSettings, "Open Settings…")
         XCTAssertTrue(english.shortcutVerificationHelp.contains("without running"))
         XCTAssertEqual(
@@ -70,6 +73,9 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
         XCTAssertEqual(chinese.launchAtLoginTitle, "登录时启动")
         XCTAssertEqual(chinese.launchAtLoginOptional, "可选")
+        XCTAssertEqual(chinese.launchAtLoginOn, "已开启")
+        XCTAssertEqual(chinese.launchAtLoginOff, "已关闭")
+        XCTAssertEqual(chinese.launchAtLoginApprovalRequired, "需要批准")
         XCTAssertEqual(chinese.launchAtLoginOpenSettings, "打开设置…")
         XCTAssertTrue(chinese.shortcutVerificationHelp.contains("不会执行"))
         XCTAssertEqual(

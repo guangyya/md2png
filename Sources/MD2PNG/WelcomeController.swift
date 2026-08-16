@@ -118,6 +118,9 @@ struct WelcomeCopy {
     let shortcutVerifiedAnnouncementFormat: String
     let launchAtLoginTitle: String
     let launchAtLoginOptional: String
+    let launchAtLoginOn: String
+    let launchAtLoginOff: String
+    let launchAtLoginApprovalRequired: String
     let launchAtLoginOpenSettings: String
     let launchAtLoginUnavailable: String
     let launchAtLoginApprovalHelp: String
@@ -223,6 +226,21 @@ struct WelcomeCopy {
             defaultValue: "Optional",
             bundle: localizationBundle
         )
+        launchAtLoginOn = L10n.text(
+            "welcome.launch_at_login.on",
+            defaultValue: "On",
+            bundle: localizationBundle
+        )
+        launchAtLoginOff = L10n.text(
+            "welcome.launch_at_login.off",
+            defaultValue: "Off",
+            bundle: localizationBundle
+        )
+        launchAtLoginApprovalRequired = L10n.text(
+            "welcome.launch_at_login.approval_required",
+            defaultValue: "Approval Needed",
+            bundle: localizationBundle
+        )
         launchAtLoginOpenSettings = L10n.text(
             "welcome.launch_at_login.open_settings",
             defaultValue: "Open Settings…",
@@ -250,12 +268,12 @@ struct WelcomeCopy {
         )
         trySample = L10n.text(
             "welcome.try_sample",
-            defaultValue: "Try a Short Sample",
+            defaultValue: "Try an Example",
             bundle: localizationBundle
         )
         trySampleHelp = L10n.text(
             "welcome.try_sample_help",
-            defaultValue: "Explicitly copy and render the bundled short sample.",
+            defaultValue: "Choose a bundled example to try.",
             bundle: localizationBundle
         )
         done = L10n.text(
@@ -542,10 +560,6 @@ private struct WelcomeView: View {
                     }
                 }
 
-                WelcomeLaunchAtLoginRow(
-                    copy: copy,
-                    state: launchAtLoginState
-                )
             }
             .padding(.horizontal, 22)
             .padding(.top, 18)
@@ -560,6 +574,7 @@ private struct WelcomeView: View {
 
             WelcomeFooter(
                 copy: copy,
+                launchAtLoginState: launchAtLoginState,
                 onTrySample: onTrySample,
                 onDone: onDone
             )
@@ -577,103 +592,163 @@ private struct WelcomeView: View {
 private struct WelcomeLaunchAtLoginRow: View {
     let copy: WelcomeCopy
     @ObservedObject var state: WelcomeLaunchAtLoginState
+    @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 9) {
-            Toggle(isOn: isEnabled) {
-                HStack(spacing: 6) {
-                    Text(copy.launchAtLoginTitle)
-                        .font(.callout.weight(.medium))
-                    Text(copy.launchAtLoginOptional)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        Button {
+            state.performPrimaryAction()
+        } label: {
+            HStack(spacing: 10) {
+                Text(copy.launchAtLoginTitle)
+                    .font(.callout.weight(.medium))
+
+                Text(copy.launchAtLoginOptional)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Label(statusText, systemImage: statusSymbol)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(statusColor)
+
+                if state.presentation.canPerformAction {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
             }
-            .toggleStyle(.checkbox)
-            .disabled(!canToggle)
-
-            Spacer()
-
-            switch state.presentation.menuAction {
-            case .enable, .disable:
-                EmptyView()
-            case .allowInSystemSettings:
-                actionButton(copy.launchAtLoginOpenSettings)
-            case .unavailable:
-                Text(copy.launchAtLoginUnavailable)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
+        .disabled(!state.presentation.canPerformAction)
         .background(
-            Color(nsColor: .controlBackgroundColor).opacity(0.72),
+            LinearGradient(
+                colors: [
+                    isHovering && state.presentation.canPerformAction
+                        ? Color.accentColor.opacity(0.12)
+                        : Color(nsColor: .controlBackgroundColor).opacity(0.72),
+                    Color.accentColor.opacity(0.045)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            ),
             in: RoundedRectangle(cornerRadius: 10, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
         }
-        .accessibilityElement(children: .contain)
+        .onHover { isHovering = $0 }
+        .help(actionHelp)
+        .accessibilityHint(actionHelp)
     }
 
-    private var isEnabled: Binding<Bool> {
-        Binding(
-            get: { state.presentation.menuAction == .disable },
-            set: { _ in state.performPrimaryAction() }
-        )
-    }
-
-    private var canToggle: Bool {
+    private var statusText: String {
         switch state.presentation.menuAction {
-        case .enable, .disable:
-            true
-        case .allowInSystemSettings, .unavailable:
-            false
+        case .enable:
+            copy.launchAtLoginOff
+        case .disable:
+            copy.launchAtLoginOn
+        case .allowInSystemSettings:
+            copy.launchAtLoginApprovalRequired
+        case .unavailable:
+            copy.launchAtLoginUnavailable
         }
     }
 
-    private func actionButton(_ title: String) -> some View {
-        Button(title) {
-            state.performPrimaryAction()
+    private var statusSymbol: String {
+        switch state.presentation.menuAction {
+        case .enable:
+            "circle.dashed"
+        case .disable:
+            "checkmark.circle.fill"
+        case .allowInSystemSettings:
+            "exclamationmark.circle.fill"
+        case .unavailable:
+            "xmark.circle"
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .help(copy.launchAtLoginApprovalHelp)
+    }
+
+    private var statusColor: Color {
+        switch state.presentation.menuAction {
+        case .disable:
+            .green
+        case .allowInSystemSettings:
+            .orange
+        case .enable, .unavailable:
+            .secondary
+        }
+    }
+
+    private var actionHelp: String {
+        switch state.presentation.menuAction {
+        case .enable:
+            L10n.text(
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login"
+            )
+        case .disable:
+            L10n.text(
+                "menu.disable_launch_at_login",
+                defaultValue: "Disable Launch at Login"
+            )
+        case .allowInSystemSettings:
+            "\(copy.launchAtLoginApprovalHelp) \(copy.launchAtLoginOpenSettings)"
+        case .unavailable:
+            copy.launchAtLoginUnavailable
+        }
     }
 }
 
 private struct WelcomeFooter: View {
     let copy: WelcomeCopy
+    @ObservedObject var launchAtLoginState: WelcomeLaunchAtLoginState
     let onTrySample: () -> Void
     let onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Label(copy.privacyNote, systemImage: "lock.shield")
-                Label(copy.reopenHint, systemImage: "menubar.rectangle")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 0) {
+            WelcomeLaunchAtLoginRow(
+                copy: copy,
+                state: launchAtLoginState
+            )
+            .padding(.horizontal, 22)
+            .padding(.vertical, 10)
 
-            Spacer(minLength: 12)
+            Divider()
+                .padding(.leading, 22)
 
-            Button(copy.trySample, action: onTrySample)
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(copy.privacyNote, systemImage: "lock.shield")
+                    Label(copy.reopenHint, systemImage: "menubar.rectangle")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 12)
+
+                Button(action: onTrySample) {
+                    Label(copy.trySample, systemImage: "sparkles")
+                }
                 .help(copy.trySampleHelp)
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
                 .controlSize(.regular)
 
-            Button(copy.done, action: onDone)
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
+                Button(copy.done, action: onDone)
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 11)
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 11)
         .background(.regularMaterial)
     }
 }
