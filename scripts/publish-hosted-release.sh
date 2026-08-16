@@ -9,6 +9,7 @@ release_assets_script="${RELEASE_ASSETS_SCRIPT:-scripts/release-assets.mjs}"
 release_manifest_script="${RELEASE_MANIFEST_SCRIPT:-scripts/release-manifest.mjs}"
 release_milestone_script="${RELEASE_MILESTONE_SCRIPT:-scripts/release-milestone.mjs}"
 release_update_channel_script="${RELEASE_UPDATE_CHANNEL_SCRIPT:-scripts/release-update-channel.sh}"
+sparkle_appcast_script="${SPARKLE_APPCAST_SCRIPT:-scripts/sparkle-appcast.mjs}"
 gh_host="${GH_HOST:-github.com}"
 gh_repo="${GH_REPO:-}"
 handoff_dir="${RELEASE_HANDOFF_DIR:-}"
@@ -60,6 +61,7 @@ asset_value_by_name() {
     '.assets[] | select(.name == $name) | .[$field]' <<< "$asset_contract_json"
 }
 release_zip_name="$(asset_value_by_key releaseZip name)"
+appcast_name="$(jq -r '.assets[] | select(.key == "appcast") | .name' <<< "$asset_contract_json")"
 release_dmg_name="$(asset_value_by_key releaseDmg name)"
 latest_dmg_name="$(asset_value_by_key latestDmg name)"
 coverage_json_name="$(asset_value_by_key coverageJson name)"
@@ -77,6 +79,15 @@ notes_file="$RUNNER_TEMP/release-notes-${version}.md"
   --report "${handoff_dir}/${coverage_json_name}" \
   --app-version "$version" \
   --commit "$source_commit"
+if [[ -n "$appcast_name" ]]; then
+  "$node_binary" "$sparkle_appcast_script" validate \
+    --file "${handoff_dir}/${appcast_name}" \
+    --archive "${handoff_dir}/${release_zip_name}" \
+    --version "$version" \
+    --build "$build_number" \
+    --repository "$gh_repo" \
+    --public-key "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Info.plist)"
+fi
 
 if ! cmp -s "${handoff_dir}/${release_dmg_name}" "${handoff_dir}/${latest_dmg_name}"; then
   echo "The latest DMG alias differs from the versioned DMG." >&2

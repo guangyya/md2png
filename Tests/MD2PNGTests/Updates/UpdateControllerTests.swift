@@ -452,6 +452,77 @@ final class UpdateControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testSparkleProbeRunsOnlyAfterExplicitCheckAndShowsUIOnlyForAnUpdate() throws {
+        let driver = FakeUpdateDriver()
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let controller = UpdateController(
+            channel: { .stableGitHubReleases(repository: self.repository) },
+            installedVersion: { "0.6.0" },
+            defaults: defaults,
+            updateDriver: driver
+        )
+
+        controller.refreshIfNeeded()
+        XCTAssertEqual(driver.probeCount, 0)
+        XCTAssertEqual(controller.status.phase, .unknown)
+
+        controller.checkAgain()
+        XCTAssertEqual(driver.probeCount, 1)
+        XCTAssertTrue(controller.status.isChecking)
+        driver.complete(.updateAvailable(displayVersion: "0.7.0"))
+
+        XCTAssertEqual(
+            controller.status.phase,
+            .sparkleUpdateAvailable(displayVersion: "0.7.0")
+        )
+        XCTAssertFalse(controller.status.isChecking)
+        XCTAssertEqual(driver.standardUICount, 1)
+    }
+
+    @MainActor
+    func testSparkleLatestResultStaysInlineWithoutOpeningStandardUI() throws {
+        let driver = FakeUpdateDriver()
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let controller = UpdateController(
+            channel: { .stableGitHubReleases(repository: self.repository) },
+            installedVersion: { "0.6.0" },
+            defaults: defaults,
+            updateDriver: driver
+        )
+
+        controller.checkAgain()
+        driver.complete(.noUpdate(reason: .onLatestVersion, latestDisplayVersion: "0.6.0"))
+
+        XCTAssertEqual(controller.status.phase, .upToDate(version: SemanticVersion("0.6.0")!))
+        XCTAssertEqual(driver.standardUICount, 0)
+    }
+
+    @MainActor
+    func testSparkleIncompatibleResultIsNotPresentedAsUpToDate() throws {
+        let driver = FakeUpdateDriver()
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let controller = UpdateController(
+            channel: { .stableGitHubReleases(repository: self.repository) },
+            installedVersion: { "0.6.0" },
+            defaults: defaults,
+            updateDriver: driver
+        )
+
+        controller.checkAgain()
+        driver.complete(.noUpdate(reason: .systemIsTooOld, latestDisplayVersion: "0.7.0"))
+
+        guard case let .failed(message, releasesURL, _, _) = controller.status.phase else {
+            return XCTFail("Expected an incompatible-update failure")
+        }
+        XCTAssertTrue(message.contains("newer version of macOS"))
+        XCTAssertEqual(releasesURL, repository.releasesURL)
+        XCTAssertEqual(driver.standardUICount, 0)
+    }
+
+    @MainActor
     private func makeController(
         defaults: UserDefaults,
         now: @escaping () -> Date = Date.init
@@ -500,5 +571,27 @@ final class UpdateControllerTests: XCTestCase {
             case digest
             case browserDownloadURL = "browser_download_url"
         }
+    }
+}
+
+@MainActor
+private final class FakeUpdateDriver: UpdateDriving {
+    private var completion: (@MainActor (UpdateProbeResult) -> Void)?
+    private(set) var probeCount = 0
+    private(set) var standardUICount = 0
+
+    func probe(completion: @escaping @MainActor (UpdateProbeResult) -> Void) {
+        probeCount += 1
+        self.completion = completion
+    }
+
+    func showStandardUpdateUI() {
+        standardUICount += 1
+    }
+
+    func complete(_ result: UpdateProbeResult) {
+        let completion = completion
+        self.completion = nil
+        completion?(result)
     }
 }

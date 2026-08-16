@@ -5,12 +5,24 @@ import XCTest
 final class AboutPresentationTests: XCTestCase {
     private let english = L10n.localizedBundle(for: "en")
 
-    func testUnknownStatusIsHidden() {
+    func testUnknownStatusOffersAnExplicitCheckWithoutClaimingAResult() {
         let presentation = makePresentation(status: UpdateStatus())
 
-        XCTAssertFalse(presentation.isVisible)
-        XCTAssertNil(presentation.primaryAction)
+        XCTAssertTrue(presentation.isVisible)
+        XCTAssertEqual(presentation.title, "Updates")
+        XCTAssertEqual(presentation.primaryAction?.title, "Check for Updates…")
+        XCTAssertEqual(presentation.primaryAction?.action, .checkAgain)
         XCTAssertNil(presentation.secondaryAction)
+    }
+
+    func testSparkleUpdatePresentationReopensTheStandardWindow() {
+        let presentation = makePresentation(status: UpdateStatus(
+            phase: .sparkleUpdateAvailable(displayVersion: "0.7.0")
+        ))
+
+        XCTAssertEqual(presentation.title, "Update available · 0.7.0")
+        XCTAssertEqual(presentation.primaryAction?.title, "Show Update")
+        XCTAssertEqual(presentation.primaryAction?.action, .showUpdate)
     }
 
     func testUpToDatePresentationMapsFeedbackAndCooldown() {

@@ -24,6 +24,7 @@ asset_value_by_name() {
     '.assets[] | select(.name == $name) | .[$field]' <<< "$asset_contract_json"
 }
 release_zip="$(asset_value_by_key releaseZip sourcePath)"
+appcast="$(jq -r '.assets[] | select(.key == "appcast") | .sourcePath' <<< "$asset_contract_json")"
 release_dmg="$(asset_value_by_key releaseDmg sourcePath)"
 latest_dmg="$(asset_value_by_key latestDmg sourcePath)"
 notes_file=".build/release-notes-${version}.md"
@@ -32,6 +33,11 @@ coverage_markdown="$(asset_value_by_key coverageMarkdown sourcePath)"
 
 if [[ -n "${TEST_UPDATE_VERSION:-}" || -n "${TEST_UPDATE_STATE:-}" ]]; then
   echo "TEST_UPDATE_VERSION and TEST_UPDATE_STATE are only for local app/run builds." >&2
+  exit 1
+fi
+
+if [[ -n "$appcast" && -z "${SPARKLE_EDDSA_PRIVATE_KEY:-}" ]]; then
+  echo "SPARKLE_EDDSA_PRIVATE_KEY is required to publish a signed update feed." >&2
   exit 1
 fi
 
@@ -138,8 +144,15 @@ make notarize \
   UPDATE_CHANNEL=stable \
   BUNDLE_IDENTIFIER="$bundle_identifier" \
   RELEASE_SUFFIX=developer-id
+if [[ -n "$appcast" ]]; then
+  GH_REPO="$gh_repo" PROJECT_URL="$project_url" ./scripts/generate-appcast.sh
+fi
 
-for artifact in "$release_zip" "$release_dmg" "$coverage_json" "$coverage_markdown"; do
+release_artifacts=("$release_zip" "$release_dmg" "$coverage_json" "$coverage_markdown")
+if [[ -n "$appcast" ]]; then
+  release_artifacts+=("$appcast")
+fi
+for artifact in "${release_artifacts[@]}"; do
   if [[ ! -s "$artifact" ]]; then
     echo "Expected release artifact is missing or empty: ${artifact}" >&2
     exit 1

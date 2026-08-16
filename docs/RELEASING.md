@@ -42,10 +42,33 @@ The normal release path uses two separately scoped identities:
 - Create the protected `release-signing` environment. Store
   `RELEASE_CERTIFICATE_P12_BASE64`, `RELEASE_CERTIFICATE_PASSWORD`,
   `RELEASE_SIGN_IDENTITY`, `RELEASE_CERTIFICATE_SHA256`, `APPLE_ID`,
-  `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD` only in that environment.
+  `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
+  `SPARKLE_EDDSA_PRIVATE_KEY` only in that environment.
   `RELEASE_SIGN_IDENTITY` is the complete Developer ID Application common name;
   the fingerprint is the certificate's SHA-256 value with or without colons.
   An environment reviewer is optional.
+
+Sparkle uses a separate Ed25519 key; it does not require another Apple
+certificate. Generate it once under the app-specific Keychain account, put only
+the printed public key in `SUPublicEDKey`, and upload the exported private seed
+to the protected environment without printing it:
+
+```sh
+swift package resolve
+.build/artifacts/sparkle/Sparkle/bin/generate_keys \
+  --account io.github.guangyya.md2png
+.build/artifacts/sparkle/Sparkle/bin/generate_keys \
+  --account io.github.guangyya.md2png \
+  -x /path/to/temporary-private-key
+gh secret set SPARKLE_EDDSA_PRIVATE_KEY \
+  --repo "$GH_REPO" \
+  --env release-signing \
+  < /path/to/temporary-private-key
+```
+
+Securely remove the temporary plaintext export and keep one separately
+encrypted offline recovery copy. The Keychain item, protected environment
+secret, offline copy, and `SUPublicEDKey` must describe the same keypair.
 
 Keep the `release`, `release:patch`, `release:minor`, and `release:major` labels.
 Protect `main` and require the stable CI checks plus Release preflight. The App
@@ -87,6 +110,19 @@ according to the operator's recovery policy. Do not revoke an old or expired
 Developer ID certificate merely because it was rotated. Reserve revocation for
 suspected compromise after assessing the effect on already published apps.
 
+Treat Sparkle EdDSA rotation as a separate migration, not routine secret
+replacement. The private key signs both the appcast and update ZIP, while the
+matching public key is pinned in every installed app. Do not replace
+`SPARKLE_EDDSA_PRIVATE_KEY` or `SUPublicEDKey` independently. A planned rotation
+must first ship a bridge app signed by the old update key and containing the new
+public key, preserve a feed path that remains verifiable by clients still on the
+old key, and validate both cohorts before retiring the old key. The current
+single `releases/latest/download/appcast.xml` feed does not implement that
+dual-cohort migration, so rotation requires a reviewed infrastructure change.
+If the update key may be compromised, stop seamless publication and direct
+users to the notarized DMG; do not weaken `SURequireSignedFeed` or silently
+replace the pin.
+
 Rotate the preparation GitHub App private key without changing its permissions
 or repository selection. Generate a replacement key while the old key is still
 valid, replace `RELEASE_PREP_PRIVATE_KEY`, and confirm the next planned
@@ -113,7 +149,7 @@ To release:
    a SHA-256 digest of that reviewed plan.
 4. Wait for normal CI and Release preflight, then merge the PR through the
    protected branch. The preparation workflow cannot approve or merge it.
-5. Watch **Trusted Release** validate, sign, notarize, publish, verify the five
+5. Watch **Trusted Release** validate, sign, notarize, publish, verify the six
    assets, and update coverage history for that exact merge commit.
 
 Release preflight derives the bump independently, requires the generated commit
@@ -137,12 +173,13 @@ The trusted workflow isolates responsibilities:
   test suite, and produces normalized JSON/Markdown coverage files;
 - `sign` alone enters `release-signing`, imports the certificate into a
   temporary keychain, checks its identity, Team ID, and fingerprint, notarizes
-  the exact source, and emits a one-day handoff with a SHA-256 manifest; and
+  the exact source, signs the versioned ZIP and appcast with the Sparkle EdDSA
+  key, and emits a one-day handoff with a SHA-256 manifest; and
 - `publish` receives no Apple secret. It alone can create the annotated tag and
   Release, synchronize the release milestone, and update issue #42. It
   revalidates signatures, staples, metadata, manifest digests, asset digests,
   and the source commit, creates the Release as a draft, and makes it
-  public/latest only after all five assets match and milestone synchronization
+  public/latest only after all six assets match and milestone synchronization
   succeeds.
 
 The milestone synchronizer compares the previous stable tag with the exact
@@ -178,9 +215,10 @@ its manifest identity and every asset digest before publication. It never
 re-signs a replacement for a partially populated draft. If
 that exact version is already the latest published Release, the workflow skips
 coverage generation, signing, and publication. A read-only macOS job instead
-downloads the existing five assets and verifies their names, labels, sizes,
+downloads the existing six assets and verifies their names, labels, sizes,
 content types, SHA-256 digests, release notes, source metadata, signatures,
-the repository-pinned public leaf-certificate SHA-256 fingerprint,
+the Sparkle feed/archive EdDSA signatures, the repository-pinned public
+leaf-certificate SHA-256 fingerprint,
 notarization tickets, architecture, packaged self-test, and issue #42 links.
 It has no environment secrets or repository write permission. The fingerprint
 contains no private key or account credential and is independently observable
@@ -391,6 +429,7 @@ make publish-release \
   GH_HOST="$GH_HOST" \
   GH_REPO="$GH_REPO" \
   BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
+  SPARKLE_EDDSA_PRIVATE_KEY="<private seed from secure storage>" \
   SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
   NOTARY_PROFILE=MDPNGNotary
 ```
@@ -413,8 +452,9 @@ This command refuses to continue unless:
 - Xcode 26.2 is selected for the canonical coverage snapshot.
 
 It first runs `make coverage` on the canonical Xcode 26.2 release toolchain,
-then builds and notarizes the arm64 ZIP and DMG, creates and pushes the
-annotated version tag, and publishes five assets using the matching changelog
+then builds and notarizes the arm64 ZIP and DMG, generates and verifies the
+signed appcast, creates and pushes the annotated version tag, and publishes six
+assets using the matching changelog
 section as the Release Notes:
 
 The required asset membership, rendered names, labels, content types, and
@@ -426,6 +466,8 @@ signing remain separate for the local and hosted paths.
 
 - the versioned ZIP archive, labeled `md2png <version> — macOS app archive
   (Apple silicon)`;
+- `appcast.xml`, whose feed signature and enclosure signature both verify with
+  the public Ed25519 key pinned in `Info.plist`;
 - the versioned DMG, labeled `md2png <version> — macOS installer (Apple
   silicon)`;
 - an identical `md2png-latest.dmg`, labeled `md2png — latest macOS
@@ -441,7 +483,7 @@ download URL across versions:
 ${PROJECT_URL}/releases/latest/download/md2png-latest.dmg
 ```
 
-The script verifies all five asset names after publishing. It refuses an
+The script verifies all six asset names after publishing. It refuses an
 existing Release and validates the report schema, app version, and exact commit
 before uploading. It also rechecks that coverage generation left the release
 worktree clean, so rerunning a version cannot silently replace its coverage
@@ -485,6 +527,7 @@ cp -f \
   "dist/md2png-latest.dmg"
 gh release create "v${version}" \
   "dist/md2png-${version}-macOS-arm64-developer-id.zip#md2png ${version} — macOS app archive (Apple silicon)" \
+  ".build/update-feed/appcast.xml#md2png ${version} — signed Sparkle appcast" \
   "dist/md2png-${version}-macOS-arm64-developer-id.dmg#md2png ${version} — macOS installer (Apple silicon)" \
   "dist/md2png-latest.dmg#md2png — latest macOS installer (Apple silicon)" \
   ".build/coverage/md2png-${version}-coverage.json#md2png ${version} — normalized source-line coverage (JSON)" \
@@ -502,48 +545,56 @@ application.
 
 ## In-app update contract
 
-When the packaged `MD2PNGUpdateChannel` is exactly `stable`, the update status
-in About uses the packaged `PROJECT_URL` to call the public GitHub latest-release
-API without credentials. Successful responses are cached for 24 hours;
-**Check Again** bypasses that cache while honoring a 60-second minimum request
-interval and GitHub rate-limit retry headers. `Info.plist` remains the single
-version source: `CFBundleShortVersionString` must match the stable tag
-`v${version}`, the changelog section, and the version inside the downloadable
-asset name:
+When the packaged `MD2PNGUpdateChannel` is exactly `stable`, About derives this
+feed URL from the packaged `PROJECT_URL`:
 
 ```text
-md2png-${version}-macOS-arm64-developer-id.dmg
+https://github.com/OWNER/REPOSITORY/releases/latest/download/appcast.xml
 ```
 
-The app requires that exact asset to have disk-image content type, positive size,
-an HTTPS GitHub Release download URL, and a `sha256:` digest. The publishing script
-checks those fields after creating the Release. Do not replace the versioned DMG
-with only the `md2png-latest.dmg` alias; the updater deliberately requires the
-version-specific asset and its verified metadata.
+Opening About never starts a request. **Check for Updates…** starts a Sparkle
+information-only probe after a 60-second local cooldown. An on-latest result is
+shown inline as **Up to Date**; newer-than-published and incompatible-system
+results are distinguished from that success state. A valid newer item ends the
+probe first and then opens Sparkle's standard UI. Download, validation,
+installation, authorization when necessary, replacement, and relaunch are owned
+by Sparkle only after the user accepts that UI. Automatic checks, automatic
+downloads, and system-profile submission are disabled.
 
-The successful in-app flow shows the available version before any download.
-Only **Download Update** downloads and verifies the DMG and asks macOS to open
-it. Installation remains manual: the user drags md2png into Applications. There
-is no embedded GitHub credential, privileged helper, silent replacement, or
-automatic relaunch.
+`Info.plist` is the version and trust-pin source. `CFBundleShortVersionString`
+and `CFBundleVersion` must match the generated appcast's short version and
+Sparkle version. `SUPublicEDKey` verifies both the signed feed and this immutable
+archive URL:
 
-For an explicit local end-to-end stable update test, keep the source version
-unchanged and run a Release build:
-
-```sh
-make run CONFIGURATION=release \
-  PROJECT_URL=https://github.com/guangyya/md2png \
-  UPDATE_CHANNEL=stable \
-  TEST_UPDATE_VERSION=0.0.0
+```text
+https://github.com/OWNER/REPOSITORY/releases/download/v${version}/md2png-${version}-macOS-arm64-developer-id.zip
 ```
 
-The override changes only the packaged app before ad-hoc signing. The publish
-target rejects it so it cannot alter a public release version.
+The protected sign job uses Sparkle's pinned `generate_appcast` tool with
+embedded release notes, no deltas, and at most three retained entries (the
+current release pipeline provides one archive). The handoff, publisher, and
+published-release verifier independently require one item, the exact release
+identity and immutable ZIP URL, HTTPS-only links, a valid feed signature, and a
+valid ZIP signature. The ZIP also contains the existing Developer ID-signed,
+notarized app; the versioned and latest DMGs remain manual installation and
+recovery artifacts.
 
-To review deterministic About layouts without consuming a GitHub API request,
-use a Debug build with `UPDATE_CHANNEL=disabled` and add one of
-`TEST_UPDATE_STATE=up-to-date`, `check-failed`, `download-failed`, or
-`ready-to-install`:
+Version `0.6.x` does not contain Sparkle, so upgrading from `0.6.x` to `0.7.0`
+remains a manual DMG installation. The `0.7.0` release must publish the first
+valid signed appcast and ZIP so an isolated `0.7.0` client can discover and
+install its first successor without replacing a release asset. Validate that
+path against a private test feed or isolated repository before announcing
+seamless updates.
+
+Never mutate a published versioned ZIP. If an update is bad but its signing key
+is still trusted, leave its evidence intact, stop marking it latest, and publish
+a higher fixed version; Sparkle intentionally does not downgrade. If the feed,
+key, or updater path cannot be trusted, stop seamless updates and direct users
+to the notarized versioned DMG. Recovery must not disable signed-feed or
+pre-extraction verification.
+
+To review deterministic About layouts without contacting the feed, use a Debug
+build with `UPDATE_CHANNEL=disabled` and a packaged fixture:
 
 ```sh
 make run CONFIGURATION=debug \
@@ -553,8 +604,6 @@ make run CONFIGURATION=debug \
   TEST_UPDATE_STATE=up-to-date
 ```
 
-The mock key is written only to the packaged Debug app;
-both the Make target and release script reject it for publication. Download
-fixtures use non-routable metadata, and their check/download/retry actions stay
-disabled. A missing ready fixture shows a display-only recoverable failure
-instead of an action pointing at a missing file.
+Both the Make target and release publisher reject test version/state overrides
+for publication. Full install/relaunch validation must use a separately signed
+test release and feed rather than changing or re-uploading a public asset.

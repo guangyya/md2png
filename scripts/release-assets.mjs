@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const contractPath = fileURLToPath(new URL("./release-assets.json", import.meta.url));
 const stableVersionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
-const assetFields = ["key", "name", "label", "contentType", "sourcePath"];
+const assetFields = ["key", "name", "label", "contentType", "sourcePath", "introducedIn"];
 
 function fail(message) {
   throw new Error(message);
@@ -41,7 +41,7 @@ function renderTemplate(value, variables) {
 
 export function validateReleaseAssetContract(contract) {
   exactKeys(contract, ["schemaVersion", "assets"], "release asset contract");
-  if (contract.schemaVersion !== 1) {
+  if (contract.schemaVersion !== 2) {
     fail(`unsupported release asset contract schemaVersion: ${contract.schemaVersion}`);
   }
   if (!Array.isArray(contract.assets)) {
@@ -58,6 +58,9 @@ export function validateReleaseAssetContract(contract) {
     validateTemplate(asset.name, ["version"], `${asset.key} name`);
     validateTemplate(asset.label, ["version"], `${asset.key} label`);
     validateTemplate(asset.sourcePath, ["version", "name"], `${asset.key} sourcePath`);
+    if (!stableVersionPattern.test(asset.introducedIn)) {
+      fail(`${asset.key} has an invalid introducedIn version`);
+    }
     if (typeof asset.contentType !== "string" || !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(asset.contentType)) {
       fail(`${asset.key} has an invalid contentType`);
     }
@@ -87,7 +90,16 @@ export function releaseAssets(version, contract = readReleaseAssetContract()) {
     fail("version exceeds the safe integer range");
   }
   validateReleaseAssetContract(contract);
-  const assets = contract.assets.map((asset) => {
+  const versionParts = version.split(".").map(Number);
+  const assets = contract.assets.filter((asset) => {
+    const introducedParts = asset.introducedIn.split(".").map(Number);
+    for (let index = 0; index < versionParts.length; index += 1) {
+      if (versionParts[index] !== introducedParts[index]) {
+        return versionParts[index] > introducedParts[index];
+      }
+    }
+    return true;
+  }).map((asset) => {
     const name = renderTemplate(asset.name, { version });
     if (name !== path.basename(name) || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) {
       fail(`${asset.key} renders an unsafe asset name`);
@@ -174,7 +186,7 @@ function main(argv) {
   const { version } = options;
   const assets = releaseAssets(version);
   if (command === "json") {
-    process.stdout.write(`${JSON.stringify({ schemaVersion: 1, version, assets }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ schemaVersion: 2, version, assets }, null, 2)}\n`);
   } else if (command === "names") {
     process.stdout.write(`${assets.map((asset) => asset.name).join("\n")}\n`);
   } else if (command === "field") {

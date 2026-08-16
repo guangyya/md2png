@@ -93,9 +93,6 @@ final class AboutController: NSWindowController {
         window?.makeKeyAndOrderFront(nil)
         window?.contentView?.layoutSubtreeIfNeeded()
         aboutView.updateReleaseNotesLayout()
-        if updateFeatureAvailable {
-            updateController.refreshIfNeeded()
-        }
     }
 
     private func bindContentActions() {
@@ -119,6 +116,8 @@ final class AboutController: NSWindowController {
         switch action {
         case .checkAgain:
             updateController.checkAgain()
+        case .showUpdate:
+            updateController.showStandardUpdateUI()
         case .download:
             updateController.downloadAvailableUpdate()
         case .cancel:

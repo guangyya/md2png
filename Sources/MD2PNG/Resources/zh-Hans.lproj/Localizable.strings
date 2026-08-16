@@ -120,9 +120,14 @@
 "about.project" = "项目";
 "about.open_project" = "打开项目";
 "about.view_all_releases" = "查看 Releases";
-"about.check_for_updates_help" = "打开“关于”时检查 GitHub；成功结果会缓存 24 小时。";
+"about.check_for_updates_help" = "仅在你选择“检查更新”时访问已签名的更新源。";
+"about.updates" = "软件更新";
+"about.check_for_updates" = "检查更新…";
 "about.update_up_to_date" = "已是最新版本 · %@";
 "about.update_available" = "发现新版本 · %@";
+"about.update_show" = "查看更新";
+"about.update_running_newer" = "当前运行的是更新的构建";
+"about.update_latest_published" = "最新发布版本：%@";
 "about.update_check_again" = "再次检查";
 "about.update_check_again_later" = "稍后再次检查";
 "about.update_checking" = "检查中…";
@@ -141,6 +146,12 @@
 "about.update_check_failed" = "更新检查失败";
 "about.update_download_failed" = "下载失败";
 "about.update_retry_after" = "%@ 后可重试。";
+"about.update_busy" = "已有更新检查正在进行。";
+"about.update_unknown_result" = "更新检查已结束，但没有返回结果。";
+"about.update_requires_newer_macos" = "最新更新需要更高版本的 macOS。";
+"about.update_requires_older_macos" = "最新更新不支持当前 macOS 版本。";
+"about.update_requires_apple_silicon" = "最新更新需要 Apple 芯片 Mac。";
+"about.update_no_compatible_release" = "没有找到兼容的更新。";
 "about.copy_version_info" = "复制版本信息";
 "about.version_info_copied" = "已复制";
 "about.version_info" = "md2png %@ (%@) · %@ · macOS %@ · %@";
@@ -160,6 +171,7 @@
 "update.accessibility.verifying" = "正在验证 md2png %@。";
 "update.accessibility.opening" = "正在打开 md2png %@。";
 "update.accessibility.up_to_date" = "md2png %@ 已是最新版本。";
+"update.accessibility.running_newer" = "当前 md2png 构建比最新发布版本更新。";
 "update.accessibility.available" = "md2png %@ 现已可用。";
 "update.error.installed_version" = "当前安装的 App 版本信息无效。";
 "update.error.repository" = "此构建未包含有效的 GitHub 仓库地址。";

@@ -51,23 +51,23 @@ Markdown action requires confirmation before replacing that newer content.
 
 ## Network behavior
 
-md2png makes no update request at launch, on a background timer, or during
-rendering. Opening **About md2png** may contact the public GitHub latest-release
-API when the last successful result is more than 24 hours old; otherwise it
-uses the local cached response. **Check Again** can request a refresh, with at
-least 60 seconds between actual requests and longer server-provided rate-limit
-delays honored across launches. The request contains the repository path, app
-version in a User-Agent, and normal network metadata such as the source IP; it
+md2png makes no update request at launch, when About opens, on a background
+timer, or during rendering. Only choosing **Check for Updates…** fetches the
+public, signed `appcast.xml` from the latest GitHub Release. A 60-second local
+cooldown prevents accidental repeated requests. Sparkle system-profile
+submission and automatic checks/downloads are disabled. The request contains
+the repository path and normal network metadata such as the source IP; it
 contains no Markdown, rendered image, clipboard content, device identifier,
-account data, or GitHub credential.
+account data, GitHub credential, or Sparkle system profile.
 
-When a newer stable version exists, the app downloads the matching versioned
-Apple silicon DMG from the GitHub Release asset URL into its caches directory,
-checks the advertised file size and SHA-256 digest, and asks macOS to open it.
-The user must still drag md2png into Applications. The app does not replace or
-relaunch itself, request administrator privileges, or report that installation
-has completed.
+If the signed feed reports no compatible newer version, About displays the
+result inline. If an update exists, Sparkle's standard window shows its version
+and release notes. Only after the user accepts does Sparkle download the exact
+versioned Apple silicon ZIP from GitHub, verify both its EdDSA signature and app
+code signature, and replace/relaunch the app. macOS may request authorization
+when the installed location is not writable. The notarized DMG remains a manual
+fallback and recovery path.
 
-**View Releases** is offered only after an update failure and opens the browser
-only when the user chooses it. **Open Project** in About also opens the configured
+**View Releases** is offered after an update failure and opens the browser only
+when the user chooses it. **Open Project** in About also opens the configured
 repository page when clicked. Rendering remains fully available offline.

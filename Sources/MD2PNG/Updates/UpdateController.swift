@@ -3,6 +3,8 @@ import AppKit
 enum UpdatePhase: Equatable, Sendable {
     case unknown
     case upToDate(version: SemanticVersion)
+    case runningNewerVersion(version: String)
+    case sparkleUpdateAvailable(displayVersion: String)
     case updateAvailable(AvailableUpdate)
     case downloading(AvailableUpdate, progressPercent: Int)
     case verifying(AvailableUpdate)
@@ -19,7 +21,8 @@ enum UpdatePhase: Equatable, Sendable {
         switch self {
         case .downloading, .verifying, .opening:
             return true
-        case .unknown, .upToDate, .updateAvailable, .readyToInstall, .failed:
+        case .unknown, .upToDate, .runningNewerVersion,
+             .sparkleUpdateAvailable, .updateAvailable, .readyToInstall, .failed:
             return false
         }
     }
@@ -34,7 +37,7 @@ enum UpdatePhase: Equatable, Sendable {
             return update
         case let .failed(_, _, _, update):
             return update
-        case .unknown, .upToDate:
+        case .unknown, .upToDate, .runningNewerVersion, .sparkleUpdateAvailable:
             return nil
         }
     }
@@ -141,6 +144,7 @@ final class UpdateController {
     static let manualCheckCooldown: TimeInterval = 60
 
     private let service: UpdateService
+    private let updateDriver: UpdateDriving?
     private let checkPolicy: UpdateCheckPolicy
     private let channel: () -> UpdateChannel
     private let installedVersion: () -> String?
@@ -165,7 +169,7 @@ final class UpdateController {
         }
     }
 
-    var isUpdating: Bool { checkTask != nil || downloadTask != nil }
+    var isUpdating: Bool { status.isChecking || checkTask != nil || downloadTask != nil }
 
     var allowsUpdatePresentation: Bool {
 #if DEBUG
@@ -205,9 +209,11 @@ final class UpdateController {
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = Date.init,
         automaticCheckInterval: TimeInterval = UpdateController.automaticCheckInterval,
-        manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown
+        manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown,
+        updateDriver: UpdateDriving? = nil
     ) {
         self.service = service
+        self.updateDriver = updateDriver
         self.channel = channel
         self.installedVersion = installedVersion
         self.openFile = openFile
@@ -270,6 +276,9 @@ final class UpdateController {
             return
         }
 #endif
+        // Sparkle checks are intentionally user-initiated from About. The legacy
+        // service path remains available only to isolated tests and debug fixtures.
+        if updateDriver != nil { return }
         if case .readyToInstall = status.phase { return }
         guard checkTask == nil, downloadTask == nil, !status.phase.isDownloadActive else { return }
         guard let configuration = configurationOrShowFailure() else { return }
@@ -330,6 +339,14 @@ final class UpdateController {
             }
             return
         }
+        if updateDriver != nil {
+            beginSparkleProbe(
+                repository: configuration.repository,
+                installedVersion: configuration.installedVersion,
+                at: currentDate
+            )
+            return
+        }
         beginCheck(
             repository: configuration.repository,
             installedVersion: configuration.installedVersion,
@@ -349,6 +366,11 @@ final class UpdateController {
             guard let self else { return }
             await downloadAndOpen(update)
         }
+    }
+
+    func showStandardUpdateUI() {
+        guard case .sparkleUpdateAvailable = status.phase else { return }
+        updateDriver?.showStandardUpdateUI()
     }
 
     func cancelUpdate() {
@@ -395,6 +417,125 @@ final class UpdateController {
     }
 
     private typealias Configuration = (repository: GitHubRepository, installedVersion: String)
+
+    private func beginSparkleProbe(
+        repository: GitHubRepository,
+        installedVersion: String,
+        at requestDate: Date
+    ) {
+        guard let updateDriver else { return }
+        checkPolicy.recordAttempt(at: requestDate)
+        var checkingStatus = status
+        checkingStatus.isChecking = true
+        checkingStatus.manualCheckFeedback = .checking
+        status = checkingStatus
+        publishManualCheckAvailability(at: requestDate)
+
+        updateDriver.probe { [weak self] result in
+            self?.finishSparkleProbe(
+                result,
+                repository: repository,
+                installedVersion: installedVersion
+            )
+        }
+    }
+
+    private func finishSparkleProbe(
+        _ result: UpdateProbeResult,
+        repository: GitHubRepository,
+        installedVersion: String
+    ) {
+        let phase: UpdatePhase
+        switch result {
+        case let .updateAvailable(displayVersion):
+            phase = .sparkleUpdateAvailable(displayVersion: displayVersion)
+        case let .noUpdate(reason, latestDisplayVersion):
+            phase = phaseForNoUpdate(
+                reason: reason,
+                latestDisplayVersion: latestDisplayVersion,
+                installedVersion: installedVersion,
+                repository: repository
+            )
+        case let .failed(message):
+            phase = .failed(
+                message: message,
+                releasesURL: repository.releasesURL,
+                retryAt: nil,
+                availableUpdate: nil
+            )
+        }
+
+        finishCheck(with: phase)
+        if case .sparkleUpdateAvailable = phase {
+            updateDriver?.showStandardUpdateUI()
+        }
+    }
+
+    private func phaseForNoUpdate(
+        reason: UpdateProbeNoUpdateReason,
+        latestDisplayVersion: String?,
+        installedVersion: String,
+        repository: GitHubRepository
+    ) -> UpdatePhase {
+        switch reason {
+        case .onLatestVersion:
+            guard let version = SemanticVersion(installedVersion) else {
+                return .failed(
+                    message: UpdateError.invalidInstalledVersion.localizedDescription,
+                    releasesURL: repository.releasesURL,
+                    retryAt: nil,
+                    availableUpdate: nil
+                )
+            }
+            return .upToDate(version: version)
+        case .onNewerThanLatestVersion:
+            return .runningNewerVersion(version: latestDisplayVersion ?? installedVersion)
+        case .systemIsTooOld:
+            return incompatibleUpdatePhase(
+                message: L10n.text(
+                    "about.update_requires_newer_macos",
+                    defaultValue: "The latest update requires a newer version of macOS."
+                ),
+                repository: repository
+            )
+        case .systemIsTooNew:
+            return incompatibleUpdatePhase(
+                message: L10n.text(
+                    "about.update_requires_older_macos",
+                    defaultValue: "The latest update does not support this version of macOS."
+                ),
+                repository: repository
+            )
+        case .hardwareDoesNotSupportARM64:
+            return incompatibleUpdatePhase(
+                message: L10n.text(
+                    "about.update_requires_apple_silicon",
+                    defaultValue: "The latest update requires an Apple silicon Mac."
+                ),
+                repository: repository
+            )
+        case .unknown:
+            return incompatibleUpdatePhase(
+                message: L10n.text(
+                    "about.update_no_compatible_release",
+                    defaultValue: "No compatible update was found."
+                ),
+                repository: repository
+            )
+        }
+    }
+
+    private func incompatibleUpdatePhase(
+        message: String,
+        repository: GitHubRepository
+    ) -> UpdatePhase {
+        .failed(
+            message: message,
+            releasesURL: repository.releasesURL,
+            retryAt: nil,
+            availableUpdate: nil
+        )
+    }
 
     private func configurationOrShowFailure() -> Configuration? {
         guard let repository = channel().repository else { return nil }

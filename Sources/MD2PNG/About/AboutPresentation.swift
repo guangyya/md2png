@@ -8,6 +8,7 @@ enum AboutUpdateTint: Equatable {
 
 enum AboutUpdatePrimaryAction: Equatable {
     case checkAgain
+    case showUpdate
     case download
     case cancel
     case openDownloadedUpdate
@@ -52,12 +53,38 @@ struct AboutUpdatePresentation: Equatable {
         switch status.phase {
         case .unknown:
             return AboutUpdatePresentation(
-                isVisible: false,
-                symbolName: "",
+                isVisible: true,
+                symbolName: status.isChecking ? "arrow.triangle.2.circlepath" : "arrow.down.circle",
                 tint: .blue,
-                title: "",
+                title: status.isChecking
+                    ? L10n.text(
+                        "about.update_checking",
+                        defaultValue: "Checking…",
+                        bundle: localizationBundle
+                    )
+                    : L10n.text(
+                        "about.updates",
+                        defaultValue: "Updates",
+                        bundle: localizationBundle
+                    ),
                 detail: nil,
-                primaryAction: nil,
+                primaryAction: AboutUpdateActionPresentation(
+                    title: status.isChecking
+                        ? L10n.text(
+                            "about.update_checking",
+                            defaultValue: "Checking…",
+                            bundle: localizationBundle
+                        )
+                        : L10n.text(
+                            "about.check_for_updates",
+                            defaultValue: "Check for Updates…",
+                            bundle: localizationBundle
+                        ),
+                    isEnabled: allowsInteractiveCheck && !status.isChecking,
+                    isEmphasized: false,
+                    toolTip: nil,
+                    action: .checkAgain
+                ),
                 secondaryAction: nil
             )
         case let .upToDate(version):
@@ -113,6 +140,67 @@ struct AboutUpdatePresentation: Equatable {
                         retryTimeText: retryTimeText
                     ),
                     action: .checkAgain
+                ),
+                secondaryAction: nil
+            )
+        case let .runningNewerVersion(version):
+            return AboutUpdatePresentation(
+                isVisible: true,
+                symbolName: "checkmark.circle.fill",
+                tint: .green,
+                title: L10n.text(
+                    "about.update_running_newer",
+                    defaultValue: "You’re running a newer build",
+                    bundle: localizationBundle
+                ),
+                detail: L10n.format(
+                    "about.update_latest_published",
+                    defaultValue: "Latest published version: %@",
+                    bundle: localizationBundle,
+                    version
+                ),
+                primaryAction: AboutUpdateActionPresentation(
+                    title: L10n.text(
+                        "about.update_check_again",
+                        defaultValue: "Check Again",
+                        bundle: localizationBundle
+                    ),
+                    isEnabled: allowsInteractiveCheck
+                        && !status.isChecking
+                        && status.nextManualCheckAt == nil,
+                    isEmphasized: false,
+                    toolTip: retryToolTip(
+                        canPerformAction: status.nextManualCheckAt == nil,
+                        retryAt: status.nextManualCheckAt,
+                        localizationBundle: localizationBundle,
+                        retryTimeText: retryTimeText
+                    ),
+                    action: .checkAgain
+                ),
+                secondaryAction: nil
+            )
+        case let .sparkleUpdateAvailable(displayVersion):
+            return AboutUpdatePresentation(
+                isVisible: true,
+                symbolName: "arrow.down.circle.fill",
+                tint: .blue,
+                title: L10n.format(
+                    "about.update_available",
+                    defaultValue: "Update available · %@",
+                    bundle: localizationBundle,
+                    displayVersion
+                ),
+                detail: nil,
+                primaryAction: AboutUpdateActionPresentation(
+                    title: L10n.text(
+                        "about.update_show",
+                        defaultValue: "Show Update",
+                        bundle: localizationBundle
+                    ),
+                    isEnabled: !status.isChecking,
+                    isEmphasized: true,
+                    toolTip: nil,
+                    action: .showUpdate
                 ),
                 secondaryAction: nil
             )
