@@ -86,11 +86,10 @@ enum Clipboard {
 
     @discardableResult
     static func write(image: NSImage) throws -> Int {
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:]) else {
+        guard let tiff = image.tiffRepresentation else {
             throw AppError.pngEncodingFailed
         }
+        let png = try RenderedImageExport.pngData(for: image)
 
         let item = NSPasteboardItem()
         guard item.setData(png, forType: .png),

@@ -152,12 +152,58 @@ final class PreviewLayoutTests: XCTestCase {
             controller.window?.title,
             L10n.format(
                 "preview.window_title_with_width",
-                defaultValue: "Last Markdown Render — %@ · %ld × %ld pt",
+                defaultValue: "Last Render — %@ · %ld × %ld px",
                 RenderWidthPreset.compact.menuTitle,
                 720,
                 1_120
             )
         )
+    }
+
+    @MainActor
+    func testPreviewProvidesActionsAndResetsNewImagesToFit() throws {
+        _ = NSApplication.shared
+        let first = try makeImage(
+            pixelsWide: 1_200,
+            pixelsHigh: 800,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+        let second = try makeImage(
+            pixelsWide: 600,
+            pixelsHigh: 1_600,
+            backgroundColor: .white,
+            accentColor: .systemPurple
+        )
+        let controller = PreviewController()
+        controller.show(image: first)
+        defer { controller.close() }
+
+        XCTAssertEqual(controller.previewZoomMode, .fit)
+        XCTAssertTrue(controller.previewHasHorizontalScroller)
+        XCTAssertEqual(
+            Set(controller.previewToolbarLabels),
+            Set([
+                L10n.text("preview.copy_again", defaultValue: "Copy Again"),
+                L10n.text("preview.save_png", defaultValue: "Save PNG…"),
+                L10n.text("preview.open_in_preview", defaultValue: "Open in Preview"),
+                L10n.text("preview.fit", defaultValue: "Fit to Window"),
+                L10n.text("preview.actual_size", defaultValue: "Actual Size"),
+                L10n.text("preview.zoom_out", defaultValue: "Zoom Out"),
+                L10n.text("preview.zoom_level", defaultValue: "Preview zoom"),
+                L10n.text("preview.zoom_in", defaultValue: "Zoom In")
+            ])
+        )
+
+        controller.selectActualSizeForTesting()
+        XCTAssertEqual(controller.previewZoomMode, .actualSize)
+        XCTAssertEqual(controller.previewZoomFactor, 1)
+        controller.zoomInForTesting()
+        XCTAssertEqual(controller.previewZoomMode, .custom(1.25))
+
+        controller.show(image: second)
+        XCTAssertEqual(controller.previewZoomMode, .fit)
+        XCTAssertTrue(controller.previewZoomStatus.contains("%"))
     }
 
     private func containsDarkContent(in bitmap: NSBitmapImageRep) -> Bool {
@@ -289,5 +335,54 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertEqual(wide.contentSize, NSSize(width: 1_360, height: 640))
         XCTAssertLessThan(compact.contentSize.width, standard.contentSize.width)
         XCTAssertLessThan(standard.contentSize.width, wide.contentSize.width)
+    }
+
+    func testActualSizeMapsOneImagePixelToOneBackingPixel() {
+        let layout = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 1_440, height: 2_240),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 900, height: 700),
+            zoomMode: .actualSize
+        )
+
+        XCTAssertEqual(layout.zoomFactor, 1)
+        XCTAssertEqual(layout.imageFrame.size, NSSize(width: 720, height: 1_120))
+        XCTAssertEqual(layout.imageFrame.minY, 24)
+    }
+
+    func testFitUsesActualPixelSizeAndPreservesTallScrolling() {
+        let layout = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 2_240, height: 8_000),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 720, height: 580),
+            zoomMode: .fit
+        )
+
+        XCTAssertEqual(layout.zoomFactor, 0.6, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 672, accuracy: 0.001)
+        XCTAssertGreaterThan(layout.canvasSize.height, 580)
+        XCTAssertEqual(layout.imageFrame.minY, 24, accuracy: 0.001)
+    }
+
+    func testCustomZoomClampsAndCreatesHorizontalScrollingCanvas() {
+        let maximum = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 800, height: 600),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 720, height: 580),
+            zoomMode: .custom(10)
+        )
+        let minimum = PreviewLayout.calculate(
+            imagePixelSize: NSSize(width: 800, height: 600),
+            backingScaleFactor: 2,
+            viewportSize: NSSize(width: 720, height: 580),
+            zoomMode: .custom(0.01)
+        )
+
+        XCTAssertEqual(maximum.zoomFactor, 4)
+        XCTAssertEqual(maximum.imageFrame.size, NSSize(width: 1_600, height: 1_200))
+        XCTAssertGreaterThan(maximum.canvasSize.width, 720)
+        XCTAssertEqual(maximum.imageFrame.minX, 24)
+        XCTAssertEqual(minimum.zoomFactor, 0.25)
+        XCTAssertEqual(minimum.imageFrame.size, NSSize(width: 100, height: 75))
     }
 }

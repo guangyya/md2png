@@ -5,7 +5,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let renderer = MarkdownRenderer()
     private let renderWidthPreference: RenderWidthPreference
     private let hud = HUDController()
-    private let previewController = PreviewController()
+    private lazy var previewController = PreviewController(
+        onCopied: { [weak self] changeCount in
+            guard let self else { return }
+            self.lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
+            self.hud.show(
+                L10n.text(
+                    "hud.png_copied_again",
+                    defaultValue: "PNG copied again — paste with Command-V"
+                ),
+                symbol: "doc.on.clipboard.fill"
+            )
+        },
+        onError: { [weak self] error in
+            self?.show(error)
+        }
+    )
     private let updateController = UpdateController()
     private lazy var aboutController = AboutController(updateController: updateController)
     private let welcomePreference = WelcomePreference()
