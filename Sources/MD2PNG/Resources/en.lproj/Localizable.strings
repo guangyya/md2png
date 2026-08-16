@@ -97,7 +97,6 @@
 "welcome.launch_at_login.optional" = "Optional";
 "welcome.launch_at_login.on" = "On";
 "welcome.launch_at_login.off" = "Off";
-"welcome.launch_at_login.approval_required" = "Approval Needed";
 "welcome.launch_at_login.open_settings" = "Open Settings…";
 "welcome.launch_at_login.unavailable" = "Unavailable";
 "welcome.launch_at_login.approval_help" = "Approval is required in Login Items.";

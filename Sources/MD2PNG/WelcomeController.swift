@@ -96,7 +96,7 @@ struct WelcomeWindowPlacement {
 
 private enum WelcomeLayout {
     static let contentSize = NSSize(width: 560, height: 570)
-    static let statusColumnWidth: CGFloat = 116
+    static let statusColumnWidth: CGFloat = 100
 }
 
 struct WelcomeCopy {
@@ -121,7 +121,6 @@ struct WelcomeCopy {
     let launchAtLoginOptional: String
     let launchAtLoginOn: String
     let launchAtLoginOff: String
-    let launchAtLoginApprovalRequired: String
     let launchAtLoginOpenSettings: String
     let launchAtLoginUnavailable: String
     let launchAtLoginApprovalHelp: String
@@ -237,11 +236,6 @@ struct WelcomeCopy {
             defaultValue: "Off",
             bundle: localizationBundle
         )
-        launchAtLoginApprovalRequired = L10n.text(
-            "welcome.launch_at_login.approval_required",
-            defaultValue: "Approval Needed",
-            bundle: localizationBundle
-        )
         launchAtLoginOpenSettings = L10n.text(
             "welcome.launch_at_login.open_settings",
             defaultValue: "Open Settings…",
@@ -307,7 +301,10 @@ final class WelcomeLaunchAtLoginState: ObservableObject {
 
     func performPrimaryAction() {
         do {
-            _ = try controller.performPrimaryAction()
+            let result = try controller.performPrimaryAction()
+            if result == .statusChanged(.requiresApproval) {
+                _ = try controller.performPrimaryAction()
+            }
         } catch {
             onError(error)
         }
@@ -612,6 +609,7 @@ private struct WelcomeLaunchAtLoginRow: View {
                 Label(statusText, systemImage: statusSymbol)
                     .font(.callout.weight(.medium))
                     .foregroundStyle(statusColor)
+                    .lineLimit(1)
                     .frame(
                         width: WelcomeLayout.statusColumnWidth,
                         alignment: .leading
@@ -653,7 +651,7 @@ private struct WelcomeLaunchAtLoginRow: View {
         case .disable:
             copy.launchAtLoginOn
         case .allowInSystemSettings:
-            copy.launchAtLoginApprovalRequired
+            copy.launchAtLoginOff
         case .unavailable:
             copy.launchAtLoginUnavailable
         }
@@ -661,12 +659,10 @@ private struct WelcomeLaunchAtLoginRow: View {
 
     private var statusSymbol: String {
         switch state.presentation.menuAction {
-        case .enable:
-            "circle.dashed"
+        case .enable, .allowInSystemSettings:
+            "circle"
         case .disable:
             "checkmark.circle.fill"
-        case .allowInSystemSettings:
-            "exclamationmark.circle.fill"
         case .unavailable:
             "xmark.circle"
         }
@@ -676,9 +672,7 @@ private struct WelcomeLaunchAtLoginRow: View {
         switch state.presentation.menuAction {
         case .disable:
             .green
-        case .allowInSystemSettings:
-            .orange
-        case .enable, .unavailable:
+        case .enable, .allowInSystemSettings, .unavailable:
             .secondary
         }
     }
@@ -819,6 +813,7 @@ private struct WelcomeShortcutRow: View {
             Label(statusText, systemImage: statusSymbol)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
+                .lineLimit(1)
                 .frame(
                     width: WelcomeLayout.statusColumnWidth,
                     alignment: .leading

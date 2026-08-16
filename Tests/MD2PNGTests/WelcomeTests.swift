@@ -57,7 +57,6 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(english.launchAtLoginOptional, "Optional")
         XCTAssertEqual(english.launchAtLoginOn, "On")
         XCTAssertEqual(english.launchAtLoginOff, "Off")
-        XCTAssertEqual(english.launchAtLoginApprovalRequired, "Approval Needed")
         XCTAssertEqual(english.launchAtLoginOpenSettings, "Open Settings…")
         XCTAssertTrue(english.shortcutVerificationHelp.contains("without running"))
         XCTAssertEqual(
@@ -75,7 +74,6 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(chinese.launchAtLoginOptional, "可选")
         XCTAssertEqual(chinese.launchAtLoginOn, "已开启")
         XCTAssertEqual(chinese.launchAtLoginOff, "已关闭")
-        XCTAssertEqual(chinese.launchAtLoginApprovalRequired, "需要批准")
         XCTAssertEqual(chinese.launchAtLoginOpenSettings, "打开设置…")
         XCTAssertTrue(chinese.shortcutVerificationHelp.contains("不会执行"))
         XCTAssertEqual(
@@ -108,11 +106,14 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(state.presentation.menuAction, .enable)
 
         state.performPrimaryAction()
-        XCTAssertEqual(service.operations, [.register])
+        XCTAssertEqual(service.operations, [.register, .openSystemSettings])
         XCTAssertEqual(state.presentation.menuAction, .allowInSystemSettings)
 
         state.performPrimaryAction()
-        XCTAssertEqual(service.operations, [.register, .openSystemSettings])
+        XCTAssertEqual(
+            service.operations,
+            [.register, .openSystemSettings, .openSystemSettings]
+        )
 
         service.status = .enabled
         service.statusAfterUnregister = .notRegistered
@@ -120,7 +121,10 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(state.presentation.menuAction, .disable)
 
         state.performPrimaryAction()
-        XCTAssertEqual(service.operations, [.register, .openSystemSettings, .unregister])
+        XCTAssertEqual(
+            service.operations,
+            [.register, .openSystemSettings, .openSystemSettings, .unregister]
+        )
         XCTAssertEqual(state.presentation.menuAction, .enable)
     }
 

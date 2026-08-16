@@ -97,7 +97,6 @@
 "welcome.launch_at_login.optional" = "可选";
 "welcome.launch_at_login.on" = "已开启";
 "welcome.launch_at_login.off" = "已关闭";
-"welcome.launch_at_login.approval_required" = "需要批准";
 "welcome.launch_at_login.open_settings" = "打开设置…";
 "welcome.launch_at_login.unavailable" = "不可用";
 "welcome.launch_at_login.approval_help" = "需要在“登录项”中批准。";
