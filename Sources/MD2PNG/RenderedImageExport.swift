@@ -61,11 +61,15 @@ final class PreviewTemporaryImageStore {
     func replace(with image: NSImage) throws -> URL {
         clear()
         do {
+            let generationDirectory = directoryURL.appendingPathComponent(
+                UUID().uuidString,
+                isDirectory: true
+            )
             try fileManager.createDirectory(
-                at: directoryURL,
+                at: generationDirectory,
                 withIntermediateDirectories: true
             )
-            let fileURL = directoryURL.appendingPathComponent("md2png-last-render.png")
+            let fileURL = generationDirectory.appendingPathComponent("md2png-last-render.png")
             try RenderedImageExport.writePNG(image, to: fileURL)
             currentFileURL = fileURL
             return fileURL
@@ -73,6 +77,13 @@ final class PreviewTemporaryImageStore {
             clear()
             throw error
         }
+    }
+
+    @discardableResult
+    func clear(ifCurrentFileURL fileURL: URL) -> Bool {
+        guard currentFileURL == fileURL else { return false }
+        clear()
+        return true
     }
 
     func clear() {

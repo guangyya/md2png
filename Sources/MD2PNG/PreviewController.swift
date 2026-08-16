@@ -1,6 +1,12 @@
 import AppKit
 import UniformTypeIdentifiers
 
+typealias PreviewFileOpenCompletion = @MainActor (Bool) -> Void
+typealias PreviewFileOpener = @MainActor (
+    URL,
+    @escaping PreviewFileOpenCompletion
+) throws -> Void
+
 enum PreviewZoomMode: Equatable {
     case fit
     case actualSize
@@ -183,6 +189,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     private let onCopied: (Int) -> Void
     private let onError: (Error) -> Void
     private let temporaryImageStore: PreviewTemporaryImageStore
+    private let openFileInPreview: PreviewFileOpener
     private var zoomMode: PreviewZoomMode = .fit
     private var currentZoomFactor: CGFloat = 1
 
@@ -221,6 +228,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     func selectActualSizeForTesting() { selectActualSize(nil) }
     func zoomInForTesting() { zoomIn(nil) }
     func zoomOutForTesting() { zoomOut(nil) }
+    func openInPreviewForTesting() { openInPreview(nil) }
     func renderedImageSnapshot() -> NSBitmapImageRep? {
         imageView.displayIfNeeded()
         guard let bitmap = imageView.bitmapImageRepForCachingDisplay(in: imageView.bounds) else {
@@ -235,12 +243,30 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         copyImage: @escaping (NSImage) throws -> Int = { try Clipboard.write(image: $0) },
         onCopied: @escaping (Int) -> Void = { _ in },
         onError: @escaping (Error) -> Void = { _ in },
-        temporaryImageStore: PreviewTemporaryImageStore = PreviewTemporaryImageStore()
+        temporaryImageStore: PreviewTemporaryImageStore = PreviewTemporaryImageStore(),
+        openFileInPreview: @escaping PreviewFileOpener = { url, completion in
+            guard let previewURL = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: "com.apple.Preview"
+            ) else {
+                throw AppError.previewOpenFailed
+            }
+            NSWorkspace.shared.open(
+                [url],
+                withApplicationAt: previewURL,
+                configuration: NSWorkspace.OpenConfiguration()
+            ) { _, error in
+                let succeeded = error == nil
+                DispatchQueue.main.async {
+                    completion(succeeded)
+                }
+            }
+        }
     ) {
         self.copyImage = copyImage
         self.onCopied = onCopied
         self.onError = onError
         self.temporaryImageStore = temporaryImageStore
+        self.openFileInPreview = openFileInPreview
         let window = PreviewWindow(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 640),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -480,21 +506,10 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         guard let image = imageView.image else { return }
         do {
             let url = try temporaryImageStore.replace(with: image)
-            guard let previewURL = NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.apple.Preview"
-            ) else {
-                throw AppError.previewOpenFailed
-            }
-            NSWorkspace.shared.open(
-                [url],
-                withApplicationAt: previewURL,
-                configuration: NSWorkspace.OpenConfiguration()
-            ) { [weak self] _, error in
-                guard error != nil else { return }
-                DispatchQueue.main.async {
-                    self?.temporaryImageStore.clear()
-                    self?.onError(AppError.previewOpenFailed)
-                }
+            try openFileInPreview(url) { [weak self] succeeded in
+                guard !succeeded, let self else { return }
+                guard self.temporaryImageStore.clear(ifCurrentFileURL: url) else { return }
+                self.onError(AppError.previewOpenFailed)
             }
         } catch AppError.pngEncodingFailed {
             temporaryImageStore.clear()

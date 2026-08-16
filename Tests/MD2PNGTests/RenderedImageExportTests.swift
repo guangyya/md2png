@@ -93,16 +93,45 @@ final class RenderedImageExportTests: XCTestCase {
             pixelSize: NSSize(width: 160, height: 120)
         )
 
-        _ = try store.replace(with: first)
+        let firstURL = try store.replace(with: first)
         let secondURL = try store.replace(with: second)
         let exported = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: secondURL)))
 
+        XCTAssertFalse(FileManager.default.fileExists(atPath: firstURL.path))
         XCTAssertEqual(exported.pixelsWide, 160)
         XCTAssertEqual(exported.pixelsHigh, 120)
-        XCTAssertEqual(
-            try FileManager.default.contentsOfDirectory(atPath: store.directoryURL.path),
-            ["md2png-last-render.png"]
+        let generationDirectories = try FileManager.default.contentsOfDirectory(
+            atPath: store.directoryURL.path
         )
+        XCTAssertEqual(generationDirectories.count, 1)
+        XCTAssertEqual(secondURL.lastPathComponent, "md2png-last-render.png")
+        XCTAssertEqual(
+            secondURL.deletingLastPathComponent().lastPathComponent,
+            generationDirectories[0]
+        )
+    }
+
+    func testPreviewTemporaryStoreUsesDistinctGenerationURLs() throws {
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "PreviewTemporaryImageStoreTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+        let store = PreviewTemporaryImageStore(baseDirectory: baseDirectory)
+        let image = try makeRetinaImage(
+            pointSize: NSSize(width: 32, height: 24),
+            pixelSize: NSSize(width: 64, height: 48)
+        )
+
+        let firstURL = try store.replace(with: image)
+        let secondURL = try store.replace(with: image)
+
+        XCTAssertNotEqual(firstURL, secondURL)
+        XCTAssertFalse(store.clear(ifCurrentFileURL: firstURL))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secondURL.path))
+        XCTAssertTrue(store.clear(ifCurrentFileURL: secondURL))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: secondURL.path))
     }
 
     func testPreviewTemporaryStoreCleansUpWhenReleased() throws {

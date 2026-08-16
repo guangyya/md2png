@@ -206,6 +206,62 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertTrue(controller.previewZoomStatus.contains("%"))
     }
 
+    @MainActor
+    func testStalePreviewOpenFailureCannotDeleteTheCurrentGeneration() throws {
+        _ = NSApplication.shared
+        let baseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "PreviewOpenLifecycleTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: baseDirectory) }
+        let store = PreviewTemporaryImageStore(baseDirectory: baseDirectory)
+        var requests: [(url: URL, completion: PreviewFileOpenCompletion)] = []
+        var reportedErrors: [Error] = []
+        let controller = PreviewController(
+            onError: { reportedErrors.append($0) },
+            temporaryImageStore: store,
+            openFileInPreview: { url, completion in
+                requests.append((url, completion))
+            }
+        )
+        defer { controller.close() }
+        let first = try makeImage(
+            pixelsWide: 320,
+            pixelsHigh: 200,
+            backgroundColor: .white,
+            accentColor: .systemRed
+        )
+        let second = try makeImage(
+            pixelsWide: 640,
+            pixelsHigh: 360,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+
+        controller.show(image: first)
+        controller.openInPreviewForTesting()
+        controller.show(image: second)
+        controller.openInPreviewForTesting()
+
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertNotEqual(requests[0].url, requests[1].url)
+        XCTAssertEqual(store.currentFileURL, requests[1].url)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: requests[1].url.path))
+
+        requests[0].completion(false)
+
+        XCTAssertEqual(store.currentFileURL, requests[1].url)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: requests[1].url.path))
+        XCTAssertTrue(reportedErrors.isEmpty)
+
+        requests[1].completion(false)
+
+        XCTAssertNil(store.currentFileURL)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: requests[1].url.path))
+        XCTAssertEqual(reportedErrors.count, 1)
+    }
+
     private func containsDarkContent(in bitmap: NSBitmapImageRep) -> Bool {
         var darkPixels = 0
         for y in stride(from: 0, to: bitmap.pixelsHigh, by: 4) {
