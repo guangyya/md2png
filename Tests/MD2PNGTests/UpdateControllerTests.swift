@@ -21,7 +21,7 @@ final class UpdateControllerTests: XCTestCase {
         XCTAssertEqual(status.phase, .upToDate(version: SemanticVersion("0.2.0")!))
     }
 
-    func testDebugReadyMockUsesRecoverablePublishedAssetMetadata() throws {
+    func testDebugReadyMockUsesOfflineFixtureMetadata() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "MD2PNGDebugUpdateMockTests-\(UUID().uuidString)",
             isDirectory: true
@@ -39,11 +39,77 @@ final class UpdateControllerTests: XCTestCase {
         let update = try XCTUnwrap(availableUpdate)
         XCTAssertEqual(message, UpdateError.revealFailed.localizedDescription)
         XCTAssertEqual(update.version, SemanticVersion("0.1.0")!)
-        XCTAssertEqual(update.size, 3_312_367)
+        XCTAssertEqual(update.tagName, "debug-fixture")
+        XCTAssertEqual(update.assetName, "md2png-debug-update-fixture.dmg")
+        XCTAssertEqual(update.downloadURL.host, "updates.invalid")
+        XCTAssertEqual(update.size, 3)
         XCTAssertEqual(
             update.sha256,
-            "40fc785583a7cfaf1e476ae8649d2eb4e8461b49680e9a0fddfc35075b79bed7"
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         )
+    }
+
+    @MainActor
+    func testDisabledChannelAndFixtureNeverContactTheUpdateService() async throws {
+        let requestCount = LockedBox(0)
+        URLProtocolStub.handler = { _ in
+            requestCount.set(requestCount.value + 1)
+            throw URLError(.badServerResponse)
+        }
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let controller = UpdateController(
+            service: UpdateService(session: UpdateTestFixtures.stubbedSession()),
+            channel: { .disabled },
+            installedVersion: { "0.1.0" },
+            defaults: defaults
+        )
+
+        controller.refreshIfNeeded()
+        controller.checkAgain()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, UpdateStatus())
+        XCTAssertFalse(controller.isUpdating)
+        XCTAssertFalse(controller.allowsUpdatePresentation)
+
+        let fixtureStatus = UpdateStatus(
+            phase: .upToDate(version: try XCTUnwrap(SemanticVersion("0.1.0")))
+        )
+        controller.setStatusForTesting(fixtureStatus)
+        controller.refreshIfNeeded()
+        controller.checkAgain()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, fixtureStatus)
+        XCTAssertTrue(controller.allowsUpdatePresentation)
+        XCTAssertFalse(controller.allowsInteractiveCheck)
+
+        let availableUpdate = UpdateTestFixtures.availableUpdate()
+        let availableStatus = UpdateStatus(phase: .updateAvailable(availableUpdate))
+        controller.setStatusForTesting(availableStatus)
+        controller.downloadAvailableUpdate()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, availableStatus)
+        XCTAssertFalse(controller.canDownload(availableUpdate))
+
+        let failedStatus = UpdateStatus(phase: .failed(
+            message: UpdateError.downloadFailed.localizedDescription,
+            releasesURL: repository.releasesURL,
+            retryAt: nil,
+            availableUpdate: availableUpdate
+        ))
+        controller.setStatusForTesting(failedStatus)
+        controller.downloadAvailableUpdate()
+        await Task.yield()
+
+        XCTAssertEqual(requestCount.value, 0)
+        XCTAssertEqual(controller.status, failedStatus)
+        XCTAssertFalse(controller.isUpdating)
     }
 
     func testCheckPolicyPersistsReleaseAndAppliesFreshnessAndRequestWindows() throws {
@@ -310,8 +376,8 @@ final class UpdateControllerTests: XCTestCase {
                 session: UpdateTestFixtures.stubbedSession(),
                 cacheDirectory: directory
             ),
+            channel: { .stableGitHubReleases(repository: self.repository) },
             installedVersion: { "0.1.0" },
-            repository: { self.repository },
             openFile: {
                 openedURLs.set(openedURLs.value + [$0])
                 return true
@@ -392,8 +458,8 @@ final class UpdateControllerTests: XCTestCase {
     ) -> UpdateController {
         UpdateController(
             service: UpdateService(session: UpdateTestFixtures.stubbedSession()),
+            channel: { .stableGitHubReleases(repository: self.repository) },
             installedVersion: { "0.1.0" },
-            repository: { self.repository },
             defaults: defaults,
             now: now
         )

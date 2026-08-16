@@ -158,25 +158,16 @@ make app CONFIGURATION=debug \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make verify-dist \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
+  UPDATE_CHANNEL=stable \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 ```
 
-To exercise a real update without editing the source version, override only the
-packaged test app:
-
-```sh
-make run CONFIGURATION=debug \
-  PROJECT_URL=https://github.com/guangyya/md2png \
-  TEST_UPDATE_VERSION=0.0.0
-```
-
-`TEST_UPDATE_VERSION` is rejected by `publish-release`; public releases always
-use `CFBundleShortVersionString` from `Info.plist`.
-
-Debug builds can also mock the About update row without making a request:
+Debug builds never use the stable production update channel, even when a
+`PROJECT_URL` is packaged. Use the explicit local fixture to exercise the About
+update row without making a release-metadata request:
 
 ```sh
 make run CONFIGURATION=debug \
@@ -186,18 +177,25 @@ make run CONFIGURATION=debug \
 ```
 
 `TEST_UPDATE_STATE` is accepted only for local Debug app/run builds and is
-rejected by the release publisher. Download-related mocks use the immutable
-published v0.1.0 DMG metadata so retries run through real verification. If that
-cached DMG has been removed, `ready-to-install` starts at the recoverable
+rejected by the release publisher. `TEST_UPDATE_VERSION` changes only the
+packaged test app version and is also rejected by `publish-release`; public
+releases always use `CFBundleShortVersionString` from `Info.plist`.
+Download-related mocks use non-routable fixture metadata and cannot start an
+update or artifact request while the Debug update channel is disabled. If the
+fixture file is absent, `ready-to-install` starts at a recoverable display-only
 download failure instead of exposing an invalid Open action.
 
 `make app` creates the default Release bundle at `dist/md2png.app`.
 `make app CONFIGURATION=debug` and `make run CONFIGURATION=debug` use the
 separate Debug bundle at `dist/debug/md2png.app`. Local builds are ad-hoc signed
 unless a signing identity is supplied. `PROJECT_URL` is optional; when omitted,
-About hides the project and update controls. The source contains no repository
-URL. `BUNDLE_IDENTIFIER` defaults to the personal identifier in `Info.plist`
-and can be overridden without editing source files.
+About hides the project and update controls. Debug builds keep a configured
+project link but hide production update controls. Only a build explicitly
+packaged with `UPDATE_CHANNEL=stable` and a valid GitHub project URL uses the
+stable GitHub Releases channel; missing, unknown, and future channel values stay
+disabled. The source contains no repository URL. `BUNDLE_IDENTIFIER` defaults
+to the personal identifier in `Info.plist` and can be overridden without
+editing source files.
 `make verify-dist` rebuilds the app, verifies its signature and arm64
 architecture, then renders a bundled Markdown, GFM table, highlighted Swift
 snippet, and Mermaid diagram without reading or modifying the clipboard.

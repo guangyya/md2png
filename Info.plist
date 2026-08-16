@@ -35,6 +35,8 @@
     <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>MD2PNGUpdateChannel</key>
+    <string>disabled</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

@@ -174,6 +174,7 @@ jobs:
       NODE_VERSION: "24.18.0"
       PNPM_VERSION: "11.19.0"
       PROJECT_URL: https://github.com/guangyya/md2png
+      UPDATE_CHANNEL: stable
       BUNDLE_IDENTIFIER: io.github.guangyya.md2png
       SOURCE_COMMIT: ${{ needs.detect.outputs.head_sha }}
     steps:
@@ -213,6 +214,7 @@ jobs:
           CONFIGURATION=release
           SOURCE_COMMIT="$SOURCE_COMMIT"
           PROJECT_URL="$PROJECT_URL"
+          UPDATE_CHANNEL="$UPDATE_CHANNEL"
           BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
 
       - name: Summarize proposed release

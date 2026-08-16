@@ -50,6 +50,7 @@ jobs:
       NODE_VERSION: "24.18.0"
       PNPM_VERSION: "11.19.0"
       PROJECT_URL: https://github.com/guangyya/md2png
+      UPDATE_CHANNEL: stable
       BUNDLE_IDENTIFIER: io.github.guangyya.md2png
 
     steps:
@@ -90,6 +91,7 @@ jobs:
           make verify-dist
           CONFIGURATION=release
           PROJECT_URL="$PROJECT_URL"
+          UPDATE_CHANNEL="$UPDATE_CHANNEL"
           BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
 
       - name: Verify generated renderer is committed
@@ -110,8 +112,10 @@ jobs:
           test "$actual_architectures" = "arm64"
           actual_bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
           actual_project_url="$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$app/Contents/Info.plist")"
+          actual_update_channel="$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGUpdateChannel' "$app/Contents/Info.plist")"
           test "$actual_bundle_identifier" = "$BUNDLE_IDENTIFIER"
           test "$actual_project_url" = "$PROJECT_URL"
+          test "$actual_update_channel" = "$UPDATE_CHANNEL"
 
           renderer_script="$(find "$swift_resources" -type f -name renderer.bundle.js -print -quit)"
           renderer_page="$(find "$swift_resources" -type f -name renderer.html -print -quit)"

@@ -636,6 +636,51 @@ final class FeatureTests: XCTestCase {
     }
 
     @MainActor
+    func testAboutKeepsProjectLinkButHidesUpdatesForDisabledChannel() {
+        _ = NSApplication.shared
+        let controller = AboutController(updateController: UpdateController(
+            channel: { .disabled }
+        ))
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Debug builds do not use production updates.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        XCTAssertFalse(controller.displayedProjectButtonIsHidden)
+        XCTAssertTrue(controller.displayedUpdateButtonIsHidden)
+    }
+
+    @MainActor
+    func testAboutOfflineFixtureDisablesProductionDownloadAction() {
+        _ = NSApplication.shared
+        let update = UpdateTestFixtures.availableUpdate()
+        let updateController = UpdateController(channel: { .disabled })
+        updateController.setStatusForTesting(UpdateStatus(
+            phase: .updateAvailable(update)
+        ))
+        let controller = AboutController(updateController: updateController)
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Debug fixtures stay offline.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        XCTAssertFalse(controller.displayedUpdateButtonIsHidden)
+        XCTAssertEqual(
+            controller.displayedUpdateButtonTitle,
+            L10n.text("about.update_download", defaultValue: "Download Update")
+        )
+        XCTAssertFalse(controller.displayedUpdateButtonIsEnabled)
+    }
+
+    @MainActor
     func testAboutReleaseNotesStartScrolledToTop() {
         _ = NSApplication.shared
         let controller = makeAboutController()
@@ -674,7 +719,10 @@ final class FeatureTests: XCTestCase {
         nextManualCheckAt: Date? = nil,
         manualCheckFeedback: ManualCheckFeedback = .none
     ) -> AboutController {
-        let updateController = UpdateController()
+        let repository = GitHubRepository(projectURL: testProjectURL)!
+        let updateController = UpdateController(
+            channel: { .stableGitHubReleases(repository: repository) }
+        )
         updateController.setStatusForTesting(UpdateStatus(
             phase: phase,
             isChecking: isChecking,

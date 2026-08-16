@@ -8,6 +8,7 @@ RELEASE_SUFFIX ?=
 GH_HOST ?= github.com
 GH_REPO ?=
 PROJECT_URL ?=
+UPDATE_CHANNEL ?= disabled
 TEST_UPDATE_VERSION ?=
 TEST_UPDATE_STATE ?=
 BUMP ?=
@@ -168,6 +169,11 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 		esac; \
 		/usr/bin/plutil -insert MD2PNGProjectURL -string "$(PROJECT_URL)" "$(CONTENTS)/Info.plist"; \
 	fi
+	@if ! /usr/bin/printf '%s\n' "$(UPDATE_CHANNEL)" | /usr/bin/grep -Eq '^[a-z][a-z0-9-]*$$'; then \
+		echo "UPDATE_CHANNEL must be a lowercase identifier such as stable, disabled, or nightly"; \
+		exit 1; \
+	fi
+	/usr/bin/plutil -replace MD2PNGUpdateChannel -string "$(UPDATE_CHANNEL)" "$(CONTENTS)/Info.plist"
 	@if [ -n "$(TEST_UPDATE_VERSION)" ]; then \
 		if ! /usr/bin/printf '%s\n' "$(TEST_UPDATE_VERSION)" | /usr/bin/grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$'; then \
 			echo "TEST_UPDATE_VERSION must be a stable semantic version such as 0.0.0"; \

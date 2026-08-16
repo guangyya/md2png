@@ -8,10 +8,12 @@ node_binary="${NODE:-node}"
 release_assets_script="${RELEASE_ASSETS_SCRIPT:-scripts/release-assets.mjs}"
 release_manifest_script="${RELEASE_MANIFEST_SCRIPT:-scripts/release-manifest.mjs}"
 release_milestone_script="${RELEASE_MILESTONE_SCRIPT:-scripts/release-milestone.mjs}"
+release_update_channel_script="${RELEASE_UPDATE_CHANNEL_SCRIPT:-scripts/release-update-channel.sh}"
 gh_host="${GH_HOST:-github.com}"
 gh_repo="${GH_REPO:-}"
 handoff_dir="${RELEASE_HANDOFF_DIR:-}"
 source_commit="${SOURCE_COMMIT:-}"
+workflow_commit="${WORKFLOW_COMMIT:-}"
 project_url="${PROJECT_URL:-}"
 bundle_identifier="${BUNDLE_IDENTIFIER:-}"
 expected_milestone_plan_sha256="${EXPECTED_MILESTONE_PLAN_SHA256:-}"
@@ -22,6 +24,10 @@ if [[ ! "$gh_repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
 fi
 if [[ ! "$source_commit" =~ ^[0-9a-f]{40}$ ]]; then
   echo "SOURCE_COMMIT must be a full lowercase commit SHA." >&2
+  exit 1
+fi
+if [[ ! "$workflow_commit" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "WORKFLOW_COMMIT must be a full lowercase commit SHA." >&2
   exit 1
 fi
 if [[ ! -d "$handoff_dir" ]]; then
@@ -36,6 +42,10 @@ if [[ -n "$(git status --porcelain)" ]]; then
   echo "The trusted publication checkout must be clean." >&2
   exit 1
 fi
+git fetch origin main --tags
+git cat-file -e "${workflow_commit}^{commit}"
+git merge-base --is-ancestor "$workflow_commit" origin/main
+git merge-base --is-ancestor "$source_commit" "$workflow_commit"
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Info.plist)"
@@ -98,6 +108,10 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_plist")" = "$b
 test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGSourceCommit' "$app_plist")" = "$source_commit"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_plist")" = "$bundle_identifier"
 test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$app_plist")" = "$project_url"
+"$release_update_channel_script" validate-app \
+  --source-commit "$source_commit" \
+  --workflow-commit "$workflow_commit" \
+  --plist "$app_plist"
 test "$(lipo -archs "$executable")" = "arm64"
 codesign --verify --deep --strict --verbose=2 "$app_path"
 xcrun stapler validate "$app_path"
@@ -107,7 +121,6 @@ spctl --assess --type execute --verbose=2 "$app_path"
 spctl --assess --type open --context context:primary-signature --verbose=2 \
   "${handoff_dir}/${release_dmg_name}"
 
-git fetch origin main --tags
 git merge-base --is-ancestor "$source_commit" origin/main
 remote_tag_object="$(git ls-remote origin "refs/tags/${tag}" | awk '{print $1}')"
 remote_tag_commit="$(git ls-remote origin "refs/tags/${tag}^{}" | awk '{print $1}')"

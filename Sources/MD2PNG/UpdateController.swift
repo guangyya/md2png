@@ -60,11 +60,11 @@ enum DebugUpdateMockState: String {
     case downloadFailed = "download-failed"
     case readyToInstall = "ready-to-install"
 
-    private static let publishedVersion = SemanticVersion("0.1.0")!
-    private static let publishedAssetName = "md2png-0.1.0-macOS-arm64-developer-id.dmg"
-    private static let publishedAssetSize: Int64 = 3_312_367
-    private static let publishedAssetSHA256 =
-        "40fc785583a7cfaf1e476ae8649d2eb4e8461b49680e9a0fddfc35075b79bed7"
+    private static let fixtureVersion = SemanticVersion("0.1.0")!
+    private static let fixtureAssetName = "md2png-debug-update-fixture.dmg"
+    private static let fixtureAssetSize: Int64 = 3
+    private static let fixtureAssetSHA256 =
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
     func status(
         installedVersion: String?,
@@ -85,17 +85,15 @@ enum DebugUpdateMockState: String {
                 availableUpdate: nil
             ))
         case .downloadFailed:
-            guard let repository, let update = publishedUpdate(repository: repository) else {
-                return nil
-            }
+            guard let update = fixtureUpdate() else { return nil }
             return UpdateStatus(phase: .failed(
                 message: UpdateError.digestMismatch.localizedDescription,
-                releasesURL: repository.releasesURL,
+                releasesURL: repository?.releasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))
         case .readyToInstall:
-            guard let repository, let update = publishedUpdate(repository: repository),
+            guard let update = fixtureUpdate(),
                   let directory = updatesDirectory ?? FileManager.default.urls(
                     for: .cachesDirectory,
                     in: .userDomainMask
@@ -110,26 +108,26 @@ enum DebugUpdateMockState: String {
             }
             return UpdateStatus(phase: .failed(
                 message: UpdateError.revealFailed.localizedDescription,
-                releasesURL: repository.releasesURL,
+                releasesURL: repository?.releasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))
         }
     }
 
-    private func publishedUpdate(repository: GitHubRepository) -> AvailableUpdate? {
-        guard let downloadURL = URL(string:
-            "https://github.com/\(repository.owner)/\(repository.name)/releases/download/v0.1.0/\(Self.publishedAssetName)"
+    private func fixtureUpdate() -> AvailableUpdate? {
+        guard let downloadURL = URL(
+            string: "https://updates.invalid/\(Self.fixtureAssetName)"
         ) else {
             return nil
         }
         return AvailableUpdate(
-            version: Self.publishedVersion,
-            tagName: "v0.1.0",
-            assetName: Self.publishedAssetName,
+            version: Self.fixtureVersion,
+            tagName: "debug-fixture",
+            assetName: Self.fixtureAssetName,
             downloadURL: downloadURL,
-            size: Self.publishedAssetSize,
-            sha256: Self.publishedAssetSHA256
+            size: Self.fixtureAssetSize,
+            sha256: Self.fixtureAssetSHA256
         )
     }
 }
@@ -144,8 +142,8 @@ final class UpdateController {
 
     private let service: UpdateService
     private let checkPolicy: UpdateCheckPolicy
+    private let channel: () -> UpdateChannel
     private let installedVersion: () -> String?
-    private let repository: () -> GitHubRepository?
     private let openFile: (URL) -> Bool
     private let revealFile: (URL) -> Void
     private let openWebPage: (URL) -> Bool
@@ -169,14 +167,36 @@ final class UpdateController {
 
     var isUpdating: Bool { checkTask != nil || downloadTask != nil }
 
+    var allowsUpdatePresentation: Bool {
+#if DEBUG
+        if usesTestingStatusOverride {
+            return true
+        }
+#endif
+        return channel().allowsUpdateChecks
+    }
+
+    var allowsInteractiveCheck: Bool {
+#if DEBUG
+        if usesTestingStatusOverride {
+            return false
+        }
+#endif
+        return channel().allowsUpdateChecks
+    }
+
+    func canDownload(_ update: AvailableUpdate) -> Bool {
+        channel().allowsDownload(update)
+    }
+
     init(
         service: UpdateService = UpdateService(),
+        channel: @escaping () -> UpdateChannel = { .current() },
         installedVersion: @escaping () -> String? = {
             Bundle.main.object(
                 forInfoDictionaryKey: "CFBundleShortVersionString"
             ) as? String
         },
-        repository: @escaping () -> GitHubRepository? = { ProjectLinks.githubRepository },
         openFile: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
         revealFile: @escaping (URL) -> Void = {
             NSWorkspace.shared.activateFileViewerSelecting([$0])
@@ -188,8 +208,8 @@ final class UpdateController {
         manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown
     ) {
         self.service = service
+        self.channel = channel
         self.installedVersion = installedVersion
-        self.repository = repository
         self.openFile = openFile
         self.revealFile = revealFile
         self.openWebPage = openWebPage
@@ -206,7 +226,7 @@ final class UpdateController {
            let mockState = DebugUpdateMockState(rawValue: rawValue),
            let mockStatus = mockState.status(
             installedVersion: installedVersion(),
-            repository: repository()
+            repository: ProjectLinks.githubRepository
            ) {
             usesTestingStatusOverride = true
             usesPackagedTestingStatusOverride = true
@@ -295,6 +315,9 @@ final class UpdateController {
 
     /// Explicit checks bypass the 24-hour cache, but still respect the local and server cooldowns.
     func checkAgain() {
+#if DEBUG
+        guard !usesTestingStatusOverride else { return }
+#endif
         guard checkTask == nil, downloadTask == nil else { return }
         guard let configuration = configurationOrShowFailure() else { return }
         let currentDate = now()
@@ -317,7 +340,8 @@ final class UpdateController {
 
     func downloadAvailableUpdate() {
         guard checkTask == nil, downloadTask == nil,
-              let update = status.phase.availableUpdate else {
+              let update = status.phase.availableUpdate,
+              canDownload(update) else {
             return
         }
         status.phase = .downloading(update, progressPercent: 0)
@@ -340,7 +364,7 @@ final class UpdateController {
               openFile(fileURL) else {
             finishDownload(with: .failed(
                 message: UpdateError.openFailed.localizedDescription,
-                releasesURL: repository()?.releasesURL,
+                releasesURL: fallbackReleasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))
@@ -356,7 +380,7 @@ final class UpdateController {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             finishDownload(with: .failed(
                 message: UpdateError.revealFailed.localizedDescription,
-                releasesURL: repository()?.releasesURL,
+                releasesURL: fallbackReleasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))
@@ -366,32 +390,36 @@ final class UpdateController {
     }
 
     func viewReleasesFallback() {
-        guard let releasesURL = repository()?.releasesURL else { return }
+        guard let releasesURL = fallbackReleasesURL else { return }
         _ = openWebPage(releasesURL)
     }
 
     private typealias Configuration = (repository: GitHubRepository, installedVersion: String)
 
     private func configurationOrShowFailure() -> Configuration? {
+        guard let repository = channel().repository else { return nil }
         guard let installedVersion = installedVersion() else {
             updateStatus(phase: .failed(
                 message: UpdateError.invalidInstalledVersion.localizedDescription,
-                releasesURL: repository()?.releasesURL,
-                retryAt: nil,
-                availableUpdate: nil
-            ))
-            return nil
-        }
-        guard let repository = repository() else {
-            updateStatus(phase: .failed(
-                message: UpdateError.unsupportedRepository.localizedDescription,
-                releasesURL: nil,
+                releasesURL: repository.releasesURL,
                 retryAt: nil,
                 availableUpdate: nil
             ))
             return nil
         }
         return (repository, installedVersion)
+    }
+
+    private var fallbackReleasesURL: URL? {
+        if let releasesURL = channel().repository?.releasesURL {
+            return releasesURL
+        }
+#if DEBUG
+        if usesPackagedTestingStatusOverride {
+            return ProjectLinks.githubRepository?.releasesURL
+        }
+#endif
+        return nil
     }
 
     private func beginCheck(
@@ -478,7 +506,7 @@ final class UpdateController {
         } catch {
             finishDownload(with: .failed(
                 message: error.localizedDescription,
-                releasesURL: repository()?.releasesURL,
+                releasesURL: fallbackReleasesURL,
                 retryAt: nil,
                 availableUpdate: update
             ))

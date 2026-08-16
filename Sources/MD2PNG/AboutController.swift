@@ -1,27 +1,5 @@
 import AppKit
 
-enum AppBuildConfiguration: Equatable {
-    case debug
-    case release
-
-    static var current: AppBuildConfiguration {
-#if DEBUG
-        .debug
-#else
-        .release
-#endif
-    }
-
-    func displayName(bundle: Bundle? = nil) -> String {
-        switch self {
-        case .debug:
-            return L10n.text("about.build_debug", defaultValue: "DEBUG", bundle: bundle)
-        case .release:
-            return L10n.text("about.build_release", defaultValue: "RELEASE", bundle: bundle)
-        }
-    }
-}
-
 struct AppMetadata {
     static let sourceCommitInfoDictionaryKey = "MD2PNGSourceCommit"
 
@@ -348,6 +326,7 @@ final class AboutController: NSWindowController {
     var displayedProjectButtonIsHidden: Bool { projectButton.isHidden }
     var displayedUpdateButtonTitle: String { updateActionButton.title }
     var displayedUpdateButtonIsHidden: Bool { updateRow.isHidden }
+    var displayedUpdateButtonIsEnabled: Bool { updateActionButton.isEnabled }
     var displayedUpdateStatus: String { updateStatusLabel.stringValue }
     var displayedUpdateDetail: String { updateDetailLabel.stringValue }
     var displayedUpdateDetailMaximumNumberOfLines: Int {
@@ -414,7 +393,7 @@ final class AboutController: NSWindowController {
         projectURL = metadata.projectURL
         updateFeatureAvailable = metadata.projectURL.flatMap(
             GitHubRepository.init(projectURL:)
-        ) != nil
+        ) != nil && updateController.allowsUpdatePresentation
         updateSlot.isHidden = !updateFeatureAvailable
         versionInfo = metadata.versionInfo()
         projectTitle.isHidden = metadata.projectURL == nil
@@ -768,7 +747,9 @@ final class AboutController: NSWindowController {
                     defaultValue: "Check Again"
                 )
             }
-            canPerformAction = !status.isChecking && status.nextManualCheckAt == nil
+            canPerformAction = updateController.allowsInteractiveCheck
+                && !status.isChecking
+                && status.nextManualCheckAt == nil
             emphasizesAction = false
             secondaryActionTitle = nil
         case let .updateAvailable(update):
@@ -784,7 +765,7 @@ final class AboutController: NSWindowController {
                 "about.update_download",
                 defaultValue: "Download Update"
             )
-            canPerformAction = !status.isChecking
+            canPerformAction = !status.isChecking && updateController.canDownload(update)
             emphasizesAction = true
             secondaryActionTitle = nil
         case let .downloading(update, progressPercent):
@@ -885,9 +866,14 @@ final class AboutController: NSWindowController {
                     defaultValue: "Retry Download"
                 )
             }
-            canPerformAction = !status.isChecking && (
-                availableUpdate != nil || status.nextManualCheckAt == nil
-            )
+            if let availableUpdate {
+                canPerformAction = !status.isChecking
+                    && updateController.canDownload(availableUpdate)
+            } else {
+                canPerformAction = updateController.allowsInteractiveCheck
+                    && !status.isChecking
+                    && status.nextManualCheckAt == nil
+            }
             emphasizesAction = true
             secondaryActionTitle = releasesURL == nil
                 ? nil
