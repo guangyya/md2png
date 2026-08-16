@@ -172,7 +172,11 @@ test("Dependabot structurally configures weekly GitHub Actions updates", () => {
 test("pull request code remains read-only and never uses pull_request_target", () => {
   const preflight = workflows["release-preflight.yml"];
   assert.doesNotMatch(preflight, /pull_request_target/);
-  assert.match(preflight, /permissions:\n  contents: read\n  pull-requests: read/);
+  assert.deepEqual(parseYaml(preflight).permissions, {
+    contents: "read",
+    issues: "read",
+    "pull-requests": "read",
+  });
   assert.doesNotMatch(preflight, /secrets\./);
   assert.doesNotMatch(preflight, /contents: write|issues: write/);
 });
@@ -465,9 +469,10 @@ test("the reviewed milestone digest is bound from preparation through publicatio
   const prepare = prepareWorkflow.jobs.prepare.steps.find(
     (step) => step.name === "Create focused release branch and pull request",
   ).run;
-  const preflight = preflightWorkflow.jobs.detect.steps.find(
+  const preflightStep = preflightWorkflow.jobs.detect.steps.find(
     (step) => step.name === "Validate release metadata change",
-  ).run;
+  );
+  const preflight = preflightStep.run;
   const authorize = releaseWorkflow.jobs.detect.steps.find(
     (step) => step.name === "Validate release authorization",
   ).run;
@@ -480,6 +485,8 @@ test("the reviewed milestone digest is bound from preparation through publicatio
   assert.match(preflight, /git rev-parse "\$\{HEAD_SHA\}\^1"/);
   assert.match(preflight, /git rev-list --count "\$\{BASE_SHA\}\.\.\$\{HEAD_SHA\}"/);
   assert.match(preflight, /release-milestone\.mjs plan[\s\S]*?\.reviewDigest[\s\S]*?milestone_plan_sha256/);
+  assert.equal(preflightStep.env.GH_TOKEN, "${{ github.token }}");
+  assert.equal(preflightStep.env.GITHUB_TOKEN, "${{ github.token }}");
   assert.match(authorize, /git\/commits\/\$\{pr_head_sha\}/);
   assert.match(authorize, /Release-Milestone-Plan-SHA256:/);
   assert.equal(
