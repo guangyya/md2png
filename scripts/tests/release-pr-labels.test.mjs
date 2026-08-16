@@ -100,6 +100,18 @@ test("rejects a conflicting bump label without retrying", async () => {
   });
 });
 
+test("rejects a release PR from any noncanonical branch before an API request", async () => {
+  await withPullRequestResponses([
+    pullRequest(["release", "release:minor"]),
+  ], async ({ dependencies, requestCount }) => {
+    await assert.rejects(
+      waitForReleasePullRequestLabels({ ...options, headRef: "feature/manual-release" }, dependencies),
+      /head ref does not match the release version/,
+    );
+    assert.equal(requestCount(), 0);
+  });
+});
+
 test("rejects live pull request identity drift and API failure", async (context) => {
   await context.test("head SHA drift", async () => {
     await withPullRequestResponses([

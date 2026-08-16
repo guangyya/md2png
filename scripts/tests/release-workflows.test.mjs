@@ -193,6 +193,9 @@ test("generated Release PR labels are verified from the live API with exact iden
 
   assert.equal(preflight.env.PR_NUMBER, "${{ github.event.pull_request.number }}");
   assert.equal(Object.hasOwn(preflight.env, "PR_LABELS"), false);
+  assert.doesNotMatch(preflight.run, /if \[\[ "\$HEAD_REF" = codex\/release-v\*/);
+  assert.match(preflight.run, /test "\$HEAD_REF" = "codex\/release-v\$\{version\}"/);
+  assert.match(preflight.run, /test "\$PR_TITLE" = "Prepare md2png \$\{version\}"/);
   assert.ok(preflight.run.indexOf("release-pr-labels.mjs verify") > preflight.run.indexOf("validate-prepared"));
   assert.match(preflight.run, /--pull-request "\$PR_NUMBER"/);
   assert.match(preflight.run, /--head-sha "\$HEAD_SHA"/);

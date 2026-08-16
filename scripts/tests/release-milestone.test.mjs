@@ -77,6 +77,7 @@ async function withMockGitHub(configuration, callback) {
       issue.milestone = { number: state.milestone.number, title: state.milestone.title };
       if (!state.items.some((item) => item.number === number)) state.items.push(issue);
       state.issueWriteCount += 1;
+      await configuration.afterIssueWrite?.({ number, state });
       send(200, issue);
     } else if (request.method === "PATCH" && /\/milestones\/\d+$/.test(url.pathname)) {
       state.milestone.state = body.state;
@@ -226,6 +227,47 @@ test("milestone sync fails closed when missing-only membership lag does not sett
         sleep: async () => {},
       }),
       /after 2 attempts: missing #3, #20/,
+    );
+    assert.equal(state.milestone.state, "open");
+    assert.equal(calls.some((call) => call.method === "PATCH" && /\/milestones\//.test(call.path)), false);
+  });
+});
+
+test("milestone sync does not retry away a write-after reassignment", async () => {
+  await withMockGitHub({
+    afterIssueWrite: ({ number, state }) => {
+      if (number !== 20) return;
+      const moved = state.issues.get(3);
+      moved.milestone = { number: 4, title: "v0.4.0" };
+      state.items = state.items.filter((item) => item.number !== 3);
+    },
+  }, async ({ calls, environment, state }) => {
+    await assert.rejects(
+      syncReleaseMilestone(plan, environment, {
+        membershipAttempts: 3,
+        membershipDelayMs: 0,
+        sleep: async () => assert.fail("conflicting reassignment must not be retried"),
+      }),
+      /issue #3 now belongs to milestone v0\.4\.0, not v0\.5\.0/,
+    );
+    assert.equal(state.milestone.state, "open");
+    assert.equal(calls.some((call) => call.method === "PATCH" && /\/milestones\//.test(call.path)), false);
+  });
+});
+
+test("milestone sync rejects a title changed after assignment", async () => {
+  await withMockGitHub({
+    afterIssueWrite: ({ number, state }) => {
+      if (number === 20) state.issues.get(3).title = "TD-003: Changed after review";
+    },
+  }, async ({ calls, environment, state }) => {
+    await assert.rejects(
+      syncReleaseMilestone(plan, environment, {
+        membershipAttempts: 3,
+        membershipDelayMs: 0,
+        sleep: async () => assert.fail("title drift must not be retried"),
+      }),
+      /milestone issue titles changed after review: #3/,
     );
     assert.equal(state.milestone.state, "open");
     assert.equal(calls.some((call) => call.method === "PATCH" && /\/milestones\//.test(call.path)), false);

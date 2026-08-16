@@ -136,17 +136,15 @@ jobs:
             exit 1
           fi
 
-          if [[ "$HEAD_REF" = codex/release-v* ]]; then
-            test "$HEAD_REF" = "codex/release-v${version}"
-            test "$PR_TITLE" = "Prepare md2png ${version}"
-            node scripts/release-pr-labels.mjs verify \
-              --repository "$GITHUB_REPOSITORY" \
-              --pull-request "$PR_NUMBER" \
-              --head-sha "$HEAD_SHA" \
-              --head-ref "$HEAD_REF" \
-              --version "$version" \
-              --bump "$bump"
-          fi
+          test "$HEAD_REF" = "codex/release-v${version}"
+          test "$PR_TITLE" = "Prepare md2png ${version}"
+          node scripts/release-pr-labels.mjs verify \
+            --repository "$GITHUB_REPOSITORY" \
+            --pull-request "$PR_NUMBER" \
+            --head-sha "$HEAD_SHA" \
+            --head-ref "$HEAD_REF" \
+            --version "$version" \
+            --bump "$bump"
 
           echo "is_release=true" >> "$GITHUB_OUTPUT"
           echo "bump=$bump" >> "$GITHUB_OUTPUT"
