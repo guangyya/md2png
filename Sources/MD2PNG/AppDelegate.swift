@@ -26,9 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let updateController = UpdateController()
     private lazy var aboutController = AboutController(updateController: updateController)
+    private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
+        launchAtLoginController: launchAtLoginController,
+        onLaunchAtLoginError: { [weak self] error in
+            self?.show(error)
+        },
         onVisibilityChange: { [weak self] isVisible in
             self?.setWelcomeWindowVisible(isVisible)
         },
@@ -66,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var examplesMenuItem: NSMenuItem!
     private var renderWidthMenuItem: NSMenuItem!
     private var renderWidthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
+    private var launchAtLoginMenuItem: NSMenuItem!
     private var renderWidthPreset: RenderWidthPreset
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
@@ -132,10 +138,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         defaultValue: "A global shortcut is already in use — menu commands still work"
                     ),
                     symbol: "keyboard.badge.ellipsis",
-                    isError: true
+                    style: .error
                 )
             }
         }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard statusItem != nil else { return }
+        updateLaunchAtLoginMenu()
     }
 
     private func configureStatusItem() {
@@ -228,6 +239,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(examplesMenuItem)
 
         menu.addItem(.separator())
+        launchAtLoginMenuItem = menu.addItem(
+            withTitle: L10n.text(
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login"
+            ),
+            action: #selector(performLaunchAtLoginAction),
+            keyEquivalent: ""
+        )
+        launchAtLoginMenuItem.target = self
+        updateLaunchAtLoginMenu()
+
+        menu.addItem(.separator())
         let welcomeItem = menu.addItem(
             withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome"),
             action: #selector(showWelcome),
@@ -259,6 +282,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         sampleGuideController.dismiss()
         clipboardPreviewView.update(Clipboard.menuPreview(includeLabel: false))
+        updateLaunchAtLoginMenu()
     }
 
     @objc private func renderClipboard() {
@@ -447,6 +471,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         welcomeController.show(shortcuts: welcomeShortcutStatuses)
     }
 
+    @objc private func performLaunchAtLoginAction() {
+        do {
+            let result = try launchAtLoginController.performPrimaryAction()
+            updateLaunchAtLoginMenu()
+            if result == .statusChanged(.requiresApproval) {
+                hud.show(
+                    L10n.text(
+                        "hud.launch_at_login_requires_approval",
+                        defaultValue: "Allow md2png in Login Items to finish setup"
+                    ),
+                    symbol: "gear.badge",
+                    style: .informational
+                )
+            }
+        } catch {
+            updateLaunchAtLoginMenu()
+            show(error)
+        }
+    }
+
+    private func updateLaunchAtLoginMenu() {
+        let presentation = launchAtLoginController.presentation
+        launchAtLoginMenuItem.title = switch presentation.menuAction {
+        case .enable:
+            L10n.text(
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login"
+            )
+        case .disable:
+            L10n.text(
+                "menu.disable_launch_at_login",
+                defaultValue: "Disable Launch at Login"
+            )
+        case .allowInSystemSettings:
+            L10n.text(
+                "menu.allow_launch_at_login",
+                defaultValue: "Allow Launch at Login…"
+            )
+        case .unavailable:
+            L10n.text(
+                "menu.launch_at_login_unavailable",
+                defaultValue: "Launch at Login Unavailable"
+            )
+        }
+        launchAtLoginMenuItem.badge = presentation.menuAction == .allowInSystemSettings
+            ? NSMenuItemBadge(string: "!")
+            : nil
+        launchAtLoginMenuItem.toolTip = presentation.menuAction == .allowInSystemSettings
+            ? L10n.text(
+                "accessibility.launch_at_login_requires_approval",
+                defaultValue: "Approval required in System Settings"
+            )
+            : nil
+        launchAtLoginMenuItem.isEnabled = presentation.canPerformAction
+        if isWelcomeWindowVisible {
+            welcomeController.refreshLaunchAtLogin()
+        }
+    }
+
     private func showSampleGuide() {
         guard !renderActivity.isRendering,
               !isPresentingClipboardConfirmation,
@@ -465,7 +548,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func show(_ error: Error) {
-        hud.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", isError: true)
+        hud.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", style: .error)
     }
 
     private func applyUpdateStatus(_ status: UpdateStatus) {
@@ -543,7 +626,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 hud.show(
                     recoveryMessage,
                     symbol: "exclamationmark.triangle.fill",
-                    isError: true
+                    style: .error
                 )
             }
             announceUpdate(message)

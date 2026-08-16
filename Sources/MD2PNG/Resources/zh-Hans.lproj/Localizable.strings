@@ -1,4 +1,5 @@
 "accessibility.app" = "MD 转 PNG";
+"accessibility.launch_at_login_requires_approval" = "需要在系统设置中批准";
 "accessibility.clipboard_preview" = "剪贴板预览";
 "accessibility.rendering" = "正在渲染";
 "accessibility.update_status" = "md2png — %@";
@@ -10,6 +11,10 @@
 "menu.show_last_render" = "显示上次渲染";
 "menu.render_width" = "输出宽度";
 "menu.examples" = "示例";
+"menu.enable_launch_at_login" = "启用登录时启动";
+"menu.disable_launch_at_login" = "关闭登录时启动";
+"menu.allow_launch_at_login" = "允许登录时启动…";
+"menu.launch_at_login_unavailable" = "登录时启动不可用";
 "menu.show_welcome" = "显示欢迎指南";
 "menu.about" = "关于 md2png";
 "menu.quit" = "退出 md2png";
@@ -40,6 +45,7 @@
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
 "hud.png_copied_again" = "PNG 已再次复制——请按 Command-V 粘贴";
 "hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
+"hud.launch_at_login_requires_approval" = "请在“登录项”中允许 md2png 以完成设置";
 
 "confirmation.clipboard_changed.title" = "剪贴板已更改";
 "confirmation.clipboard_changed.restore" = "其他应用已更改剪贴板。是否用上次的 Markdown 替换当前内容？";
@@ -55,6 +61,7 @@
 "error.preview_open_failed" = "无法在“预览”中打开渲染图片。";
 "error.clipboard_write_failed" = "无法更新剪贴板。";
 "error.example_unavailable" = "无法加载“%@”Markdown 文件。";
+"error.launch_at_login_unavailable" = "此 md2png 副本无法使用“登录时启动”。";
 
 "preview.window_title" = "上次渲染";
 "preview.window_title_with_dimensions" = "上次渲染 — %ld × %ld px";
@@ -86,10 +93,17 @@
 "welcome.shortcut_unavailable" = "已占用";
 "welcome.shortcut_conflict_help" = "其他应用正在使用该快捷键。仍可从 md2png 菜单执行所有操作。";
 "welcome.shortcut_verified_announcement" = "“%@”快捷键已生效。";
-"welcome.privacy_note" = "md2png 绝不会自动粘贴、发送或上传你的内容。";
-"welcome.reopen_hint" = "如果窗口被遮住，可从 md2png 菜单栏选择“显示欢迎指南”重新打开。";
-"welcome.try_sample" = "试试简短示例";
-"welcome.try_sample_help" = "打开“示例”菜单，选择“简短示例”后再渲染。";
+"welcome.launch_at_login.title" = "登录时启动";
+"welcome.launch_at_login.optional" = "可选";
+"welcome.launch_at_login.on" = "已开启";
+"welcome.launch_at_login.off" = "已关闭";
+"welcome.launch_at_login.open_settings" = "打开设置…";
+"welcome.launch_at_login.unavailable" = "不可用";
+"welcome.launch_at_login.approval_help" = "需要在“登录项”中批准。";
+"welcome.privacy_note" = "内容仅在本机处理，不会自动上传。";
+"welcome.reopen_hint" = "可从菜单中的“显示欢迎指南”重新打开。";
+"welcome.try_sample" = "试试示例";
+"welcome.try_sample_help" = "选择一个内置示例试用。";
 "welcome.sample_guide.title" = "在 md2png 菜单中找到“示例”";
 "welcome.replay_demo" = "重新播放操作演示";
 "welcome.done" = "完成";

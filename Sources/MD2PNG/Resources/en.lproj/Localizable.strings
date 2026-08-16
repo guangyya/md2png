@@ -1,4 +1,5 @@
 "accessibility.app" = "md2png";
+"accessibility.launch_at_login_requires_approval" = "Approval required in System Settings";
 "accessibility.clipboard_preview" = "Clipboard preview";
 "accessibility.rendering" = "Rendering";
 "accessibility.update_status" = "md2png — %@";
@@ -10,6 +11,10 @@
 "menu.show_last_render" = "Show Last Render";
 "menu.render_width" = "Output Width";
 "menu.examples" = "Examples";
+"menu.enable_launch_at_login" = "Enable Launch at Login";
+"menu.disable_launch_at_login" = "Disable Launch at Login";
+"menu.allow_launch_at_login" = "Allow Launch at Login…";
+"menu.launch_at_login_unavailable" = "Launch at Login Unavailable";
 "menu.show_welcome" = "Show Welcome";
 "menu.about" = "About md2png";
 "menu.quit" = "Quit md2png";
@@ -40,6 +45,7 @@
 "hud.png_copied" = "PNG copied — paste with Command-V";
 "hud.png_copied_again" = "PNG copied again — paste with Command-V";
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
+"hud.launch_at_login_requires_approval" = "Allow md2png in Login Items to finish setup";
 
 "confirmation.clipboard_changed.title" = "Clipboard Changed";
 "confirmation.clipboard_changed.restore" = "Another app changed the clipboard. Replace it with the last Markdown?";
@@ -55,6 +61,7 @@
 "error.preview_open_failed" = "The rendered image could not be opened in Preview.";
 "error.clipboard_write_failed" = "The clipboard could not be updated.";
 "error.example_unavailable" = "The %@ Markdown file could not be loaded.";
+"error.launch_at_login_unavailable" = "Launch at Login is unavailable for this copy of md2png.";
 
 "preview.window_title" = "Last Render";
 "preview.window_title_with_dimensions" = "Last Render — %ld × %ld px";
@@ -86,10 +93,17 @@
 "welcome.shortcut_unavailable" = "In Use";
 "welcome.shortcut_conflict_help" = "Another app is using a shortcut. Every action remains available from the md2png menu.";
 "welcome.shortcut_verified_announcement" = "%@ shortcut works.";
-"welcome.privacy_note" = "md2png never pastes, sends, or uploads your content automatically.";
-"welcome.reopen_hint" = "If this window gets hidden, choose Show Welcome from the md2png menu bar.";
-"welcome.try_sample" = "Try a Short Sample";
-"welcome.try_sample_help" = "Open Examples and choose Short Sample to render it.";
+"welcome.launch_at_login.title" = "Launch at Login";
+"welcome.launch_at_login.optional" = "Optional";
+"welcome.launch_at_login.on" = "On";
+"welcome.launch_at_login.off" = "Off";
+"welcome.launch_at_login.open_settings" = "Open Settings…";
+"welcome.launch_at_login.unavailable" = "Unavailable";
+"welcome.launch_at_login.approval_help" = "Approval is required in Login Items.";
+"welcome.privacy_note" = "Private and local. Nothing is uploaded automatically.";
+"welcome.reopen_hint" = "Reopen from Show Welcome in the menu.";
+"welcome.try_sample" = "Try an Example";
+"welcome.try_sample_help" = "Choose a bundled example to try.";
 "welcome.sample_guide.title" = "Find Examples in the md2png menu";
 "welcome.replay_demo" = "Replay workflow demo";
 "welcome.done" = "Done";

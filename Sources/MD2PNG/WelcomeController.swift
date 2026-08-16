@@ -95,7 +95,8 @@ struct WelcomeWindowPlacement {
 }
 
 private enum WelcomeLayout {
-    static let contentSize = NSSize(width: 560, height: 580)
+    static let contentSize = NSSize(width: 560, height: 570)
+    static let statusColumnWidth: CGFloat = 100
 }
 
 struct WelcomeCopy {
@@ -116,6 +117,13 @@ struct WelcomeCopy {
     let shortcutUnavailable: String
     let shortcutConflictHelp: String
     let shortcutVerifiedAnnouncementFormat: String
+    let launchAtLoginTitle: String
+    let launchAtLoginOptional: String
+    let launchAtLoginOn: String
+    let launchAtLoginOff: String
+    let launchAtLoginOpenSettings: String
+    let launchAtLoginUnavailable: String
+    let launchAtLoginApprovalHelp: String
     let privacyNote: String
     let reopenHint: String
     let trySample: String
@@ -208,24 +216,59 @@ struct WelcomeCopy {
             defaultValue: "%@ shortcut works.",
             bundle: localizationBundle
         )
+        launchAtLoginTitle = L10n.text(
+            "welcome.launch_at_login.title",
+            defaultValue: "Launch at Login",
+            bundle: localizationBundle
+        )
+        launchAtLoginOptional = L10n.text(
+            "welcome.launch_at_login.optional",
+            defaultValue: "Optional",
+            bundle: localizationBundle
+        )
+        launchAtLoginOn = L10n.text(
+            "welcome.launch_at_login.on",
+            defaultValue: "On",
+            bundle: localizationBundle
+        )
+        launchAtLoginOff = L10n.text(
+            "welcome.launch_at_login.off",
+            defaultValue: "Off",
+            bundle: localizationBundle
+        )
+        launchAtLoginOpenSettings = L10n.text(
+            "welcome.launch_at_login.open_settings",
+            defaultValue: "Open Settings…",
+            bundle: localizationBundle
+        )
+        launchAtLoginUnavailable = L10n.text(
+            "welcome.launch_at_login.unavailable",
+            defaultValue: "Unavailable",
+            bundle: localizationBundle
+        )
+        launchAtLoginApprovalHelp = L10n.text(
+            "welcome.launch_at_login.approval_help",
+            defaultValue: "Approval is required in Login Items.",
+            bundle: localizationBundle
+        )
         privacyNote = L10n.text(
             "welcome.privacy_note",
-            defaultValue: "md2png never pastes, sends, or uploads your content automatically.",
+            defaultValue: "Private and local. Nothing is uploaded automatically.",
             bundle: localizationBundle
         )
         reopenHint = L10n.text(
             "welcome.reopen_hint",
-            defaultValue: "If this window gets hidden, choose Show Welcome from the md2png menu bar.",
+            defaultValue: "Reopen from Show Welcome in the menu.",
             bundle: localizationBundle
         )
         trySample = L10n.text(
             "welcome.try_sample",
-            defaultValue: "Try a Short Sample",
+            defaultValue: "Try an Example",
             bundle: localizationBundle
         )
         trySampleHelp = L10n.text(
             "welcome.try_sample_help",
-            defaultValue: "Explicitly copy and render the bundled short sample.",
+            defaultValue: "Choose a bundled example to try.",
             bundle: localizationBundle
         )
         done = L10n.text(
@@ -237,12 +280,46 @@ struct WelcomeCopy {
 }
 
 @MainActor
+final class WelcomeLaunchAtLoginState: ObservableObject {
+    @Published private(set) var presentation: LaunchAtLoginPresentation
+
+    private let controller: LaunchAtLoginController
+    private let onError: (Error) -> Void
+
+    init(
+        controller: LaunchAtLoginController,
+        onError: @escaping (Error) -> Void = { _ in }
+    ) {
+        self.controller = controller
+        self.onError = onError
+        presentation = controller.presentation
+    }
+
+    func refresh() {
+        presentation = controller.presentation
+    }
+
+    func performPrimaryAction() {
+        do {
+            let result = try controller.performPrimaryAction()
+            if result == .statusChanged(.requiresApproval) {
+                controller.openSystemSettings()
+            }
+        } catch {
+            onError(error)
+        }
+        refresh()
+    }
+}
+
+@MainActor
 final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let preference: WelcomePreference
     private let copy: WelcomeCopy
     private let onVisibilityChange: (Bool) -> Void
     private let onTrySample: () -> Void
     private let shortcutVerificationState = WelcomeShortcutVerificationState()
+    private let launchAtLoginState: WelcomeLaunchAtLoginState
 
 #if DEBUG
     var displayedShortcutStatuses: [WelcomeShortcutStatus] {
@@ -251,16 +328,25 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     var displayedContentSize: NSSize {
         window?.contentView?.bounds.size ?? .zero
     }
+    var displayedLaunchAtLoginPresentation: LaunchAtLoginPresentation {
+        launchAtLoginState.presentation
+    }
 #endif
 
     init(
         preference: WelcomePreference = WelcomePreference(),
         localizationBundle: Bundle? = nil,
+        launchAtLoginController: LaunchAtLoginController = LaunchAtLoginController(),
+        onLaunchAtLoginError: @escaping (Error) -> Void = { _ in },
         onVisibilityChange: @escaping (Bool) -> Void = { _ in },
         onTrySample: @escaping () -> Void
     ) {
         self.preference = preference
         copy = WelcomeCopy(localizationBundle: localizationBundle)
+        launchAtLoginState = WelcomeLaunchAtLoginState(
+            controller: launchAtLoginController,
+            onError: onLaunchAtLoginError
+        )
         self.onVisibilityChange = onVisibilityChange
         self.onTrySample = onTrySample
         super.init(window: nil)
@@ -279,9 +365,11 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 
     func show(shortcuts: [WelcomeShortcutStatus]) {
         shortcutVerificationState.reset(shortcuts: shortcuts)
+        launchAtLoginState.refresh()
         let rootView = WelcomeView(
             copy: copy,
             shortcutVerificationState: shortcutVerificationState,
+            launchAtLoginState: launchAtLoginState,
             onTrySample: { [weak self] in self?.trySample() },
             onDone: { [weak self] in self?.complete() }
         )
@@ -318,12 +406,20 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         return true
     }
 
+    func refreshLaunchAtLogin() {
+        launchAtLoginState.refresh()
+    }
+
     func windowWillClose(_ notification: Notification) {
         preference.markCompleted()
         onVisibilityChange(false)
     }
 
 #if DEBUG
+    func performLaunchAtLoginActionForTesting() {
+        launchAtLoginState.performPrimaryAction()
+    }
+
     func trySampleForTesting() {
         trySample()
     }
@@ -377,6 +473,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 private struct WelcomeView: View {
     let copy: WelcomeCopy
     @ObservedObject var shortcutVerificationState: WelcomeShortcutVerificationState
+    @ObservedObject var launchAtLoginState: WelcomeLaunchAtLoginState
     let onTrySample: () -> Void
     let onDone: () -> Void
 
@@ -385,116 +482,101 @@ private struct WelcomeView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 13) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .padding(7)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                Color.cyan.opacity(0.2),
-                                Color.purple.opacity(0.16)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.cyan.opacity(0.5), Color.purple.opacity(0.4)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.8
-                            )
-                    }
-                    .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(copy.title)
-                        .font(.system(size: 23, weight: .semibold))
-                        .foregroundStyle(
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 13) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 44, height: 44)
+                        .padding(7)
+                        .background(
                             LinearGradient(
-                                colors: [Color.primary, Color.purple.opacity(0.9)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                                colors: [
+                                    Color.cyan.opacity(0.2),
+                                    Color.purple.opacity(0.16)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                         )
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(copy.subtitle)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.cyan.opacity(0.5),
+                                            Color.purple.opacity(0.4)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.8
+                                )
+                        }
+                        .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(copy.title)
+                            .font(.system(size: 23, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.primary, Color.purple.opacity(0.9)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(copy.subtitle)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-            }
 
-            WelcomeWorkflowDemo(copy: copy)
+                WelcomeWorkflowDemo(copy: copy)
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text(copy.shortcutsTitle)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(copy.shortcutsTitle)
+                        .font(.headline)
 
-                Text(copy.shortcutVerificationHelp)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                ForEach(shortcutVerificationState.shortcuts) { shortcut in
-                    WelcomeShortcutRow(shortcut: shortcut, copy: copy)
-                }
-
-                if hasShortcutConflict {
-                    Label(copy.shortcutConflictHelp, systemImage: "info.circle")
+                    Text(copy.shortcutVerificationHelp)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Label(copy.privacyNote, systemImage: "lock.shield")
-                Label(copy.reopenHint, systemImage: "menubar.rectangle")
+                    ForEach(shortcutVerificationState.shortcuts) { shortcut in
+                        WelcomeShortcutRow(shortcut: shortcut, copy: copy)
+                    }
+
+                    if hasShortcutConflict {
+                        Label(copy.shortcutConflictHelp, systemImage: "info.circle")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
             }
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color.cyan.opacity(0.06),
-                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(Color.cyan.opacity(0.18), lineWidth: 0.6)
-            }
 
-            Spacer(minLength: 0)
+            Divider()
 
-            HStack {
-                Button(action: onTrySample) {
-                    Label(copy.trySample, systemImage: "sparkles")
-                }
-                .help(copy.trySampleHelp)
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-
-                Spacer()
-
-                Button(copy.done, action: onDone)
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
-            }
+            WelcomeFooter(
+                copy: copy,
+                launchAtLoginState: launchAtLoginState,
+                onTrySample: onTrySample,
+                onDone: onDone
+            )
         }
-        .padding(22)
         .frame(
             width: WelcomeLayout.contentSize.width,
             height: WelcomeLayout.contentSize.height
@@ -502,6 +584,164 @@ private struct WelcomeView: View {
         .background {
             WelcomeBackdrop()
         }
+    }
+}
+
+private struct WelcomeLaunchAtLoginRow: View {
+    let copy: WelcomeCopy
+    @ObservedObject var state: WelcomeLaunchAtLoginState
+    @State private var isHovering = false
+
+    var body: some View {
+        Button {
+            state.performPrimaryAction()
+        } label: {
+            HStack(spacing: 10) {
+                Text(copy.launchAtLoginTitle)
+                    .font(.callout.weight(.medium))
+
+                Text(copy.launchAtLoginOptional)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Label(statusText, systemImage: statusSymbol)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(statusColor)
+                    .lineLimit(1)
+                    .frame(
+                        width: WelcomeLayout.statusColumnWidth,
+                        alignment: .leading
+                    )
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!state.presentation.canPerformAction)
+        .background(
+            LinearGradient(
+                colors: [
+                    isHovering && state.presentation.canPerformAction
+                        ? Color.accentColor.opacity(0.12)
+                        : Color(nsColor: .controlBackgroundColor).opacity(0.72),
+                    Color.accentColor.opacity(0.045)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            ),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
+        }
+        .onHover { isHovering = $0 }
+        .help(actionHelp)
+        .accessibilityHint(actionHelp)
+    }
+
+    private var statusText: String {
+        switch state.presentation.menuAction {
+        case .enable:
+            copy.launchAtLoginOff
+        case .disable:
+            copy.launchAtLoginOn
+        case .allowInSystemSettings:
+            copy.launchAtLoginOff
+        case .unavailable:
+            copy.launchAtLoginUnavailable
+        }
+    }
+
+    private var statusSymbol: String {
+        switch state.presentation.menuAction {
+        case .enable, .allowInSystemSettings:
+            "circle"
+        case .disable:
+            "checkmark.circle.fill"
+        case .unavailable:
+            "xmark.circle"
+        }
+    }
+
+    private var statusColor: Color {
+        switch state.presentation.menuAction {
+        case .disable:
+            .green
+        case .enable, .allowInSystemSettings, .unavailable:
+            .secondary
+        }
+    }
+
+    private var actionHelp: String {
+        switch state.presentation.menuAction {
+        case .enable:
+            L10n.text(
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login"
+            )
+        case .disable:
+            L10n.text(
+                "menu.disable_launch_at_login",
+                defaultValue: "Disable Launch at Login"
+            )
+        case .allowInSystemSettings:
+            "\(copy.launchAtLoginApprovalHelp) \(copy.launchAtLoginOpenSettings)"
+        case .unavailable:
+            copy.launchAtLoginUnavailable
+        }
+    }
+}
+
+private struct WelcomeFooter: View {
+    let copy: WelcomeCopy
+    @ObservedObject var launchAtLoginState: WelcomeLaunchAtLoginState
+    let onTrySample: () -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            WelcomeLaunchAtLoginRow(
+                copy: copy,
+                state: launchAtLoginState
+            )
+            .padding(.horizontal, 22)
+            .padding(.vertical, 10)
+
+            Divider()
+                .padding(.leading, 22)
+
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(copy.privacyNote, systemImage: "lock.shield")
+                    Label(copy.reopenHint, systemImage: "menubar.rectangle")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 12)
+
+                Button(action: onTrySample) {
+                    Label(copy.trySample, systemImage: "sparkles")
+                }
+                .help(copy.trySampleHelp)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Button(copy.done, action: onDone)
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 11)
+        }
+        .background(.regularMaterial)
     }
 }
 
@@ -573,7 +813,11 @@ private struct WelcomeShortcutRow: View {
             Label(statusText, systemImage: statusSymbol)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
-                .frame(width: 88, alignment: .leading)
+                .lineLimit(1)
+                .frame(
+                    width: WelcomeLayout.statusColumnWidth,
+                    alignment: .leading
+                )
                 .symbolEffect(.bounce, value: shortcut.verificationCount)
         }
         .padding(.horizontal, 10)
