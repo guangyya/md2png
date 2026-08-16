@@ -10,6 +10,7 @@
 "menu.restore_last_markdown" = "Restore Last Markdown";
 "menu.show_last_render" = "Show Last Render";
 "menu.render_width" = "Output Width";
+"menu.render_theme" = "Theme";
 "menu.examples" = "Examples";
 "menu.enable_launch_at_login" = "Enable Launch at Login";
 "menu.disable_launch_at_login" = "Disable Launch at Login";
@@ -22,6 +23,10 @@
 "render_width.compact" = "Compact";
 "render_width.standard" = "Standard";
 "render_width.wide" = "Wide";
+
+"render_theme.clean_light" = "Clean Light";
+"render_theme.warm_paper" = "Warm Paper";
+"render_theme.dark" = "Dark";
 
 "clipboard.labeled" = "Clipboard: %@";
 "clipboard.png_image" = "PNG image";

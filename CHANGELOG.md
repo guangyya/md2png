@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add bundled Clean Light, Warm Paper, and Dark render themes with coordinated
+  Markdown, syntax-highlighting, and Mermaid palettes, an opaque fixed output,
+  and a locally remembered explicit selection shared by every render entry point.
+
 ## [0.6.0] - 2026-08-16
 
 ### Added

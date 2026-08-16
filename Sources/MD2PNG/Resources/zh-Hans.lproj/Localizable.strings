@@ -10,6 +10,7 @@
 "menu.restore_last_markdown" = "恢复上次的 Markdown";
 "menu.show_last_render" = "显示上次渲染";
 "menu.render_width" = "输出宽度";
+"menu.render_theme" = "主题";
 "menu.examples" = "示例";
 "menu.enable_launch_at_login" = "启用登录时启动";
 "menu.disable_launch_at_login" = "关闭登录时启动";
@@ -22,6 +23,10 @@
 "render_width.compact" = "紧凑";
 "render_width.standard" = "标准";
 "render_width.wide" = "宽幅";
+
+"render_theme.clean_light" = "简洁浅色";
+"render_theme.warm_paper" = "暖色纸张";
+"render_theme.dark" = "深色";
 
 "clipboard.labeled" = "剪贴板：%@";
 "clipboard.png_image" = "PNG 图片";

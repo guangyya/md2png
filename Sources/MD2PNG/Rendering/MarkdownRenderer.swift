@@ -9,6 +9,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         let id: UUID
         let markdown: String
         let widthPreset: RenderWidthPreset
+        let theme: RenderTheme
         let completion: Completion
     }
 
@@ -67,12 +68,14 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     func render(
         _ markdown: String,
         widthPreset: RenderWidthPreset = .standard,
+        theme: RenderTheme = .cleanLight,
         completion: @escaping Completion
     ) {
         let request = Request(
             id: UUID(),
             markdown: markdown,
             widthPreset: widthPreset,
+            theme: theme,
             completion: completion
         )
         requests[request.id] = request
@@ -138,11 +141,12 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                 let value = try await self.webView.callAsyncJavaScript(
                     """
                     document.getElementById("card").style.maxWidth = maximumWidth + "px"
-                    return await window.renderMarkdown(markdown)
+                    return await window.renderMarkdown(markdown, renderTheme)
                     """,
                     arguments: [
                         "markdown": request.markdown,
-                        "maximumWidth": request.widthPreset.cardMaximumWidth
+                        "maximumWidth": request.widthPreset.cardMaximumWidth,
+                        "renderTheme": request.theme.rawValue
                     ],
                     in: nil,
                     contentWorld: .page
