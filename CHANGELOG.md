@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-16
+
 ### Added
 
 - Add opt-in Launch at Login controls to the menu and Welcome guide, backed by
