@@ -92,6 +92,13 @@ struct GitHubRepository: Equatable, Sendable {
         components.path = "/\(owner)/\(name)/releases"
         return components.url!
     }
+
+    var appcastURL: URL {
+        releasesURL
+            .appendingPathComponent("latest")
+            .appendingPathComponent("download")
+            .appendingPathComponent("appcast.xml")
+    }
 }
 
 struct UpdateRelease: Codable, Equatable, Sendable {

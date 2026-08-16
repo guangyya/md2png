@@ -143,10 +143,9 @@ reference for tables, highlighted code, and multiple diagrams in one image.
   being fetched.
 - No analytics, telemetry, advertising, account integration, bot, or
   service-specific API is included.
-- Opening **About md2png** silently refreshes public GitHub Release metadata when
-  the last successful result is more than 24 hours old. **Check Again** is
-  available without exposing a GitHub account or credential; no Markdown or
-  clipboard data is included in the request.
+- Opening **About md2png** does not make an update request. Choosing **Check for
+  Updates…** fetches the signed public appcast without a GitHub account or
+  credential; no Markdown, clipboard data, or system profile is included.
 - The basic copy/render/paste workflow does not need Accessibility permission.
 - The app never pastes or sends content automatically.
 
@@ -225,9 +224,9 @@ make publish-release \
   NOTARY_PROFILE=MDPNGNotary
 ```
 
-Each published release contains a versioned ZIP, a versioned DMG, and the fixed
-`md2png-latest.dmg` alias. See [Releasing](docs/RELEASING.md) before running
-the command.
+Each published release contains a signed Sparkle appcast, a versioned ZIP, a
+versioned DMG, the fixed `md2png-latest.dmg` alias, and two coverage reports.
+See [Releasing](docs/RELEASING.md) before running the command.
 
 ## Project layout
 

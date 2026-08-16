@@ -120,9 +120,14 @@
 "about.project" = "Project";
 "about.open_project" = "Open Project";
 "about.view_all_releases" = "View Releases";
-"about.check_for_updates_help" = "Checks GitHub when About opens; successful results are cached for 24 hours.";
+"about.check_for_updates_help" = "Checks the signed update feed only when you choose Check for Updates.";
+"about.updates" = "Updates";
+"about.check_for_updates" = "Check for Updates…";
 "about.update_up_to_date" = "Up to Date · %@";
 "about.update_available" = "Update available · %@";
+"about.update_show" = "Show Update";
+"about.update_running_newer" = "You’re running a newer build";
+"about.update_latest_published" = "Latest published version: %@";
 "about.update_check_again" = "Check Again";
 "about.update_check_again_later" = "Check Again Later";
 "about.update_checking" = "Checking…";
@@ -141,6 +146,12 @@
 "about.update_check_failed" = "Update check failed";
 "about.update_download_failed" = "Download failed";
 "about.update_retry_after" = "Try again after %@.";
+"about.update_busy" = "Another update check is already in progress.";
+"about.update_unknown_result" = "The update check finished without a result.";
+"about.update_requires_newer_macos" = "The latest update requires a newer version of macOS.";
+"about.update_requires_older_macos" = "The latest update does not support this version of macOS.";
+"about.update_requires_apple_silicon" = "The latest update requires an Apple silicon Mac.";
+"about.update_no_compatible_release" = "No compatible update was found.";
 "about.copy_version_info" = "Copy Version Info";
 "about.version_info_copied" = "Copied";
 "about.version_info" = "md2png %@ (%@) · %@ · macOS %@ · %@";
@@ -160,6 +171,7 @@
 "update.accessibility.verifying" = "Verifying md2png %@.";
 "update.accessibility.opening" = "Opening md2png %@.";
 "update.accessibility.up_to_date" = "md2png %@ is up to date.";
+"update.accessibility.running_newer" = "This md2png build is newer than the latest published version.";
 "update.accessibility.available" = "md2png %@ is available.";
 "update.error.installed_version" = "The installed app version is not valid.";
 "update.error.repository" = "This build does not contain a valid GitHub repository address.";

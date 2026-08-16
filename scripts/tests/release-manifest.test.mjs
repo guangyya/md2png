@@ -15,14 +15,29 @@ const version = "0.4.0";
 const build = "4";
 const commit = "0123456789abcdef0123456789abcdef01234567";
 
-function fixture() {
+function fixture(fixtureVersion = version) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "md2png-manifest-test-"));
-  const files = releaseAssetNames(version);
+  const files = releaseAssetNames(fixtureVersion);
   for (const name of files) {
     fs.writeFileSync(path.join(directory, name), name.endsWith(".dmg") ? "same dmg" : `content:${name}`);
   }
   return { directory, files };
 }
+
+test("requires the sixth signed-feed asset starting at v0.7", (context) => {
+  const futureVersion = "0.7.0";
+  const { directory, files } = fixture(futureVersion);
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = createManifest({
+    directory,
+    files,
+    version: futureVersion,
+    build: "7",
+    commit,
+  });
+  assert.equal(manifest.assets.length, 6);
+  assert.ok(manifest.assets.some((asset) => asset.name === "appcast.xml"));
+});
 
 test("creates a normalized manifest and validates every handoff digest", (context) => {
   const { directory, files } = fixture();

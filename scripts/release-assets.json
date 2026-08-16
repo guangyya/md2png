@@ -1,40 +1,53 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "assets": [
     {
       "key": "releaseZip",
       "name": "md2png-{version}-macOS-arm64-developer-id.zip",
       "label": "md2png {version} — macOS app archive (Apple silicon)",
       "contentType": "application/zip",
-      "sourcePath": "dist/{name}"
+      "sourcePath": "dist/{name}",
+      "introducedIn": "0.0.0"
+    },
+    {
+      "key": "appcast",
+      "name": "appcast.xml",
+      "label": "md2png {version} — signed Sparkle appcast",
+      "contentType": "application/xml",
+      "sourcePath": ".build/update-feed/{name}",
+      "introducedIn": "0.7.0"
     },
     {
       "key": "releaseDmg",
       "name": "md2png-{version}-macOS-arm64-developer-id.dmg",
       "label": "md2png {version} — macOS installer (Apple silicon)",
       "contentType": "application/x-apple-diskimage",
-      "sourcePath": "dist/{name}"
+      "sourcePath": "dist/{name}",
+      "introducedIn": "0.0.0"
     },
     {
       "key": "latestDmg",
       "name": "md2png-latest.dmg",
       "label": "md2png — latest macOS installer (Apple silicon)",
       "contentType": "application/x-apple-diskimage",
-      "sourcePath": "dist/{name}"
+      "sourcePath": "dist/{name}",
+      "introducedIn": "0.0.0"
     },
     {
       "key": "coverageJson",
       "name": "md2png-{version}-coverage.json",
       "label": "md2png {version} — normalized source-line coverage (JSON)",
       "contentType": "application/json",
-      "sourcePath": ".build/coverage/{name}"
+      "sourcePath": ".build/coverage/{name}",
+      "introducedIn": "0.0.0"
     },
     {
       "key": "coverageMarkdown",
       "name": "md2png-{version}-coverage.md",
       "label": "md2png {version} — source-line coverage summary (Markdown)",
       "contentType": "application/octet-stream",
-      "sourcePath": ".build/coverage/{name}"
+      "sourcePath": ".build/coverage/{name}",
+      "introducedIn": "0.0.0"
     }
   ]
 }

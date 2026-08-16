@@ -62,6 +62,19 @@ test("renders the reviewed release asset contract exactly", () => {
   assert.deepEqual(releaseAsset(version, "coverageJson"), expected[3]);
 });
 
+test("adds the signed appcast only at the v0.7 migration boundary", () => {
+  assert.throws(() => releaseAsset("0.6.0", "appcast"), /unknown release asset key/);
+  assert.deepEqual(releaseAsset("0.7.0", "appcast"), {
+    key: "appcast",
+    name: "appcast.xml",
+    label: "md2png 0.7.0 — signed Sparkle appcast",
+    contentType: "application/xml",
+    sourcePath: ".build/update-feed/appcast.xml",
+  });
+  assert.equal(releaseAssets("0.6.0").length, 5);
+  assert.equal(releaseAssets("0.7.0").length, 6);
+});
+
 test("treats JSON membership as authoritative and rejects malformed contract entries", () => {
   const contract = readReleaseAssetContract();
   const clone = () => structuredClone(contract);
@@ -108,7 +121,7 @@ test("rejects missing, extra, renamed, mislabeled, and mistyped published sets",
 test("CLI emits JSON and names from the same contract", () => {
   const json = spawnSync(process.execPath, [scriptPath, "json", "--version", version], { encoding: "utf8" });
   assert.equal(json.status, 0, json.stderr);
-  assert.deepEqual(JSON.parse(json.stdout), { schemaVersion: 1, version, assets: expected });
+  assert.deepEqual(JSON.parse(json.stdout), { schemaVersion: 2, version, assets: expected });
   const names = spawnSync(process.execPath, [scriptPath, "names", "--version", version], { encoding: "utf8" });
   assert.equal(names.status, 0, names.stderr);
   assert.deepEqual(names.stdout.trim().split("\n"), expected.map((asset) => asset.name));
@@ -125,6 +138,7 @@ test("CLI emits JSON and names from the same contract", () => {
 test("release tooling consumes the contract instead of redefining canonical asset metadata", () => {
   const consumers = [
     "scripts/release-manifest.mjs",
+    "scripts/generate-appcast.sh",
     "scripts/release-automation.mjs",
     "scripts/coverage-history.mjs",
     "scripts/publish-release.sh",

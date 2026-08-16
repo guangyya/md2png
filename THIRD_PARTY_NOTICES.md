@@ -1,7 +1,7 @@
 # Third-party notices
 
-md2png bundles the following open-source packages in its local web
-renderer. Each package remains subject to its own license.
+md2png bundles the following open-source packages. Each package remains subject
+to its own license.
 
 | Package | Version | License |
 |---|---:|---|
@@ -10,6 +10,7 @@ renderer. Each package remains subject to its own license.
 | [markdown-it](https://github.com/markdown-it/markdown-it) | 14.1.0 | MIT |
 | [Mermaid](https://github.com/mermaid-js/mermaid) | 11.9.0 | MIT |
 | [esbuild](https://github.com/evanw/esbuild) | 0.28.2 | MIT |
+| [Sparkle](https://github.com/sparkle-project/Sparkle) | 2.9.5 | [MIT and bundled third-party notices](ThirdPartyLicenses/Sparkle-2.9.5.txt) |
 
-The complete resolved dependency graph is recorded in
-`WebRenderer/pnpm-lock.yaml`.
+The resolved dependency graphs are recorded in `WebRenderer/pnpm-lock.yaml` and
+`Package.resolved`.

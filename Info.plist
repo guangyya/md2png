@@ -39,5 +39,21 @@
     <string>disabled</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUPublicEDKey</key>
+    <string>e5b5D6VY3VV3z1p/hRfrUC7MLeTPo0lMRaSGbymyLKE=</string>
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUSendProfileInfo</key>
+    <false/>
+    <key>SUSignedFeedFailureExpirationInterval</key>
+    <integer>0</integer>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
 </dict>
 </plist>

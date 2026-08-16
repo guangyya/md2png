@@ -143,7 +143,7 @@ final class AboutContentView: NSView {
         updateSlot.isHidden = !updateFeatureAvailable
         updateRow.toolTip = L10n.text(
             "about.check_for_updates_help",
-            defaultValue: "Checks GitHub when About opens; successful results are cached for 24 hours."
+            defaultValue: "Checks the signed update feed only when you choose Check for Updates."
         )
         showCopyReady()
     }

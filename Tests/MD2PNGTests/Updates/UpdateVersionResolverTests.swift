@@ -33,6 +33,10 @@ final class UpdateVersionResolverTests: XCTestCase {
             repository.releasesURL.absoluteString,
             "https://github.com/guangyya/md2png/releases"
         )
+        XCTAssertEqual(
+            repository.appcastURL.absoluteString,
+            "https://github.com/guangyya/md2png/releases/latest/download/appcast.xml"
+        )
     }
 
     func testGitHubRepositoryRejectsNonGitHubOrAmbiguousURLs() {

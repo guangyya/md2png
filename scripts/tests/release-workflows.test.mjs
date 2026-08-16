@@ -327,6 +327,7 @@ test("trusted publication tooling can stage from main while a pre-contract sourc
     "release-milestone.mjs",
     "release-update-channel.sh",
     "release-update-channel-contract-v1",
+    "sparkle-appcast.mjs",
   ]) {
     fs.copyFileSync(path.join(repoRoot, "scripts", file), path.join(fixture, "scripts", file));
   }
@@ -358,6 +359,7 @@ test("trusted publication tooling can stage from main while a pre-contract sourc
   assert.ok(fs.existsSync(staged.RELEASE_MANIFEST_SCRIPT));
   assert.ok(fs.existsSync(staged.RELEASE_MILESTONE_SCRIPT));
   assert.ok(fs.existsSync(staged.RELEASE_UPDATE_CHANNEL_SCRIPT));
+  assert.ok(fs.existsSync(staged.SPARKLE_APPCAST_SCRIPT));
   const rendered = spawnSync(process.execPath, [
     staged.RELEASE_ASSETS_SCRIPT,
     "names",
@@ -386,10 +388,11 @@ test("Apple secrets and GitHub publication permissions are isolated", () => {
   const publish = release.slice(release.indexOf("  publish:"));
   assert.match(sign, /environment: release-signing/);
   assert.match(sign, /RELEASE_CERTIFICATE_P12_BASE64/);
+  assert.match(sign, /SPARKLE_EDDSA_PRIVATE_KEY/);
   assert.match(sign, /openssl x509 -checkend 0/);
   assert.doesNotMatch(sign, /contents: write|issues: write/);
   assert.match(publish, /contents: write\n      issues: write/);
-  assert.doesNotMatch(publish, /RELEASE_CERTIFICATE|APPLE_APP_SPECIFIC_PASSWORD|APPLE_ID/);
+  assert.doesNotMatch(publish, /RELEASE_CERTIFICATE|SPARKLE_EDDSA_PRIVATE_KEY|APPLE_APP_SPECIFIC_PASSWORD|APPLE_ID/);
   assert.match(publish, /publish-hosted-release\.sh/);
 });
 
@@ -473,6 +476,7 @@ test("published reruns use a protected-main read-only verifier", () => {
   assert.deepEqual(releaseJobs.publish.needs, ["detect", "sign"]);
 
   assert.match(verifier, /gh release download/);
+  assert.match(verifier, /sparkle-appcast\.mjs validate/);
   assert.match(verifier, /remote_digest/);
   assert.match(verifier, /codesign --verify --deep --strict/);
   assert.match(verifier, /codesign -d --extract-certificates/);

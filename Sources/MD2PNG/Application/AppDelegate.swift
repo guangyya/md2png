@@ -24,7 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.setPreviewWindowVisible(isVisible)
         }
     )
-    private let updateController = UpdateController()
+    private let updateController = UpdateController(
+        updateDriver: SparkleUpdateDriver {
+            UpdateChannel.current().repository?.appcastURL
+        }
+    )
     private lazy var aboutController = AboutController(updateController: updateController)
     private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
@@ -569,6 +573,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 defaultValue: "md2png %@ is up to date.",
                 version.description
             ))
+        case .runningNewerVersion:
+            announceUpdate(L10n.text(
+                "update.accessibility.running_newer",
+                defaultValue: "This md2png build is newer than the latest published version."
+            ))
+        case let .sparkleUpdateAvailable(displayVersion):
+            announceUpdate(L10n.format(
+                "update.accessibility.available",
+                defaultValue: "md2png %@ is available.",
+                displayVersion
+            ))
         case let .updateAvailable(update):
             if previousPhase.isDownloadActive {
                 let message = L10n.text(
@@ -655,7 +670,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             symbolName = "checkmark.shield"
         case .opening:
             symbolName = "opticaldiscdrive"
-        case .unknown, .upToDate, .updateAvailable, .readyToInstall, .failed:
+        case .unknown, .upToDate, .runningNewerVersion,
+             .sparkleUpdateAvailable, .updateAvailable, .readyToInstall, .failed:
             symbolName = nil
         }
 
@@ -698,7 +714,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 defaultValue: "Opening md2png %@…",
                 update.version.description
             )
-        case .unknown, .upToDate, .updateAvailable, .readyToInstall, .failed:
+        case .unknown, .upToDate, .runningNewerVersion,
+             .sparkleUpdateAvailable, .updateAvailable, .readyToInstall, .failed:
             return L10n.text("accessibility.app", defaultValue: "md2png")
         }
     }

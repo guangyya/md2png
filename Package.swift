@@ -11,9 +11,18 @@ let package = Package(
     products: [
         .executable(name: "md2png", targets: ["MD2PNG"])
     ],
+    dependencies: [
+        .package(
+            url: "https://github.com/sparkle-project/Sparkle",
+            exact: "2.9.5"
+        )
+    ],
     targets: [
         .executableTarget(
             name: "MD2PNG",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             resources: [
                 .process("Resources")
             ],
@@ -21,7 +30,11 @@ let package = Package(
                 .linkedFramework("AppKit"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("ServiceManagement"),
-                .linkedFramework("WebKit")
+                .linkedFramework("WebKit"),
+                .unsafeFlags([
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "@executable_path/../Frameworks"
+                ])
             ]
         ),
         .testTarget(

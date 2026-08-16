@@ -106,6 +106,7 @@ asset_value_by_name() {
     '.assets[] | select(.name == $name) | .[$field]' <<< "$asset_contract_json"
 }
 release_zip_name="$(asset_value_by_key releaseZip name)"
+appcast_name="$(jq -r '.assets[] | select(.key == "appcast") | .name' <<< "$asset_contract_json")"
 release_dmg_name="$(asset_value_by_key releaseDmg name)"
 latest_dmg_name="$(asset_value_by_key latestDmg name)"
 coverage_json_name="$(asset_value_by_key coverageJson name)"
@@ -143,6 +144,16 @@ for name in "${expected_names[@]}"; do
   test "$remote_content_type" = "$(asset_value_by_name "$name" contentType)"
   test "$remote_label" = "$(asset_value_by_name "$name" label)"
 done
+
+if [[ -n "$appcast_name" ]]; then
+  "$node_binary" scripts/sparkle-appcast.mjs validate \
+    --file "${assets_dir}/${appcast_name}" \
+    --archive "${assets_dir}/${release_zip_name}" \
+    --version "$version" \
+    --build "$build_number" \
+    --repository "$gh_repo" \
+    --public-key "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$source_plist")"
+fi
 
 cmp -s "${assets_dir}/${release_dmg_name}" "${assets_dir}/${latest_dmg_name}"
 "$node_binary" scripts/coverage-report.mjs validate \

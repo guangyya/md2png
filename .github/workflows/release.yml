@@ -447,15 +447,17 @@ jobs:
           git merge-base --is-ancestor "$SOURCE_COMMIT" "$WORKFLOW_COMMIT"
           trusted_dir="$RUNNER_TEMP/release-asset-tooling"
           mkdir -p "$trusted_dir"
-          for file in release-assets.mjs release-assets.json release-manifest.mjs release-recovery.mjs release-update-channel.sh release-update-channel-contract-v1; do
+          for file in release-assets.mjs release-assets.json release-manifest.mjs release-recovery.mjs release-update-channel.sh release-update-channel-contract-v1 generate-appcast.sh sparkle-appcast.mjs; do
             git show "${WORKFLOW_COMMIT}:scripts/${file}" > "$trusted_dir/$file"
             test -s "$trusted_dir/$file"
           done
-          chmod +x "$trusted_dir/release-assets.mjs" "$trusted_dir/release-manifest.mjs" "$trusted_dir/release-recovery.mjs" "$trusted_dir/release-update-channel.sh"
+          chmod +x "$trusted_dir/release-assets.mjs" "$trusted_dir/release-manifest.mjs" "$trusted_dir/release-recovery.mjs" "$trusted_dir/release-update-channel.sh" "$trusted_dir/generate-appcast.sh" "$trusted_dir/sparkle-appcast.mjs"
           printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_dir/release-assets.mjs" >> "$GITHUB_ENV"
           printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_dir/release-manifest.mjs" >> "$GITHUB_ENV"
           printf 'RELEASE_RECOVERY_SCRIPT=%s\n' "$trusted_dir/release-recovery.mjs" >> "$GITHUB_ENV"
           printf 'RELEASE_UPDATE_CHANNEL_SCRIPT=%s\n' "$trusted_dir/release-update-channel.sh" >> "$GITHUB_ENV"
+          printf 'SPARKLE_GENERATE_APPCAST_SCRIPT=%s\n' "$trusted_dir/generate-appcast.sh" >> "$GITHUB_ENV"
+          printf 'SPARKLE_APPCAST_SCRIPT=%s\n' "$trusted_dir/sparkle-appcast.mjs" >> "$GITHUB_ENV"
 
       - name: Set up pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -488,6 +490,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
         shell: bash
         run: |
           set -euo pipefail
@@ -565,6 +568,13 @@ jobs:
             --source-commit "$SOURCE_COMMIT" \
             --workflow-commit "$WORKFLOW_COMMIT" \
             --plist dist/md2png.app/Contents/Info.plist
+          if jq -e '.assets[] | select(.key == "appcast")' <<< "$asset_contract" >/dev/null; then
+            REPO_ROOT="$GITHUB_WORKSPACE" \
+              GH_REPO="$GITHUB_REPOSITORY" \
+              RELEASE_ASSETS_SCRIPT="$RELEASE_ASSETS_SCRIPT" \
+              SPARKLE_APPCAST_SCRIPT="$SPARKLE_APPCAST_SCRIPT" \
+              "$SPARKLE_GENERATE_APPCAST_SCRIPT"
+          fi
 
           handoff=".build/release-handoff"
           mkdir -p "$handoff"
@@ -706,12 +716,14 @@ jobs:
           trusted_release_manifest="$RUNNER_TEMP/release-manifest.mjs"
           trusted_release_milestone="$RUNNER_TEMP/release-milestone.mjs"
           trusted_release_update_channel="$RUNNER_TEMP/release-update-channel.sh"
+          trusted_sparkle_appcast="$RUNNER_TEMP/sparkle-appcast.mjs"
           git show "${WORKFLOW_COMMIT}:scripts/publish-hosted-release.sh" > "$trusted_publisher"
           git show "${WORKFLOW_COMMIT}:scripts/release-assets.mjs" > "$trusted_release_assets"
           git show "${WORKFLOW_COMMIT}:scripts/release-assets.json" > "$trusted_asset_contract"
           git show "${WORKFLOW_COMMIT}:scripts/release-manifest.mjs" > "$trusted_release_manifest"
           git show "${WORKFLOW_COMMIT}:scripts/release-milestone.mjs" > "$trusted_release_milestone"
           git show "${WORKFLOW_COMMIT}:scripts/release-update-channel.sh" > "$trusted_release_update_channel"
+          git show "${WORKFLOW_COMMIT}:scripts/sparkle-appcast.mjs" > "$trusted_sparkle_appcast"
           chmod +x "$trusted_publisher"
           chmod +x "$trusted_release_update_channel"
           test -s "$trusted_publisher"
@@ -720,11 +732,13 @@ jobs:
           test -s "$trusted_release_manifest"
           test -s "$trusted_release_milestone"
           test -s "$trusted_release_update_channel"
+          test -s "$trusted_sparkle_appcast"
           printf 'TRUSTED_PUBLISHER=%s\n' "$trusted_publisher" >> "$GITHUB_ENV"
           printf 'RELEASE_ASSETS_SCRIPT=%s\n' "$trusted_release_assets" >> "$GITHUB_ENV"
           printf 'RELEASE_MANIFEST_SCRIPT=%s\n' "$trusted_release_manifest" >> "$GITHUB_ENV"
           printf 'RELEASE_MILESTONE_SCRIPT=%s\n' "$trusted_release_milestone" >> "$GITHUB_ENV"
           printf 'RELEASE_UPDATE_CHANNEL_SCRIPT=%s\n' "$trusted_release_update_channel" >> "$GITHUB_ENV"
+          printf 'SPARKLE_APPCAST_SCRIPT=%s\n' "$trusted_sparkle_appcast" >> "$GITHUB_ENV"
 
       - name: Publish or safely resume exact release
         env:

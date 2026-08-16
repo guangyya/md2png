@@ -28,6 +28,16 @@ APP_DIR := dist/$(APP_NAME).app
 DEBUG_APP_PREREQUISITE :=
 endif
 CONTENTS := $(APP_DIR)/Contents
+FRAMEWORKS := $(CONTENTS)/Frameworks
+SPARKLE_FRAMEWORK := $(FRAMEWORKS)/Sparkle.framework
+LEGAL_RESOURCES := $(CONTENTS)/Resources/Legal
+THIRD_PARTY_LICENSES := $(LEGAL_RESOURCES)/ThirdPartyLicenses
+SPARKLE_LICENSE_SOURCE := ThirdPartyLicenses/Sparkle-2.9.5.txt
+SPARKLE_LICENSE := $(THIRD_PARTY_LICENSES)/Sparkle-2.9.5.txt
+# SwiftPM's test runner must be able to load binary-target frameworks before
+# the app packaging step copies them into Contents/Frameworks.
+SPARKLE_TEST_FRAMEWORKS := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
+SWIFT_TEST_ENV = DYLD_FRAMEWORK_PATH="$(SPARKLE_TEST_FRAMEWORKS)$${DYLD_FRAMEWORK_PATH:+:$${DYLD_FRAMEWORK_PATH}}"
 ICON_SOURCE := Assets/AppIcon/AppIcon.png
 ICONSET_DIR := .build/AppIcon.iconset
 APP_ICON := .build/AppIcon.icns
@@ -83,8 +93,8 @@ coverage-tool-test:
 	$(NODE) --test scripts/tests/*.test.mjs
 
 coverage: renderer coverage-tool-test
-	swift test --enable-code-coverage
-	@coverage_source="$$(swift test --show-codecov-path | tail -n 1)"; \
+	$(SWIFT_TEST_ENV) swift test --enable-code-coverage
+	@coverage_source="$$( $(SWIFT_TEST_ENV) swift test --show-codecov-path | tail -n 1)"; \
 		test -s "$$coverage_source" || { echo "SwiftPM coverage JSON is missing or empty: $$coverage_source"; exit 1; }; \
 		swift_version="$$(swift --version | sed -n '1p')"; \
 		xcode_version="$$(xcodebuild -version | paste -s -d ' ' -)"; \
@@ -105,6 +115,7 @@ coverage-validate:
 		--commit "$(SOURCE_COMMIT)"
 
 release-asset-paths:
+	@printf 'appcast=%s\n' "$(call release_asset_field,appcast,sourcePath)"
 	@printf 'coverageJson=%s\n' "$(COVERAGE_JSON)"
 	@printf 'coverageMarkdown=%s\n' "$(COVERAGE_MARKDOWN)"
 	@printf 'releaseZip=%s\n' "$(RELEASE_ZIP)"
@@ -123,7 +134,7 @@ validate-release-preparation:
 		--repo-root "$(CURDIR)"
 
 test: renderer coverage-tool-test
-	swift test
+	$(SWIFT_TEST_ENV) swift test
 
 build: renderer
 	swift build -c $(CONFIGURATION) --triple $(ARM64_TRIPLE)
@@ -136,8 +147,15 @@ debug-stop:
 
 app: build icon $(DEBUG_APP_PREREQUISITE)
 	rm -rf "$(APP_DIR)"
-	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources"
+	mkdir -p "$(CONTENTS)/MacOS" "$(CONTENTS)/Resources" "$(FRAMEWORKS)" "$(THIRD_PARTY_LICENSES)"
 	cp "$(ARM64_BUILD_DIR)/$(TARGET_NAME)" "$(CONTENTS)/MacOS/$(TARGET_NAME)"
+	ditto "$(ARM64_BUILD_DIR)/Sparkle.framework" "$(SPARKLE_FRAMEWORK)"
+	rm -rf "$(SPARKLE_FRAMEWORK)/Versions/B/XPCServices" \
+		"$(SPARKLE_FRAMEWORK)/XPCServices" \
+		"$(SPARKLE_FRAMEWORK)/Versions/B/Headers" \
+		"$(SPARKLE_FRAMEWORK)/Headers" \
+		"$(SPARKLE_FRAMEWORK)/Versions/B/PrivateHeaders" \
+		"$(SPARKLE_FRAMEWORK)/PrivateHeaders"
 	cp Info.plist "$(CONTENTS)/Info.plist"
 	@effective_bundle_identifier="$(BUNDLE_IDENTIFIER)"; \
 	debug_checkout_id=""; \
@@ -197,11 +215,27 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 	./scripts/release-notes.sh "$(VERSION)" ABOUT_CHANGELOG.md >/dev/null
 	cp ABOUT_CHANGELOG.md "$(CONTENTS)/Resources/ABOUT_CHANGELOG.md"
 	cp -R Examples "$(CONTENTS)/Resources/Examples"
+	cp THIRD_PARTY_NOTICES.md "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	cp "$(SPARKLE_LICENSE_SOURCE)" "$(SPARKLE_LICENSE)"
+	codesign $(SIGN_FLAGS) "$(SPARKLE_FRAMEWORK)/Versions/B/Autoupdate"
+	codesign $(SIGN_FLAGS) "$(SPARKLE_FRAMEWORK)/Versions/B/Updater.app"
+	codesign $(SIGN_FLAGS) "$(SPARKLE_FRAMEWORK)"
 	codesign $(SIGN_FLAGS) "$(APP_DIR)"
 
 verify-dist: app
+	cmp -s THIRD_PARTY_NOTICES.md "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	grep -Fq '](ThirdPartyLicenses/Sparkle-2.9.5.txt)' "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	test -f "$(SPARKLE_LICENSE)"
+	cmp -s "$(SPARKLE_LICENSE_SOURCE)" "$(SPARKLE_LICENSE)"
+	grep -Fq 'EXTERNAL LICENSES' "$(SPARKLE_LICENSE)"
+	test ! -e "$(SPARKLE_FRAMEWORK)/XPCServices"
+	codesign --verify --strict --verbose=2 "$(SPARKLE_FRAMEWORK)/Versions/B/Autoupdate"
+	codesign --verify --strict --verbose=2 "$(SPARKLE_FRAMEWORK)/Versions/B/Updater.app"
+	codesign --verify --strict --verbose=2 "$(SPARKLE_FRAMEWORK)"
 	codesign --verify --deep --strict --verbose=2 "$(APP_DIR)"
 	test "$$(lipo -archs "$(CONTENTS)/MacOS/$(TARGET_NAME)")" = "arm64"
+	otool -L "$(CONTENTS)/MacOS/$(TARGET_NAME)" | grep -Fq '@rpath/Sparkle.framework/Versions/B/Sparkle'
+	otool -l "$(CONTENTS)/MacOS/$(TARGET_NAME)" | grep -Fq '@executable_path/../Frameworks'
 	"$(CONTENTS)/MacOS/$(TARGET_NAME)" --self-test
 
 release: verify-dist
