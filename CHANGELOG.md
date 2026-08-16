@@ -9,9 +9,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Add an opt-in Launch at Login menu toggle backed by the native macOS main-app
-  login service, including effective-state refresh and a System Settings route
-  when approval is required.
+- Add opt-in Launch at Login controls to the menu and Welcome guide, backed by
+  the native macOS main-app login service, including effective-state refresh
+  and an explicit System Settings route when approval is required.
 
 ## [0.5.0] - 2026-08-16
 

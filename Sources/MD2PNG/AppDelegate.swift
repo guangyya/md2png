@@ -30,6 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
+        launchAtLoginController: launchAtLoginController,
+        onLaunchAtLoginError: { [weak self] error in
+            self?.show(error)
+        },
         onVisibilityChange: { [weak self] isVisible in
             self?.setWelcomeWindowVisible(isVisible)
         },
@@ -68,7 +72,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var renderWidthMenuItem: NSMenuItem!
     private var renderWidthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
     private var launchAtLoginMenuItem: NSMenuItem!
-    private var loginItemsSettingsMenuItem: NSMenuItem!
     private var renderWidthPreset: RenderWidthPreset
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
@@ -135,10 +138,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         defaultValue: "A global shortcut is already in use — menu commands still work"
                     ),
                     symbol: "keyboard.badge.ellipsis",
-                    isError: true
+                    style: .error
                 )
             }
         }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard statusItem != nil else { return }
+        updateLaunchAtLoginMenu()
     }
 
     private func configureStatusItem() {
@@ -236,20 +244,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "menu.enable_launch_at_login",
                 defaultValue: "Enable Launch at Login"
             ),
-            action: #selector(toggleLaunchAtLogin),
+            action: #selector(performLaunchAtLoginAction),
             keyEquivalent: ""
         )
         launchAtLoginMenuItem.target = self
-
-        loginItemsSettingsMenuItem = menu.addItem(
-            withTitle: L10n.text(
-                "menu.open_login_items_settings",
-                defaultValue: "Open Login Items Settings…"
-            ),
-            action: #selector(openLoginItemsSettings),
-            keyEquivalent: ""
-        )
-        loginItemsSettingsMenuItem.target = self
         updateLaunchAtLoginMenu()
 
         menu.addItem(.separator())
@@ -473,28 +471,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         welcomeController.show(shortcuts: welcomeShortcutStatuses)
     }
 
-    @objc private func toggleLaunchAtLogin() {
+    @objc private func performLaunchAtLoginAction() {
         do {
-            let status = try launchAtLoginController.toggle()
+            let result = try launchAtLoginController.performPrimaryAction()
             updateLaunchAtLoginMenu()
-            if status == .requiresApproval {
+            if result == .statusChanged(.requiresApproval) {
                 hud.show(
                     L10n.text(
                         "hud.launch_at_login_requires_approval",
-                        defaultValue: "Allow md2png in Login Items to launch it automatically"
+                        defaultValue: "Allow md2png in Login Items to finish setup"
                     ),
                     symbol: "gear.badge",
-                    isError: true
+                    style: .informational
                 )
             }
         } catch {
             updateLaunchAtLoginMenu()
             show(error)
         }
-    }
-
-    @objc private func openLoginItemsSettings() {
-        launchAtLoginController.openSystemSettings()
     }
 
     private func updateLaunchAtLoginMenu() {
@@ -510,14 +504,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "menu.disable_launch_at_login",
                 defaultValue: "Disable Launch at Login"
             )
+        case .allowInSystemSettings:
+            L10n.text(
+                "menu.allow_launch_at_login",
+                defaultValue: "Allow Launch at Login…"
+            )
         case .unavailable:
             L10n.text(
                 "menu.launch_at_login_unavailable",
                 defaultValue: "Launch at Login Unavailable"
             )
         }
-        launchAtLoginMenuItem.isEnabled = presentation.canToggle
-        loginItemsSettingsMenuItem.isHidden = !presentation.showsSystemSettingsAction
+        launchAtLoginMenuItem.badge = presentation.menuAction == .allowInSystemSettings
+            ? NSMenuItemBadge(string: "!")
+            : nil
+        launchAtLoginMenuItem.toolTip = presentation.menuAction == .allowInSystemSettings
+            ? L10n.text(
+                "accessibility.launch_at_login_requires_approval",
+                defaultValue: "Approval required in System Settings"
+            )
+            : nil
+        launchAtLoginMenuItem.isEnabled = presentation.canPerformAction
+        if isWelcomeWindowVisible {
+            welcomeController.refreshLaunchAtLogin()
+        }
     }
 
     private func showSampleGuide() {
@@ -538,7 +548,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func show(_ error: Error) {
-        hud.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", isError: true)
+        hud.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", style: .error)
     }
 
     private func applyUpdateStatus(_ status: UpdateStatus) {
@@ -616,7 +626,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 hud.show(
                     recoveryMessage,
                     symbol: "exclamationmark.triangle.fill",
-                    isError: true
+                    style: .error
                 )
             }
             announceUpdate(message)

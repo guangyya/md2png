@@ -44,8 +44,9 @@ sending it.
 - Retina-friendly PNG/TIFF clipboard output.
 - Global render and last-preview shortcuts plus equivalent menu commands.
 - A one-time first-launch guide with the three-step workflow, live shortcut
-  registration status, an explicit menu-guided short-sample action, and a menu
-  command to reopen it. Bundled examples open their preview after rendering.
+  registration status, an optional state-aware Launch at Login control, an
+  explicit menu-guided short-sample action, and a menu command to reopen it.
+  Bundled examples open their preview after rendering.
 - Compact clipboard preview, non-activating HUD, and an in-memory preview of the
   latest successful render with explicit copy, save, Preview, fit, actual-size,
   and zoom controls.
@@ -54,8 +55,8 @@ sending it.
 - Short, long, formatting, code, checklist, table, flowchart, sequence, and
   Gantt samples that render immediately when selected.
 - English and Simplified Chinese UI selected from macOS language settings.
-- An off-by-default Launch at Login menu toggle backed by the native macOS
-  main-app login service, with effective-state refresh and an approval route.
+- An off-by-default Launch at Login action backed by the native macOS main-app
+  login service, with effective-state refresh and an explicit approval route.
 - About window with Debug/Release identification, version/build/source commit,
   release notes, project link, update action, and copyable diagnostics.
 - Silent update discovery in About, backed by a 24-hour successful-result cache

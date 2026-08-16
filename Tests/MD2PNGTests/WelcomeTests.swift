@@ -53,6 +53,9 @@ final class WelcomeTests: XCTestCase {
         XCTAssertTrue(english.trySampleHelp.contains("Examples"))
         XCTAssertEqual(english.shortcutDetected, "Detected")
         XCTAssertEqual(english.shortcutVerified, "Works")
+        XCTAssertEqual(english.launchAtLoginTitle, "Launch at Login")
+        XCTAssertEqual(english.launchAtLoginOptional, "Optional")
+        XCTAssertEqual(english.launchAtLoginOpenSettings, "Open Settings…")
         XCTAssertTrue(english.shortcutVerificationHelp.contains("without running"))
         XCTAssertEqual(
             String(
@@ -65,6 +68,9 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(chinese.shortcutDetected, "已检测")
         XCTAssertEqual(chinese.shortcutVerified, "已生效")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
+        XCTAssertEqual(chinese.launchAtLoginTitle, "登录时启动")
+        XCTAssertEqual(chinese.launchAtLoginOptional, "可选")
+        XCTAssertEqual(chinese.launchAtLoginOpenSettings, "打开设置…")
         XCTAssertTrue(chinese.shortcutVerificationHelp.contains("不会执行"))
         XCTAssertEqual(
             String(
@@ -83,6 +89,49 @@ final class WelcomeTests: XCTestCase {
             L10n.text("menu.show_welcome", defaultValue: "", bundle: chineseBundle),
             "显示欢迎指南"
         )
+    }
+
+    @MainActor
+    func testWelcomeLaunchAtLoginStateHandlesEveryActionInline() {
+        let service = WelcomeLaunchAtLoginServiceStub(status: .notRegistered)
+        service.statusAfterRegister = .requiresApproval
+        let state = WelcomeLaunchAtLoginState(
+            controller: LaunchAtLoginController(service: service)
+        )
+
+        XCTAssertEqual(state.presentation.menuAction, .enable)
+
+        state.performPrimaryAction()
+        XCTAssertEqual(service.operations, [.register])
+        XCTAssertEqual(state.presentation.menuAction, .allowInSystemSettings)
+
+        state.performPrimaryAction()
+        XCTAssertEqual(service.operations, [.register, .openSystemSettings])
+
+        service.status = .enabled
+        service.statusAfterUnregister = .notRegistered
+        state.refresh()
+        XCTAssertEqual(state.presentation.menuAction, .disable)
+
+        state.performPrimaryAction()
+        XCTAssertEqual(service.operations, [.register, .openSystemSettings, .unregister])
+        XCTAssertEqual(state.presentation.menuAction, .enable)
+    }
+
+    @MainActor
+    func testWelcomeLaunchAtLoginStateReportsUnavailableErrorsInline() {
+        let service = WelcomeLaunchAtLoginServiceStub(status: .unknown)
+        var errors: [Error] = []
+        let state = WelcomeLaunchAtLoginState(
+            controller: LaunchAtLoginController(service: service),
+            onError: { errors.append($0) }
+        )
+
+        state.performPrimaryAction()
+
+        XCTAssertEqual(errors.count, 1)
+        XCTAssertTrue(service.operations.isEmpty)
+        XCTAssertEqual(state.presentation.menuAction, .unavailable)
     }
 
     @MainActor
@@ -403,7 +452,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(controller.showIfNeeded(shortcuts: shortcuts))
         XCTAssertEqual(controller.window?.title, "Welcome to md2png")
-        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 560, height: 580))
+        XCTAssertEqual(controller.displayedContentSize, NSSize(width: 560, height: 620))
         XCTAssertEqual(controller.displayedShortcutStatuses, shortcuts)
         XCTAssertEqual(controller.window?.isVisible, true)
         XCTAssertEqual(controller.window?.level, .normal)
@@ -426,6 +475,42 @@ final class WelcomeTests: XCTestCase {
     private func makeDefaults() throws -> (UserDefaults, String) {
         let suiteName = "MD2PNGWelcomeTests.\(UUID().uuidString)"
         return (try XCTUnwrap(UserDefaults(suiteName: suiteName)), suiteName)
+    }
+}
+
+@MainActor
+private final class WelcomeLaunchAtLoginServiceStub: LaunchAtLoginServicing {
+    enum Operation: Equatable {
+        case register
+        case unregister
+        case openSystemSettings
+    }
+
+    var status: LaunchAtLoginStatus
+    var statusAfterRegister: LaunchAtLoginStatus?
+    var statusAfterUnregister: LaunchAtLoginStatus?
+    private(set) var operations: [Operation] = []
+
+    init(status: LaunchAtLoginStatus) {
+        self.status = status
+    }
+
+    func register() throws {
+        operations.append(.register)
+        if let statusAfterRegister {
+            status = statusAfterRegister
+        }
+    }
+
+    func unregister() throws {
+        operations.append(.unregister)
+        if let statusAfterUnregister {
+            status = statusAfterUnregister
+        }
+    }
+
+    func openSystemSettings() {
+        operations.append(.openSystemSettings)
     }
 }
 

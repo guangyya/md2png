@@ -95,7 +95,7 @@ struct WelcomeWindowPlacement {
 }
 
 private enum WelcomeLayout {
-    static let contentSize = NSSize(width: 560, height: 580)
+    static let contentSize = NSSize(width: 560, height: 620)
 }
 
 struct WelcomeCopy {
@@ -116,6 +116,13 @@ struct WelcomeCopy {
     let shortcutUnavailable: String
     let shortcutConflictHelp: String
     let shortcutVerifiedAnnouncementFormat: String
+    let launchAtLoginTitle: String
+    let launchAtLoginOptional: String
+    let launchAtLoginEnable: String
+    let launchAtLoginDisable: String
+    let launchAtLoginOpenSettings: String
+    let launchAtLoginUnavailable: String
+    let launchAtLoginApprovalHelp: String
     let privacyNote: String
     let reopenHint: String
     let trySample: String
@@ -208,6 +215,41 @@ struct WelcomeCopy {
             defaultValue: "%@ shortcut works.",
             bundle: localizationBundle
         )
+        launchAtLoginTitle = L10n.text(
+            "welcome.launch_at_login.title",
+            defaultValue: "Launch at Login",
+            bundle: localizationBundle
+        )
+        launchAtLoginOptional = L10n.text(
+            "welcome.launch_at_login.optional",
+            defaultValue: "Optional",
+            bundle: localizationBundle
+        )
+        launchAtLoginEnable = L10n.text(
+            "welcome.launch_at_login.enable",
+            defaultValue: "Enable",
+            bundle: localizationBundle
+        )
+        launchAtLoginDisable = L10n.text(
+            "welcome.launch_at_login.disable",
+            defaultValue: "Disable",
+            bundle: localizationBundle
+        )
+        launchAtLoginOpenSettings = L10n.text(
+            "welcome.launch_at_login.open_settings",
+            defaultValue: "Open Settings…",
+            bundle: localizationBundle
+        )
+        launchAtLoginUnavailable = L10n.text(
+            "welcome.launch_at_login.unavailable",
+            defaultValue: "Unavailable",
+            bundle: localizationBundle
+        )
+        launchAtLoginApprovalHelp = L10n.text(
+            "welcome.launch_at_login.approval_help",
+            defaultValue: "Approval is required in Login Items.",
+            bundle: localizationBundle
+        )
         privacyNote = L10n.text(
             "welcome.privacy_note",
             defaultValue: "md2png never pastes, sends, or uploads your content automatically.",
@@ -237,12 +279,43 @@ struct WelcomeCopy {
 }
 
 @MainActor
+final class WelcomeLaunchAtLoginState: ObservableObject {
+    @Published private(set) var presentation: LaunchAtLoginPresentation
+
+    private let controller: LaunchAtLoginController
+    private let onError: (Error) -> Void
+
+    init(
+        controller: LaunchAtLoginController,
+        onError: @escaping (Error) -> Void = { _ in }
+    ) {
+        self.controller = controller
+        self.onError = onError
+        presentation = controller.presentation
+    }
+
+    func refresh() {
+        presentation = controller.presentation
+    }
+
+    func performPrimaryAction() {
+        do {
+            _ = try controller.performPrimaryAction()
+        } catch {
+            onError(error)
+        }
+        refresh()
+    }
+}
+
+@MainActor
 final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let preference: WelcomePreference
     private let copy: WelcomeCopy
     private let onVisibilityChange: (Bool) -> Void
     private let onTrySample: () -> Void
     private let shortcutVerificationState = WelcomeShortcutVerificationState()
+    private let launchAtLoginState: WelcomeLaunchAtLoginState
 
 #if DEBUG
     var displayedShortcutStatuses: [WelcomeShortcutStatus] {
@@ -251,16 +324,25 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     var displayedContentSize: NSSize {
         window?.contentView?.bounds.size ?? .zero
     }
+    var displayedLaunchAtLoginPresentation: LaunchAtLoginPresentation {
+        launchAtLoginState.presentation
+    }
 #endif
 
     init(
         preference: WelcomePreference = WelcomePreference(),
         localizationBundle: Bundle? = nil,
+        launchAtLoginController: LaunchAtLoginController = LaunchAtLoginController(),
+        onLaunchAtLoginError: @escaping (Error) -> Void = { _ in },
         onVisibilityChange: @escaping (Bool) -> Void = { _ in },
         onTrySample: @escaping () -> Void
     ) {
         self.preference = preference
         copy = WelcomeCopy(localizationBundle: localizationBundle)
+        launchAtLoginState = WelcomeLaunchAtLoginState(
+            controller: launchAtLoginController,
+            onError: onLaunchAtLoginError
+        )
         self.onVisibilityChange = onVisibilityChange
         self.onTrySample = onTrySample
         super.init(window: nil)
@@ -279,9 +361,11 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 
     func show(shortcuts: [WelcomeShortcutStatus]) {
         shortcutVerificationState.reset(shortcuts: shortcuts)
+        launchAtLoginState.refresh()
         let rootView = WelcomeView(
             copy: copy,
             shortcutVerificationState: shortcutVerificationState,
+            launchAtLoginState: launchAtLoginState,
             onTrySample: { [weak self] in self?.trySample() },
             onDone: { [weak self] in self?.complete() }
         )
@@ -318,12 +402,20 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         return true
     }
 
+    func refreshLaunchAtLogin() {
+        launchAtLoginState.refresh()
+    }
+
     func windowWillClose(_ notification: Notification) {
         preference.markCompleted()
         onVisibilityChange(false)
     }
 
 #if DEBUG
+    func performLaunchAtLoginActionForTesting() {
+        launchAtLoginState.performPrimaryAction()
+    }
+
     func trySampleForTesting() {
         trySample()
     }
@@ -377,6 +469,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
 private struct WelcomeView: View {
     let copy: WelcomeCopy
     @ObservedObject var shortcutVerificationState: WelcomeShortcutVerificationState
+    @ObservedObject var launchAtLoginState: WelcomeLaunchAtLoginState
     let onTrySample: () -> Void
     let onDone: () -> Void
 
@@ -457,6 +550,11 @@ private struct WelcomeView: View {
                 }
             }
 
+            WelcomeLaunchAtLoginRow(
+                copy: copy,
+                state: launchAtLoginState
+            )
+
             VStack(alignment: .leading, spacing: 4) {
                 Label(copy.privacyNote, systemImage: "lock.shield")
                 Label(copy.reopenHint, systemImage: "menubar.rectangle")
@@ -502,6 +600,65 @@ private struct WelcomeView: View {
         .background {
             WelcomeBackdrop()
         }
+    }
+}
+
+private struct WelcomeLaunchAtLoginRow: View {
+    let copy: WelcomeCopy
+    @ObservedObject var state: WelcomeLaunchAtLoginState
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "power")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            Text(copy.launchAtLoginTitle)
+                .font(.callout.weight(.medium))
+
+            Text(copy.launchAtLoginOptional)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            switch state.presentation.menuAction {
+            case .enable:
+                actionButton(copy.launchAtLoginEnable)
+            case .disable:
+                actionButton(copy.launchAtLoginDisable)
+            case .allowInSystemSettings:
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(.orange)
+                    .help(copy.launchAtLoginApprovalHelp)
+                    .accessibilityLabel(copy.launchAtLoginApprovalHelp)
+                actionButton(copy.launchAtLoginOpenSettings)
+            case .unavailable:
+                Text(copy.launchAtLoginUnavailable)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color(nsColor: .controlBackgroundColor).opacity(0.72),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func actionButton(_ title: String) -> some View {
+        Button(title) {
+            state.performPrimaryAction()
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
     }
 }
 

@@ -1,5 +1,26 @@
 import AppKit
 
+enum HUDStyle: Equatable {
+    case success
+    case informational
+    case error
+
+    var tintColor: NSColor {
+        switch self {
+        case .success:
+            .systemGreen
+        case .informational:
+            .controlAccentColor
+        case .error:
+            .systemRed
+        }
+    }
+
+    var displayDuration: TimeInterval {
+        self == .error ? 4.0 : 2.2
+    }
+}
+
 @MainActor
 enum HUDLayout {
     static let minimumWidth: CGFloat = 320
@@ -40,7 +61,7 @@ final class HUDController {
     private var panel: NSPanel?
     private var dismissWorkItem: DispatchWorkItem?
 
-    func show(_ message: String, symbol: String, isError: Bool = false) {
+    func show(_ message: String, symbol: String, style: HUDStyle = .success) {
         dismissWorkItem?.cancel()
         panel?.orderOut(nil)
 
@@ -71,7 +92,7 @@ final class HUDController {
             systemSymbolName: symbol,
             accessibilityDescription: nil
         ) ?? NSImage())
-        icon.contentTintColor = isError ? .systemRed : .systemGreen
+        icon.contentTintColor = style.tintColor
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         let label = NSTextField(labelWithString: message)
@@ -114,6 +135,6 @@ final class HUDController {
             if self?.panel === panel { self?.panel = nil }
         }
         dismissWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + (isError ? 4.0 : 2.2), execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + style.displayDuration, execute: workItem)
     }
 }

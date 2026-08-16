@@ -103,14 +103,16 @@ toolbar can copy the image again, save it explicitly, open it in Preview, fit it
 to the window, inspect one PNG pixel per display backing pixel, and zoom without
 changing the generated image or clipboard contents.
 The welcome guide opens once on first launch and can be reopened from the menu;
-its sample button opens a status-item menu guide that first shows the main menu,
+it includes an optional, state-aware Launch at Login control. Its sample button
+opens a status-item menu guide that first shows the main menu,
 then reveals Examples; rendering starts only after the user chooses a sample. While the guide is
 open, md2png appears in Command-Tab so the window cannot become unreachable;
 closing the guide returns the app to its menu bar-only mode.
 Launch at Login always reflects the effective macOS state with an explicit
-enable or disable action. If approval is required, the menu also shows **Open
-Login Items Settings…**. Disabling it unregisters the login item; no helper or
-background worker is installed.
+action. If approval is required, the single menu row becomes **Allow Launch at
+Login…**, shows a trailing alert badge, and opens Login Items settings when
+selected. Disabling it unregisters the login item; no helper or background
+worker is installed.
 See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
 dimensions and same-source reference renders.
 

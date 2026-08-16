@@ -6,71 +6,77 @@ final class LaunchAtLoginTests: XCTestCase {
     func testPresentationReflectsEveryEffectiveSystemStatus() {
         let notRegistered = LaunchAtLoginPresentation(status: .notRegistered)
         XCTAssertEqual(notRegistered.menuAction, .enable)
-        XCTAssertTrue(notRegistered.canToggle)
-        XCTAssertFalse(notRegistered.showsSystemSettingsAction)
+        XCTAssertTrue(notRegistered.canPerformAction)
 
         let enabled = LaunchAtLoginPresentation(status: .enabled)
         XCTAssertEqual(enabled.menuAction, .disable)
-        XCTAssertTrue(enabled.canToggle)
-        XCTAssertFalse(enabled.showsSystemSettingsAction)
+        XCTAssertTrue(enabled.canPerformAction)
 
         let requiresApproval = LaunchAtLoginPresentation(status: .requiresApproval)
-        XCTAssertEqual(requiresApproval.menuAction, .disable)
-        XCTAssertTrue(requiresApproval.canToggle)
-        XCTAssertTrue(requiresApproval.showsSystemSettingsAction)
+        XCTAssertEqual(requiresApproval.menuAction, .allowInSystemSettings)
+        XCTAssertTrue(requiresApproval.canPerformAction)
 
         let notFound = LaunchAtLoginPresentation(status: .notFound)
         XCTAssertEqual(notFound.menuAction, .enable)
-        XCTAssertTrue(notFound.canToggle)
-        XCTAssertFalse(notFound.showsSystemSettingsAction)
+        XCTAssertTrue(notFound.canPerformAction)
 
         let unknown = LaunchAtLoginPresentation(status: .unknown)
         XCTAssertEqual(unknown.menuAction, .unavailable)
-        XCTAssertFalse(unknown.canToggle)
-        XCTAssertFalse(unknown.showsSystemSettingsAction)
+        XCTAssertFalse(unknown.canPerformAction)
     }
 
-    func testToggleRegistersAnUnregisteredMainApp() throws {
+    func testPrimaryActionRegistersAnUnregisteredMainApp() throws {
         let service = LaunchAtLoginServiceStub(status: .notRegistered)
         service.statusAfterRegister = .enabled
         let controller = LaunchAtLoginController(service: service)
 
-        XCTAssertEqual(try controller.toggle(), .enabled)
+        XCTAssertEqual(try controller.performPrimaryAction(), .statusChanged(.enabled))
         XCTAssertEqual(service.operations, [.register])
     }
 
-    func testToggleUnregistersAnEnabledMainApp() throws {
+    func testPrimaryActionUnregistersAnEnabledMainApp() throws {
         let service = LaunchAtLoginServiceStub(status: .enabled)
         service.statusAfterUnregister = .notRegistered
         let controller = LaunchAtLoginController(service: service)
 
-        XCTAssertEqual(try controller.toggle(), .notRegistered)
+        XCTAssertEqual(try controller.performPrimaryAction(), .statusChanged(.notRegistered))
         XCTAssertEqual(service.operations, [.unregister])
     }
 
-    func testToggleAttemptsRegistrationWhenNativeStatusIsNotFound() throws {
+    func testPrimaryActionAttemptsRegistrationWhenNativeStatusIsNotFound() throws {
         let service = LaunchAtLoginServiceStub(status: .notFound)
         service.statusAfterRegister = .enabled
         let controller = LaunchAtLoginController(service: service)
 
-        XCTAssertEqual(try controller.toggle(), .enabled)
+        XCTAssertEqual(try controller.performPrimaryAction(), .statusChanged(.enabled))
         XCTAssertEqual(service.operations, [.register])
     }
 
-    func testToggleUnregistersARegistrationThatRequiresApproval() throws {
+    func testPrimaryActionOpensSettingsWhenApprovalIsRequired() throws {
         let service = LaunchAtLoginServiceStub(status: .requiresApproval)
-        service.statusAfterUnregister = .notRegistered
         let controller = LaunchAtLoginController(service: service)
 
-        XCTAssertEqual(try controller.toggle(), .notRegistered)
-        XCTAssertEqual(service.operations, [.unregister])
+        XCTAssertEqual(try controller.performPrimaryAction(), .openedSystemSettings)
+        XCTAssertEqual(service.operations, [.openSystemSettings])
     }
 
-    func testToggleReportsUnavailableWithoutCallingTheSystemService() {
+    func testPrimaryActionReturnsApprovalTransitionAfterRegistration() throws {
+        let service = LaunchAtLoginServiceStub(status: .notRegistered)
+        service.statusAfterRegister = .requiresApproval
+        let controller = LaunchAtLoginController(service: service)
+
+        XCTAssertEqual(
+            try controller.performPrimaryAction(),
+            .statusChanged(.requiresApproval)
+        )
+        XCTAssertEqual(service.operations, [.register])
+    }
+
+    func testPrimaryActionReportsUnavailableWithoutCallingTheSystemService() {
         let service = LaunchAtLoginServiceStub(status: .unknown)
         let controller = LaunchAtLoginController(service: service)
 
-        XCTAssertThrowsError(try controller.toggle()) { error in
+        XCTAssertThrowsError(try controller.performPrimaryAction()) { error in
             XCTAssertTrue(error is LaunchAtLoginError)
         }
         XCTAssertTrue(service.operations.isEmpty)
@@ -83,17 +89,7 @@ final class LaunchAtLoginTests: XCTestCase {
 
         service.status = .requiresApproval
 
-        XCTAssertEqual(controller.presentation.menuAction, .disable)
-        XCTAssertTrue(controller.presentation.showsSystemSettingsAction)
-    }
-
-    func testOpenSystemSettingsForwardsToNativeService() {
-        let service = LaunchAtLoginServiceStub(status: .requiresApproval)
-        let controller = LaunchAtLoginController(service: service)
-
-        controller.openSystemSettings()
-
-        XCTAssertEqual(service.operations, [.openSystemSettings])
+        XCTAssertEqual(controller.presentation.menuAction, .allowInSystemSettings)
     }
 
     func testLaunchAtLoginLocalizationsResolve() throws {
@@ -109,12 +105,16 @@ final class LaunchAtLoginTests: XCTestCase {
             "Disable Launch at Login"
         )
         XCTAssertEqual(
+            L10n.text("menu.allow_launch_at_login", defaultValue: "", bundle: english),
+            "Allow Launch at Login…"
+        )
+        XCTAssertEqual(
             L10n.text("menu.enable_launch_at_login", defaultValue: "", bundle: chinese),
             "启用登录时启动"
         )
         XCTAssertEqual(
-            L10n.text("menu.open_login_items_settings", defaultValue: "", bundle: chinese),
-            "打开登录项设置…"
+            L10n.text("menu.allow_launch_at_login", defaultValue: "", bundle: chinese),
+            "允许登录时启动…"
         )
     }
 }

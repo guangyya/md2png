@@ -12,32 +12,33 @@ enum LaunchAtLoginStatus: Equatable {
 enum LaunchAtLoginMenuAction: Equatable {
     case enable
     case disable
+    case allowInSystemSettings
     case unavailable
+}
+
+enum LaunchAtLoginActionResult: Equatable {
+    case statusChanged(LaunchAtLoginStatus)
+    case openedSystemSettings
 }
 
 struct LaunchAtLoginPresentation: Equatable {
     let menuAction: LaunchAtLoginMenuAction
-    let canToggle: Bool
-    let showsSystemSettingsAction: Bool
+    let canPerformAction: Bool
 
     init(status: LaunchAtLoginStatus) {
         switch status {
         case .notRegistered, .notFound:
             menuAction = .enable
-            canToggle = true
-            showsSystemSettingsAction = false
+            canPerformAction = true
         case .enabled:
             menuAction = .disable
-            canToggle = true
-            showsSystemSettingsAction = false
+            canPerformAction = true
         case .requiresApproval:
-            menuAction = .disable
-            canToggle = true
-            showsSystemSettingsAction = true
+            menuAction = .allowInSystemSettings
+            canPerformAction = true
         case .unknown:
             menuAction = .unavailable
-            canToggle = false
-            showsSystemSettingsAction = false
+            canPerformAction = false
         }
     }
 }
@@ -117,19 +118,19 @@ final class LaunchAtLoginController {
     }
 
     @discardableResult
-    func toggle() throws -> LaunchAtLoginStatus {
+    func performPrimaryAction() throws -> LaunchAtLoginActionResult {
         switch status {
         case .notRegistered, .notFound:
             try service.register()
-        case .enabled, .requiresApproval:
+            return .statusChanged(status)
+        case .enabled:
             try service.unregister()
+            return .statusChanged(status)
+        case .requiresApproval:
+            service.openSystemSettings()
+            return .openedSystemSettings
         case .unknown:
             throw LaunchAtLoginError.unavailable
         }
-        return status
-    }
-
-    func openSystemSettings() {
-        service.openSystemSettings()
     }
 }
