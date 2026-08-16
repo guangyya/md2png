@@ -158,6 +158,7 @@ make app CONFIGURATION=debug \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make verify-dist \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
+  UPDATE_CHANNEL=stable \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
@@ -189,10 +190,12 @@ download failure instead of exposing an invalid Open action.
 separate Debug bundle at `dist/debug/md2png.app`. Local builds are ad-hoc signed
 unless a signing identity is supplied. `PROJECT_URL` is optional; when omitted,
 About hides the project and update controls. Debug builds keep a configured
-project link but hide production update controls; Release builds with a valid
-GitHub project URL use the stable GitHub Releases channel. The source contains
-no repository URL. `BUNDLE_IDENTIFIER` defaults to the personal identifier in
-`Info.plist` and can be overridden without editing source files.
+project link but hide production update controls. Only a build explicitly
+packaged with `UPDATE_CHANNEL=stable` and a valid GitHub project URL uses the
+stable GitHub Releases channel; missing, unknown, and future channel values stay
+disabled. The source contains no repository URL. `BUNDLE_IDENTIFIER` defaults
+to the personal identifier in `Info.plist` and can be overridden without
+editing source files.
 `make verify-dist` rebuilds the app, verifies its signature and arm64
 architecture, then renders a bundled Markdown, GFM table, highlighted Swift
 snippet, and Mermaid diagram without reading or modifying the clipboard.

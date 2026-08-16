@@ -5,9 +5,9 @@ import XCTest
 final class UpdateChannelTests: XCTestCase {
     private let projectURL = URL(string: "https://github.com/guangyya/md2png")!
 
-    func testDebugBuildDisablesUpdatesEvenWithAProductionRepository() {
+    func testMissingChannelDisablesUpdatesEvenWithAProductionRepository() {
         let channel = UpdateChannel.resolve(
-            buildConfiguration: .debug,
+            configuredValue: nil,
             projectURL: projectURL
         )
 
@@ -16,9 +16,9 @@ final class UpdateChannelTests: XCTestCase {
         XCTAssertFalse(channel.allowsUpdateChecks)
     }
 
-    func testReleaseBuildUsesTheStableGitHubReleasesChannel() throws {
+    func testExplicitStableChannelUsesGitHubReleases() throws {
         let channel = UpdateChannel.resolve(
-            buildConfiguration: .release,
+            configuredValue: "stable",
             projectURL: projectURL
         )
         let repository = try XCTUnwrap(channel.repository)
@@ -37,18 +37,31 @@ final class UpdateChannelTests: XCTestCase {
         XCTAssertTrue(channel.allowsUpdateChecks)
     }
 
-    func testReleaseBuildDisablesUpdatesWithoutAValidGitHubRepository() {
+    func testStableChannelDisablesUpdatesWithoutAValidGitHubRepository() {
         XCTAssertEqual(
             UpdateChannel.resolve(
-                buildConfiguration: .release,
+                configuredValue: "stable",
                 projectURL: URL(string: "https://example.com/guangyya/md2png")
             ),
             .disabled
         )
         XCTAssertEqual(
-            UpdateChannel.resolve(buildConfiguration: .release, projectURL: nil),
+            UpdateChannel.resolve(configuredValue: "stable", projectURL: nil),
             .disabled
         )
+    }
+
+    func testUnknownAndNightlyChannelsFailClosed() {
+        for configuredValue in ["nightly", "unknown", "STABLE", " stable "] {
+            XCTAssertEqual(
+                UpdateChannel.resolve(
+                    configuredValue: configuredValue,
+                    projectURL: projectURL
+                ),
+                .disabled,
+                "Unexpected stable channel for \(configuredValue)"
+            )
+        }
     }
 
     func testOnlyStableChannelAllowsItsExactReleaseArtifact() throws {

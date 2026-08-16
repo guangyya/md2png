@@ -98,6 +98,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_plist")" = "$b
 test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGSourceCommit' "$app_plist")" = "$source_commit"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_plist")" = "$bundle_identifier"
 test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGProjectURL' "$app_plist")" = "$project_url"
+test "$(/usr/libexec/PlistBuddy -c 'Print :MD2PNGUpdateChannel' "$app_plist")" = "stable"
 test "$(lipo -archs "$executable")" = "arm64"
 codesign --verify --deep --strict --verbose=2 "$app_path"
 xcrun stapler validate "$app_path"

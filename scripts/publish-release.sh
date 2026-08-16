@@ -135,6 +135,7 @@ make notarize \
   SIGN_IDENTITY="$sign_identity" \
   NOTARY_PROFILE="$notary_profile" \
   PROJECT_URL="$project_url" \
+  UPDATE_CHANNEL=stable \
   BUNDLE_IDENTIFIER="$bundle_identifier" \
   RELEASE_SUFFIX=developer-id
 

@@ -533,6 +533,34 @@ test("release remains draft until every uploaded asset has been verified", () =>
   assert.match(publisher, /\.draft <<< "\$published_release_json"\)" = "false"/);
 });
 
+test("stable update delivery requires an explicit packaged channel", () => {
+  const makefile = fs.readFileSync(path.join(repoRoot, "Makefile"), "utf8");
+  const infoPlist = fs.readFileSync(path.join(repoRoot, "Info.plist"), "utf8");
+  const ci = parseYaml(allWorkflows["ci.yml"]);
+  const preflight = parseYaml(workflows["release-preflight.yml"]);
+  const release = parseYaml(workflows["release.yml"]);
+  const localPublisher = fs.readFileSync(
+    path.join(repoRoot, "scripts/publish-release.sh"),
+    "utf8",
+  );
+  const hostedPublisher = fs.readFileSync(
+    path.join(repoRoot, "scripts/publish-hosted-release.sh"),
+    "utf8",
+  );
+
+  assert.match(makefile, /^UPDATE_CHANNEL \?= disabled$/m);
+  assert.match(makefile, /plutil -replace MD2PNGUpdateChannel -string "\$\(UPDATE_CHANNEL\)"/);
+  assert.match(infoPlist, /<key>MD2PNGUpdateChannel<\/key>\s*<string>disabled<\/string>/);
+  assert.equal(ci.jobs.verify.env.UPDATE_CHANNEL, "stable");
+  assert.equal(preflight.jobs.verify.env.UPDATE_CHANNEL, "stable");
+  assert.equal(release.jobs.validate.env.UPDATE_CHANNEL, "stable");
+  assert.equal(release.jobs.sign.env.UPDATE_CHANNEL, "stable");
+  assert.equal(release.jobs.publish.env.UPDATE_CHANNEL, "stable");
+  assert.match(localPublisher, /UPDATE_CHANNEL=stable/);
+  assert.match(hostedPublisher, /Print :MD2PNGUpdateChannel/);
+  assert.match(hostedPublisher, /= "stable"/);
+});
+
 test("Release PR previews and trusted publication applies the issue milestone", () => {
   const prepare = workflows["prepare-release-pr.yml"];
   const publisher = fs.readFileSync(path.join(repoRoot, "scripts/publish-hosted-release.sh"), "utf8");

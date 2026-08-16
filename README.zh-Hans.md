@@ -119,6 +119,7 @@ make app CONFIGURATION=debug \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make verify-dist \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
+  UPDATE_CHANNEL=stable \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
@@ -143,8 +144,9 @@ make run CONFIGURATION=debug \
 状态，而不会提供一个指向缺失文件的“打开”操作。
 
 `PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与更新控件。Debug
-构建会保留已配置的项目链接，但隐藏生产更新控件；带有效 GitHub 项目地址的 Release
-构建使用稳定 GitHub Releases 渠道。源码不包含固定仓库地址。
+构建会保留已配置的项目链接，但隐藏生产更新控件。只有显式打包了
+`UPDATE_CHANNEL=stable` 且带有效 GitHub 项目地址的构建才使用稳定 GitHub Releases
+渠道；缺失、未知和未来新增的渠道值默认禁用。源码不包含固定仓库地址。
 `BUNDLE_IDENTIFIER` 默认读取 `Info.plist` 中的个人标识，也可在构建时覆盖。
 `make verify-dist` 会重新构建 App，检查签名和 arm64 架构，再通过内置
 Markdown、GFM 表格、高亮 Swift 代码和 Mermaid 图执行离线渲染自测；

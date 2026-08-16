@@ -14,12 +14,17 @@ repository owner or path is embedded in source:
 export GH_HOST=github.com
 export GH_REPO=OWNER/REPOSITORY
 export PROJECT_URL="https://${GH_HOST}/${GH_REPO}"
+export UPDATE_CHANNEL=stable
 export BUNDLE_IDENTIFIER=io.github.OWNER.md2png
 ```
 
 `GH_HOST` defaults to `github.com`, but `GH_REPO` is deliberately required for
 publishing. `PROJECT_URL` is written to the packaged app only; if it is omitted
 from a local build, About hides the project and Releases links.
+`UPDATE_CHANNEL=stable` is an independent, explicit trust boundary for public
+stable builds. Missing, unknown, `disabled`, and future values such as
+`nightly` fail closed instead of inheriting the stable endpoint and artifact
+policy.
 `BUNDLE_IDENTIFIER` defaults to the personal value in `Info.plist`
 and may be overridden for any build.
 The build embeds the current Git commit in the packaged app automatically;
@@ -488,13 +493,14 @@ application.
 
 ## In-app update contract
 
-The update status in About uses the packaged `PROJECT_URL` to call the public
-GitHub latest-release API without credentials. Successful responses are cached
-for 24 hours; **Check Again** bypasses that cache while honoring a 60-second
-minimum request interval and GitHub rate-limit retry headers. `Info.plist`
-remains the single version source: `CFBundleShortVersionString` must match the
-stable tag `v${version}`, the changelog section, and the version inside the
-downloadable asset name:
+When the packaged `MD2PNGUpdateChannel` is exactly `stable`, the update status
+in About uses the packaged `PROJECT_URL` to call the public GitHub latest-release
+API without credentials. Successful responses are cached for 24 hours;
+**Check Again** bypasses that cache while honoring a 60-second minimum request
+interval and GitHub rate-limit retry headers. `Info.plist` remains the single
+version source: `CFBundleShortVersionString` must match the stable tag
+`v${version}`, the changelog section, and the version inside the downloadable
+asset name:
 
 ```text
 md2png-${version}-macOS-arm64-developer-id.dmg
@@ -503,8 +509,8 @@ md2png-${version}-macOS-arm64-developer-id.dmg
 The app requires that exact asset to have disk-image content type, positive size,
 an HTTPS GitHub Release download URL, and a `sha256:` digest. The publishing script
 checks those fields after creating the Release. Do not replace the versioned DMG
-with only the `md2png-latest.dmg` alias; the updater deliberately uses immutable,
-version-specific metadata.
+with only the `md2png-latest.dmg` alias; the updater deliberately requires the
+version-specific asset and its verified metadata.
 
 The successful in-app flow shows the available version before any download.
 Only **Download Update** downloads and verifies the DMG and asks macOS to open
@@ -512,11 +518,13 @@ it. Installation remains manual: the user drags md2png into Applications. There
 is no embedded GitHub credential, privileged helper, silent replacement, or
 automatic relaunch.
 
-For a local end-to-end update test, keep the source version unchanged and run:
+For an explicit local end-to-end stable update test, keep the source version
+unchanged and run a Release build:
 
 ```sh
-make run CONFIGURATION=debug \
+make run CONFIGURATION=release \
   PROJECT_URL=https://github.com/guangyya/md2png \
+  UPDATE_CHANNEL=stable \
   TEST_UPDATE_VERSION=0.0.0
 ```
 
@@ -524,12 +532,20 @@ The override changes only the packaged app before ad-hoc signing. The publish
 target rejects it so it cannot alter a public release version.
 
 To review deterministic About layouts without consuming a GitHub API request,
-add one of `TEST_UPDATE_STATE=up-to-date`, `check-failed`, `download-failed`, or
-`ready-to-install`
-to that Debug `make run` command. The mock key is written only to the packaged
-Debug app; both the Make target and release script reject it for publication.
-The download-related mocks use the immutable published v0.1.0 asset metadata,
-so retry actions exercise the real download and verification path. The
-`ready-to-install` state requires that verified DMG in the update cache; when it
-has been removed, the mock shows the recoverable download failure instead of a
-ready action pointing at a missing file.
+use a Debug build with `UPDATE_CHANNEL=disabled` and add one of
+`TEST_UPDATE_STATE=up-to-date`, `check-failed`, `download-failed`, or
+`ready-to-install`:
+
+```sh
+make run CONFIGURATION=debug \
+  PROJECT_URL=https://github.com/guangyya/md2png \
+  UPDATE_CHANNEL=disabled \
+  TEST_UPDATE_VERSION=0.0.0 \
+  TEST_UPDATE_STATE=up-to-date
+```
+
+The mock key is written only to the packaged Debug app;
+both the Make target and release script reject it for publication. Download
+fixtures use non-routable metadata, and their check/download/retry actions stay
+disabled. A missing ready fixture shows a display-only recoverable failure
+instead of an action pointing at a missing file.

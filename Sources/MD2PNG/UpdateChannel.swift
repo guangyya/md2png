@@ -23,14 +23,17 @@ enum AppBuildConfiguration: Equatable, Sendable {
 }
 
 enum UpdateChannel: Equatable, Sendable {
+    static let infoDictionaryKey = "MD2PNGUpdateChannel"
+
     case disabled
     case stableGitHubReleases(repository: GitHubRepository)
 
     static func resolve(
-        buildConfiguration: AppBuildConfiguration,
+        configuredValue: Any?,
         projectURL: URL?
     ) -> UpdateChannel {
-        guard buildConfiguration == .release,
+        guard let configuredValue = configuredValue as? String,
+              configuredValue == "stable",
               let projectURL,
               let repository = GitHubRepository(projectURL: projectURL) else {
             return .disabled
@@ -40,7 +43,7 @@ enum UpdateChannel: Equatable, Sendable {
 
     static func current(bundle: Bundle = .main) -> UpdateChannel {
         resolve(
-            buildConfiguration: .current,
+            configuredValue: bundle.object(forInfoDictionaryKey: infoDictionaryKey),
             projectURL: ProjectLinks.projectURL(bundle: bundle)
         )
     }
