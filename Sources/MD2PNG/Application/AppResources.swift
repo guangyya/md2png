@@ -12,25 +12,65 @@ enum ExampleKind: Int, CaseIterable {
     case gantt
 
     var menuTitle: String {
+        menuTitle(localizationBundle: nil)
+    }
+
+    func menuTitle(localizationBundle: Bundle?) -> String {
         switch self {
         case .short:
-            return L10n.text("example.short", defaultValue: "Short Sample")
+            return L10n.text(
+                "example.short",
+                defaultValue: "Short Sample",
+                bundle: localizationBundle
+            )
         case .long:
-            return L10n.text("example.long", defaultValue: "Long Sample")
+            return L10n.text(
+                "example.long",
+                defaultValue: "Long Sample",
+                bundle: localizationBundle
+            )
         case .formatting:
-            return L10n.text("example.formatting", defaultValue: "Formatting")
+            return L10n.text(
+                "example.formatting",
+                defaultValue: "Formatting",
+                bundle: localizationBundle
+            )
         case .code:
-            return L10n.text("example.code", defaultValue: "Code Blocks")
+            return L10n.text(
+                "example.code",
+                defaultValue: "Code Blocks",
+                bundle: localizationBundle
+            )
         case .checklist:
-            return L10n.text("example.checklist", defaultValue: "Checklist")
+            return L10n.text(
+                "example.checklist",
+                defaultValue: "Checklist",
+                bundle: localizationBundle
+            )
         case .table:
-            return L10n.text("example.table", defaultValue: "GFM Table")
+            return L10n.text(
+                "example.table",
+                defaultValue: "GFM Table",
+                bundle: localizationBundle
+            )
         case .flowchart:
-            return L10n.text("example.flowchart", defaultValue: "Flowchart")
+            return L10n.text(
+                "example.flowchart",
+                defaultValue: "Flowchart",
+                bundle: localizationBundle
+            )
         case .sequence:
-            return L10n.text("example.sequence", defaultValue: "Sequence Diagram")
+            return L10n.text(
+                "example.sequence",
+                defaultValue: "Sequence Diagram",
+                bundle: localizationBundle
+            )
         case .gantt:
-            return L10n.text("example.gantt", defaultValue: "Gantt Timeline")
+            return L10n.text(
+                "example.gantt",
+                defaultValue: "Gantt Timeline",
+                bundle: localizationBundle
+            )
         }
     }
 

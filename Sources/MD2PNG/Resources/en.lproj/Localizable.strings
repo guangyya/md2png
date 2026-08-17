@@ -86,10 +86,13 @@
 "welcome.subtitle" = "A private, local workflow in three simple steps.";
 "welcome.step.copy.title" = "Copy Markdown";
 "welcome.step.copy.detail" = "Copy Markdown text in any app.";
+"welcome.step.copy.completion_detail" = "Copy in any app";
 "welcome.step.render.title" = "Render it";
 "welcome.step.render.detail" = "Use the global shortcut or choose Render Clipboard as Image from the menu bar.";
+"welcome.step.render.completion_detail" = "Render locally";
 "welcome.step.paste.title" = "Paste the PNG";
 "welcome.step.paste.detail" = "Press Command-V, review the image, and send it yourself.";
+"welcome.step.paste.completion_detail" = "Review, then send";
 "welcome.shortcuts" = "Global shortcuts";
 "welcome.shortcut_verification_help" = "Press a shortcut here to test it without running the command.";
 "welcome.shortcut_ready" = "Ready";

@@ -7,6 +7,15 @@ private enum WelcomeDemoPalette {
     static let pink = Color(red: 0.94, green: 0.28, blue: 0.62)
 }
 
+enum WelcomeWorkflowLayout {
+    static let replayButtonSize: CGFloat = 26
+    static let replayButtonInset: CGFloat = 9
+    static let stageWidth: CGFloat = 128
+    static let stageOffset: CGFloat = 154
+    static let trackHeight: CGFloat = 70
+    static let shortcutVerticalOffset: CGFloat = 20
+}
+
 enum WelcomeWorkflowPhase: Int, CaseIterable, Equatable {
     case copy
     case render
@@ -18,11 +27,17 @@ struct WelcomeAnimationProgress: Equatable {
     let cardTravel: CGFloat
     let keyPress: CGFloat
     let imageReveal: CGFloat
-    let pastePrompt: CGFloat
-    let activityOpacity: CGFloat
     let detailIndex: Int
+    let showsCompletedJourney: Bool
 
     static let reducedMotion = WelcomeAnimationProgress(phase: .complete)
+
+    func shortcutOpacity(for phase: WelcomeWorkflowPhase) -> CGFloat {
+        if showsCompletedJourney {
+            return phase == .complete ? 0 : 1
+        }
+        return phase.rawValue == detailIndex ? 1 : 0
+    }
 
     init(phase: WelcomeWorkflowPhase) {
         switch phase {
@@ -30,30 +45,105 @@ struct WelcomeAnimationProgress: Equatable {
             cardTravel = -1
             keyPress = 0
             imageReveal = 0
-            pastePrompt = 0
-            activityOpacity = 1
             detailIndex = 0
+            showsCompletedJourney = false
         case .render:
             cardTravel = 0
             keyPress = 1
             imageReveal = 0.56
-            pastePrompt = 0
-            activityOpacity = 1
             detailIndex = 1
+            showsCompletedJourney = false
         case .paste:
             cardTravel = 1
             keyPress = 0
             imageReveal = 1
-            pastePrompt = 1
-            activityOpacity = 1
             detailIndex = 2
+            showsCompletedJourney = false
         case .complete:
             cardTravel = 1
             keyPress = 0
             imageReveal = 1
-            pastePrompt = 0.72
-            activityOpacity = 0.82
             detailIndex = 2
+            showsCompletedJourney = true
+        }
+    }
+}
+
+struct WelcomeCompletedJourneyStage: Equatable, Identifiable {
+    let phase: WelcomeWorkflowPhase
+    let cardOffset: CGFloat
+    let shortcutKeys: [String]
+
+    var id: Int { phase.rawValue }
+    var progress: WelcomeAnimationProgress { WelcomeAnimationProgress(phase: phase) }
+
+    static let all = [
+        WelcomeCompletedJourneyStage(
+            phase: .copy,
+            cardOffset: -WelcomeWorkflowLayout.stageOffset,
+            shortcutKeys: ["⌘", "C"]
+        ),
+        WelcomeCompletedJourneyStage(
+            phase: .render,
+            cardOffset: 0,
+            shortcutKeys: ["⌃", "⌘", "X"]
+        ),
+        WelcomeCompletedJourneyStage(
+            phase: .paste,
+            cardOffset: WelcomeWorkflowLayout.stageOffset,
+            shortcutKeys: ["⌘", "V"]
+        )
+    ]
+}
+
+struct WelcomeCardMotion: Equatable {
+    let rotation: Double
+    let scale: CGFloat
+    let verticalOffset: CGFloat
+    let activityShadowOpacity: Double
+    let copyGlowOpacity: Double
+
+    init(
+        progress: WelcomeAnimationProgress,
+        copyEmphasis: CGFloat,
+        isSettled: Bool
+    ) {
+        if isSettled {
+            rotation = 0
+            scale = 1
+            verticalOffset = 0
+            activityShadowOpacity = 0.12
+            copyGlowOpacity = 0
+        } else {
+            rotation = sin(Double(progress.imageReveal) * .pi) * 9
+            scale = 1 + 0.045 * progress.keyPress + 0.06 * copyEmphasis
+            verticalOffset = -3 * copyEmphasis
+            activityShadowOpacity = 0.12 + 0.18 * Double(progress.keyPress)
+            copyGlowOpacity = 0.3 * Double(copyEmphasis)
+        }
+    }
+}
+
+struct WelcomeShortcutContrastStyle: Equatable {
+    let tintOpacity: Double
+    let containerBorderOpacity: Double
+    let containerBorderWidth: CGFloat
+    let keyBorderOpacity: Double
+    let keyBorderWidth: CGFloat
+
+    init(contrast: ColorSchemeContrast) {
+        if contrast == .increased {
+            tintOpacity = 0.2
+            containerBorderOpacity = 0.55
+            containerBorderWidth = 1.2
+            keyBorderOpacity = 0.62
+            keyBorderWidth = 1.2
+        } else {
+            tintOpacity = 0.12
+            containerBorderOpacity = 0.26
+            containerBorderWidth = 0.8
+            keyBorderOpacity = 0.34
+            keyBorderWidth = 0.8
         }
     }
 }
@@ -62,20 +152,36 @@ struct WelcomeWorkflowDemo: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase = WelcomeWorkflowPhase.copy
     @State private var sequenceID = 0
+    @State private var copyEmphasis: CGFloat = 0
 
     let copy: WelcomeCopy
 
     var body: some View {
-        WelcomeWorkflowScene(
-            copy: copy,
-            progress: reduceMotion
-                ? .reducedMotion
-                : WelcomeAnimationProgress(phase: phase)
-        )
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
+        ZStack(alignment: .topTrailing) {
+            WelcomeWorkflowScene(
+                copy: copy,
+                progress: reduceMotion
+                    ? .reducedMotion
+                    : WelcomeAnimationProgress(phase: phase),
+                copyEmphasis: reduceMotion ? 0 : copyEmphasis
+            )
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(copy.copyStepTitle). \(copy.renderStepTitle). \(copy.pasteStepTitle)."
+            )
+
+            WelcomeReplayButton(label: copy.replayDemo, action: replay)
+                .frame(
+                    width: WelcomeWorkflowLayout.replayButtonSize,
+                    height: WelcomeWorkflowLayout.replayButtonSize
+                )
+                .background(.thinMaterial, in: Circle())
+                .padding(WelcomeWorkflowLayout.replayButtonInset)
+        }
         .frame(maxWidth: .infinity)
-        .frame(height: 156)
+        .frame(minHeight: 156)
         .background(
             LinearGradient(
                 colors: [
@@ -102,26 +208,7 @@ struct WelcomeWorkflowDemo: View {
                     lineWidth: 0.7
                 )
         }
-        .overlay(alignment: .topTrailing) {
-            Button(action: replay) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
-                    .background(.thinMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .help(L10n.text(
-                "welcome.replay_demo",
-                defaultValue: "Replay workflow demo"
-            ))
-            .padding(9)
-        }
         .shadow(color: WelcomeDemoPalette.violet.opacity(0.07), radius: 10, y: 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "\(copy.copyStepTitle). \(copy.renderStepTitle). \(copy.pasteStepTitle)."
-        )
         .task(id: sequenceID) {
             await runSequence()
         }
@@ -131,10 +218,19 @@ struct WelcomeWorkflowDemo: View {
     private func runSequence() async {
         if reduceMotion {
             phase = .complete
+            copyEmphasis = 0
             return
         }
 
-        guard await pause(nanoseconds: 900_000_000) else { return }
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.56)) {
+            copyEmphasis = 1
+        }
+        guard await pause(nanoseconds: 360_000_000) else { return }
+        withAnimation(.easeOut(duration: 0.24)) {
+            copyEmphasis = 0
+        }
+
+        guard await pause(nanoseconds: 540_000_000) else { return }
         withAnimation(.spring(response: 0.58, dampingFraction: 0.8)) {
             phase = .render
         }
@@ -155,6 +251,7 @@ struct WelcomeWorkflowDemo: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             phase = reduceMotion ? .complete : .copy
+            copyEmphasis = 0
         }
         sequenceID += 1
     }
@@ -169,43 +266,131 @@ struct WelcomeWorkflowDemo: View {
     }
 }
 
+struct WelcomeReplayButton: NSViewRepresentable {
+    static let identifier = NSUserInterfaceItemIdentifier("WelcomeReplayButton")
+
+    let label: String
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton()
+        button.identifier = Self.identifier
+        button.title = ""
+        button.image = NSImage(
+            systemSymbolName: "arrow.clockwise",
+            accessibilityDescription: nil
+        )
+        button.imagePosition = .imageOnly
+        button.isBordered = false
+        button.focusRingType = .default
+        button.setAccessibilityElement(true)
+        button.setAccessibilityRole(.button)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.performAction)
+        button.keyEquivalent = "r"
+        button.keyEquivalentModifierMask = [.command]
+        update(button)
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        context.coordinator.action = action
+        update(button)
+    }
+
+    private func update(_ button: NSButton) {
+        button.toolTip = label
+        button.setAccessibilityLabel(label)
+        button.setAccessibilityHelp(label)
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        @objc func performAction() {
+            action()
+        }
+    }
+}
+
 private struct WelcomeWorkflowScene: View {
     let copy: WelcomeCopy
     let progress: WelcomeAnimationProgress
+    let copyEmphasis: CGFloat
 
     var body: some View {
         VStack(spacing: 7) {
-            HStack(spacing: 8) {
+            ZStack {
                 WelcomeStageLabel(
                     title: copy.copyStepTitle,
                     symbol: "doc.on.doc.fill",
                     color: WelcomeDemoPalette.cyan,
-                    isActive: progress.detailIndex == 0
+                    isActive: progress.showsCompletedJourney || progress.detailIndex == 0
                 )
+                .frame(width: WelcomeWorkflowLayout.stageWidth)
+                .offset(x: -WelcomeWorkflowLayout.stageOffset)
                 WelcomeStageLabel(
                     title: copy.renderStepTitle,
                     symbol: "command",
                     color: WelcomeDemoPalette.violet,
-                    isActive: progress.detailIndex == 1
+                    isActive: progress.showsCompletedJourney || progress.detailIndex == 1
                 )
+                .frame(width: WelcomeWorkflowLayout.stageWidth)
                 WelcomeStageLabel(
                     title: copy.pasteStepTitle,
                     symbol: "photo.fill",
                     color: WelcomeDemoPalette.pink,
-                    isActive: progress.detailIndex == 2
+                    isActive: progress.showsCompletedJourney || progress.detailIndex == 2
                 )
+                .frame(width: WelcomeWorkflowLayout.stageWidth)
+                .offset(x: WelcomeWorkflowLayout.stageOffset)
             }
+            .frame(maxWidth: .infinity)
 
-            WelcomeTransformTrack(progress: progress)
+            WelcomeTransformTrack(progress: progress, copyEmphasis: copyEmphasis)
 
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, minHeight: 16)
-                .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
+            Group {
+                if progress.showsCompletedJourney {
+                    completedDetails
+                } else {
+                    Text(detail)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 16)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
+            .animation(.easeInOut(duration: 0.22), value: progress.showsCompletedJourney)
         }
+    }
+
+    private var completedDetails: some View {
+        ZStack {
+            completionDetail(copy.copyStepCompletionDetail)
+                .offset(x: -WelcomeWorkflowLayout.stageOffset)
+            completionDetail(copy.renderStepCompletionDetail)
+            completionDetail(copy.pasteStepCompletionDetail)
+                .offset(x: WelcomeWorkflowLayout.stageOffset)
+        }
+        .frame(maxWidth: .infinity, minHeight: 16)
+    }
+
+    private func completionDetail(_ text: String) -> some View {
+        Text(text)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .frame(width: WelcomeWorkflowLayout.stageWidth)
     }
 
     private var detail: String {
@@ -229,7 +414,8 @@ private struct WelcomeStageLabel: View {
     var body: some View {
         Label(title, systemImage: symbol)
             .font(.caption.weight(.semibold))
-            .lineLimit(1)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(isActive ? color : .secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -247,6 +433,7 @@ private struct WelcomeStageLabel: View {
 
 private struct WelcomeTransformTrack: View {
     let progress: WelcomeAnimationProgress
+    let copyEmphasis: CGFloat
 
     var body: some View {
         ZStack {
@@ -263,26 +450,43 @@ private struct WelcomeTransformTrack: View {
             }
             .frame(width: 358)
 
-            WelcomeTransformCard(progress: progress)
-                .offset(x: 154 * progress.cardTravel)
+            ForEach(WelcomeCompletedJourneyStage.all) { stage in
+                WelcomeTransformCard(progress: stage.progress, isSettled: true)
+                    .offset(x: stage.cardOffset)
+                    .opacity(progress.showsCompletedJourney ? 1 : 0)
+                    .scaleEffect(progress.showsCompletedJourney ? 1 : 0.92)
+            }
 
-            WelcomeShortcutBadge()
-                .offset(y: 28)
-                .opacity(progress.keyPress)
-                .scaleEffect(0.78 + 0.22 * progress.keyPress)
+            WelcomeTransformCard(progress: progress, copyEmphasis: copyEmphasis)
+                .offset(x: WelcomeWorkflowLayout.stageOffset * progress.cardTravel)
+                .opacity(progress.showsCompletedJourney ? 0 : 1)
 
-            Text("⌘V")
-                .font(.system(.caption, design: .rounded).weight(.bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(WelcomeDemoPalette.pink, in: Capsule())
-                .shadow(color: WelcomeDemoPalette.pink.opacity(0.28), radius: 6, y: 2)
-                .offset(x: 204, y: -25 - 5 * progress.pastePrompt)
-                .opacity(progress.pastePrompt * progress.activityOpacity)
-                .scaleEffect(0.78 + 0.22 * progress.pastePrompt)
+            ForEach(WelcomeCompletedJourneyStage.all) { stage in
+                let shortcutOpacity = progress.shortcutOpacity(for: stage.phase)
+                WelcomeShortcutBadge(
+                    keys: stage.shortcutKeys,
+                    color: shortcutColor(for: stage.phase)
+                )
+                .offset(
+                    x: stage.cardOffset,
+                    y: WelcomeWorkflowLayout.shortcutVerticalOffset
+                )
+                .opacity(shortcutOpacity)
+                .scaleEffect(0.78 + 0.22 * shortcutOpacity)
+            }
         }
-        .frame(height: 70)
+        .frame(height: WelcomeWorkflowLayout.trackHeight)
+    }
+
+    private func shortcutColor(for phase: WelcomeWorkflowPhase) -> Color {
+        switch phase {
+        case .copy:
+            WelcomeDemoPalette.cyan
+        case .render:
+            WelcomeDemoPalette.violet
+        case .paste, .complete:
+            WelcomeDemoPalette.pink
+        }
     }
 }
 
@@ -301,9 +505,15 @@ private struct WelcomeTrackNode: View {
 
 private struct WelcomeTransformCard: View {
     let progress: WelcomeAnimationProgress
+    var isSettled = false
+    var copyEmphasis: CGFloat = 0
 
-    private var flipAngle: Double {
-        sin(Double(progress.imageReveal) * .pi) * 9
+    private var motion: WelcomeCardMotion {
+        WelcomeCardMotion(
+            progress: progress,
+            copyEmphasis: copyEmphasis,
+            isSettled: isSettled
+        )
     }
 
     var body: some View {
@@ -331,13 +541,19 @@ private struct WelcomeTransformCard: View {
                     lineWidth: 0.8
                 )
         }
-        .frame(width: 128, height: 62)
-        .rotation3DEffect(.degrees(flipAngle), axis: (x: 0, y: 1, z: 0))
-        .scaleEffect(1 + 0.045 * progress.keyPress)
+        .frame(width: WelcomeWorkflowLayout.stageWidth, height: 62)
+        .rotation3DEffect(.degrees(motion.rotation), axis: (x: 0, y: 1, z: 0))
+        .scaleEffect(motion.scale)
+        .offset(y: motion.verticalOffset)
         .shadow(
-            color: WelcomeDemoPalette.violet.opacity(0.12 + 0.18 * progress.keyPress),
+            color: WelcomeDemoPalette.violet.opacity(motion.activityShadowOpacity),
             radius: 9,
             y: 4
+        )
+        .shadow(
+            color: WelcomeDemoPalette.cyan.opacity(motion.copyGlowOpacity),
+            radius: 12,
+            y: 2
         )
         .overlay(alignment: .topTrailing) {
             Image(systemName: progress.imageReveal > 0.8 ? "photo.fill" : "doc.text.fill")
@@ -387,21 +603,51 @@ private struct WelcomePNGFace: View {
 }
 
 private struct WelcomeShortcutBadge: View {
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    let keys: [String]
+    let color: Color
+
+    private var style: WelcomeShortcutContrastStyle {
+        WelcomeShortcutContrastStyle(contrast: colorSchemeContrast)
+    }
+
     var body: some View {
         HStack(spacing: 3) {
-            ForEach(["⌃", "⌘", "X"], id: \.self) { key in
+            ForEach(keys, id: \.self) { key in
                 Text(key)
                     .font(.system(.caption2, design: .rounded).weight(.bold))
+                    .foregroundStyle(Color(nsColor: .labelColor))
                     .frame(width: 18, height: 18)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 4))
+                    .background(
+                        Color(nsColor: .controlBackgroundColor),
+                        in: RoundedRectangle(cornerRadius: 4)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(
+                                Color(nsColor: .labelColor).opacity(style.keyBorderOpacity),
+                                lineWidth: style.keyBorderWidth
+                            )
+                    }
             }
         }
         .padding(4)
-        .background(WelcomeDemoPalette.violet.opacity(0.2), in: Capsule())
-        .overlay {
-            Capsule().stroke(WelcomeDemoPalette.violet.opacity(0.45), lineWidth: 0.7)
+        .background {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(color.opacity(style.tintOpacity))
+                }
         }
-        .shadow(color: WelcomeDemoPalette.violet.opacity(0.25), radius: 6, y: 2)
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(
+                Color(nsColor: .labelColor).opacity(style.containerBorderOpacity),
+                lineWidth: style.containerBorderWidth
+            )
+        }
+        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
     }
 }
 

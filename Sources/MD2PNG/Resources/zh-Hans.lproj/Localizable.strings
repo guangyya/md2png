@@ -86,10 +86,13 @@
 "welcome.subtitle" = "三步完成，内容始终在本机处理。";
 "welcome.step.copy.title" = "复制 Markdown";
 "welcome.step.copy.detail" = "在任意应用中复制 Markdown 文本。";
+"welcome.step.copy.completion_detail" = "在任意应用中复制";
 "welcome.step.render.title" = "渲染图片";
 "welcome.step.render.detail" = "使用全局快捷键，或从菜单栏选择“将剪贴板渲染为图片”。";
+"welcome.step.render.completion_detail" = "在本机渲染";
 "welcome.step.paste.title" = "粘贴 PNG";
 "welcome.step.paste.detail" = "按 Command-V 粘贴，检查图片后再自行发送。";
+"welcome.step.paste.completion_detail" = "检查后再发送";
 "welcome.shortcuts" = "全局快捷键";
 "welcome.shortcut_verification_help" = "在此按下快捷键即可测试，不会执行对应命令。";
 "welcome.shortcut_ready" = "可用";
