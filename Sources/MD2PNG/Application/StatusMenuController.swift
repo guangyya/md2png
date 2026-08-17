@@ -1,6 +1,6 @@
 import AppKit
 
-struct StatusItemPresentation {
+struct StatusItemPresentation: Equatable {
     let symbolName: String?
     let accessibilityLabel: String
 }

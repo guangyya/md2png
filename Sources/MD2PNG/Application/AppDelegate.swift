@@ -92,6 +92,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.show(lastRender)
         }
     )
+    private lazy var updateStatusPresenter = UpdateStatusPresenter(
+        showHUD: { [weak self] message, symbol, style in
+            self?.hud.show(message, symbol: symbol, style: style)
+        },
+        applyStatusItem: { [weak self] presentation in
+            self?.statusMenuController?.applyStatusItem(presentation)
+        },
+        isAboutVisible: { [weak self] in
+            self?.aboutController.window?.isVisible == true
+        },
+        announce: { [weak self] message in
+            guard let button = self?.statusMenuController?.button else { return }
+            NSAccessibility.post(
+                element: button,
+                notification: .announcementRequested,
+                userInfo: [
+                    .announcement: message,
+                    .priority: NSAccessibilityPriorityLevel.medium.rawValue
+                ]
+            )
+        }
+    )
 
     private var statusMenuController: StatusMenuController?
     private var hotKey: GlobalHotKey?
@@ -99,7 +121,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clipboardContainsMarkdown = false
     private var isSampleGuidePresentationScheduled = false
     private var isWaitingForUpdateDeferralBeforeTermination = false
-    private var currentUpdateStatus = UpdateStatus()
     private var updateStatusObserverID: UUID?
     private var isPreviewWindowVisible = false
     private var isWelcomeWindowVisible = false
@@ -122,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
-        presentRelaunchResultIfNeeded()
+        updateStatusPresenter.presentRelaunchResultIfNeeded()
 
         let registrations: [GlobalHotKey.Registration] = [
             .render { [weak self] in self?.globalShortcutRouter.handle(.render) },
@@ -238,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateLaunchAtLoginMenu()
 
         updateStatusObserverID = updateController.observeStatus { [weak self] status in
-            self?.applyUpdateStatus(status)
+            self?.updateStatusPresenter.apply(status)
         }
     }
 
@@ -259,7 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             isRendering: state.isRendering,
             isUpdateInstallPending: state.isUpdateInstallPending
         )))
-        updateStatusItemAppearance()
+        updateStatusPresenter.apply(state)
     }
 
     private func refreshClipboardMenuState() {
@@ -499,301 +520,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderCoordinator.setUpdateInstallPending(isPending)
     }
 
-    private func presentRelaunchResultIfNeeded() {
-        let runningVersion = Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? ""
-        guard let result = UpdateRelaunchMarker().reconcile(
-            runningVersion: runningVersion
-        ) else {
-            return
-        }
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            switch result {
-            case let .updated(version):
-                self.hud.show(
-                    L10n.format(
-                        "update.updated_to_version",
-                        defaultValue: "Updated to version %@",
-                        version
-                    ),
-                    symbol: "checkmark.circle.fill"
-                )
-            case let .notUpdated(expectedVersion, runningVersion):
-                self.hud.show(
-                    L10n.format(
-                        "update.relaunch_not_updated",
-                        defaultValue: "Update to %1$@ did not complete — still running %2$@. Open About md2png to retry.",
-                        expectedVersion,
-                        runningVersion
-                    ),
-                    symbol: "exclamationmark.triangle.fill",
-                    style: .error
-                )
-            }
-        }
-    }
-
-    private func applyUpdateStatus(_ status: UpdateStatus) {
-        let previousStatus = currentUpdateStatus
-        currentUpdateStatus = status
-        updateStatusItemAppearance()
-        guard previousStatus.phase != status.phase else { return }
-        presentUpdateTransition(from: previousStatus.phase, to: status.phase)
-    }
-
-    private func presentUpdateTransition(
-        from previousPhase: UpdatePhase,
-        to phase: UpdatePhase
-    ) {
-        switch phase {
-        case .unknown:
-            break
-        case let .upToDate(version):
-            announceUpdate(L10n.format(
-                "update.accessibility.up_to_date",
-                defaultValue: "md2png %@ is up to date.",
-                version.description
-            ))
-        case .runningNewerVersion:
-            announceUpdate(L10n.text(
-                "update.accessibility.running_newer",
-                defaultValue: "This md2png build is newer than the latest published version."
-            ))
-        case let .sparkleUpdateAvailable(update):
-            announceUpdate(L10n.format(
-                "update.accessibility.available",
-                defaultValue: "md2png %@ is available.",
-                update.displayVersion
-            ))
-        case let .sparkleDownloading(update, _):
-            if case .sparkleDownloading = previousPhase { return }
-            announceUpdate(L10n.format(
-                "update.accessibility.downloading",
-                defaultValue: "Downloading md2png %@.",
-                update.displayVersion
-            ))
-        case let .sparkleExtracting(update, _):
-            announceUpdate(L10n.format(
-                "update.accessibility.preparing",
-                defaultValue: "Preparing md2png %@ for installation.",
-                update.displayVersion
-            ))
-        case let .sparkleReadyToInstall(update):
-            let message = L10n.format(
-                "update.accessibility.ready_to_relaunch",
-                defaultValue: "md2png %@ is ready to install and relaunch.",
-                update.displayVersion
-            )
-            if aboutController.window?.isVisible != true {
-                hud.show(message, symbol: "arrow.down.app.fill")
-            }
-            announceUpdate(message)
-        case let .sparkleInstalling(update):
-            announceUpdate(L10n.format(
-                "update.accessibility.installing",
-                defaultValue: "Installing md2png %@ and relaunching.",
-                update.displayVersion
-            ))
-        case let .sparkleFailed(message, _):
-            if previousPhase.isDownloadActive,
-               aboutController.window?.isVisible != true {
-                let recoveryMessage = L10n.format(
-                    "update.hud.failed",
-                    defaultValue: "%@ Open About md2png to retry.",
-                    message
-                )
-                hud.show(
-                    recoveryMessage,
-                    symbol: "exclamationmark.triangle.fill",
-                    style: .error
-                )
-            }
-            announceUpdate(message)
-        case let .updateAvailable(update):
-            if previousPhase.isDownloadActive {
-                let message = L10n.text(
-                    "update.accessibility.cancelled",
-                    defaultValue: "Update cancelled"
-                )
-                if aboutController.window?.isVisible != true {
-                    hud.show(message, symbol: "xmark.circle.fill")
-                }
-                announceUpdate(message)
-            } else {
-                announceUpdate(L10n.format(
-                    "update.accessibility.available",
-                    defaultValue: "md2png %@ is available.",
-                    update.version.description
-                ))
-            }
-        case let .downloading(update, _):
-            if case .downloading = previousPhase { return }
-            announceUpdate(L10n.format(
-                "update.accessibility.downloading",
-                defaultValue: "Downloading md2png %@.",
-                update.version.description
-            ))
-        case let .verifying(update):
-            announceUpdate(L10n.format(
-                "update.accessibility.verifying",
-                defaultValue: "Verifying md2png %@.",
-                update.version.description
-            ))
-        case let .opening(update):
-            announceUpdate(L10n.format(
-                "update.accessibility.opening",
-                defaultValue: "Opening md2png %@.",
-                update.version.description
-            ))
-        case let .readyToInstall(update, _):
-            let message = L10n.format(
-                "update.accessibility.ready",
-                defaultValue: "md2png %@ DMG opened — drag it into Applications",
-                update.version.description
-            )
-            if aboutController.window?.isVisible != true {
-                hud.show(message, symbol: "arrow.down.app.fill")
-            }
-            announceUpdate(message)
-        case let .failed(message, _, _, _):
-            if previousPhase.isDownloadActive,
-               aboutController.window?.isVisible != true {
-                let recoveryMessage = L10n.format(
-                    "update.hud.failed",
-                    defaultValue: "%@ Open About md2png to retry.",
-                    message
-                )
-                hud.show(
-                    recoveryMessage,
-                    symbol: "exclamationmark.triangle.fill",
-                    style: .error
-                )
-            }
-            announceUpdate(message)
-        }
-    }
-
-    private func updateStatusItemAppearance() {
-        let renderState = renderCoordinator.state
-        let presentation: StatusItemPresentation
-        if renderState.isRendering {
-            presentation = StatusItemPresentation(
-                symbolName: "hourglass",
-                accessibilityLabel: L10n.text(
-                    "accessibility.rendering",
-                    defaultValue: "Rendering"
-                )
-            )
-        } else if renderState.isUpdateInstallPending {
-            presentation = StatusItemPresentation(
-                symbolName: "arrow.triangle.2.circlepath",
-                accessibilityLabel: L10n.text(
-                    "update.install_pending_accessibility",
-                    defaultValue: "md2png — update installation is starting"
-                )
-            )
-        } else {
-            let symbolName: String? = switch currentUpdateStatus.phase {
-            case .sparkleDownloading, .downloading:
-                "arrow.down.circle"
-            case .sparkleExtracting, .verifying:
-                "checkmark.shield"
-            case .sparkleInstalling:
-                "arrow.triangle.2.circlepath"
-            case .opening:
-                "opticaldiscdrive"
-            case .unknown, .upToDate, .runningNewerVersion,
-                 .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleFailed,
-                 .updateAvailable, .readyToInstall, .failed:
-                nil
-            }
-            presentation = StatusItemPresentation(
-                symbolName: symbolName,
-                accessibilityLabel: symbolName == nil
-                    ? L10n.text("accessibility.app", defaultValue: "md2png")
-                    : L10n.format(
-                        "accessibility.update_status",
-                        defaultValue: "md2png — %@",
-                        updateAccessibilityStatus
-                    )
-            )
-        }
-        statusMenuController?.applyStatusItem(presentation)
-    }
-
-    private var updateAccessibilityStatus: String {
-        switch currentUpdateStatus.phase {
-        case let .sparkleDownloading(update, progressPercent):
-            if let progressPercent {
-                return L10n.format(
-                    "about.update_downloading_progress",
-                    defaultValue: "Downloading md2png %1$@ — %2$ld%%",
-                    update.displayVersion,
-                    progressPercent
-                )
-            }
-            return L10n.format(
-                "about.update_downloading_version",
-                defaultValue: "Downloading md2png %@…",
-                update.displayVersion
-            )
-        case let .sparkleExtracting(update, progressPercent):
-            if let progressPercent {
-                return L10n.format(
-                    "about.update_preparing_progress",
-                    defaultValue: "Preparing md2png %1$@ — %2$ld%%",
-                    update.displayVersion,
-                    progressPercent
-                )
-            }
-            return L10n.format(
-                "about.update_preparing_version",
-                defaultValue: "Preparing md2png %@…",
-                update.displayVersion
-            )
-        case let .sparkleInstalling(update):
-            return L10n.format(
-                "about.update_installing_version",
-                defaultValue: "Installing md2png %@…",
-                update.displayVersion
-            )
-        case let .downloading(update, progressPercent):
-            return L10n.format(
-                "about.update_downloading_progress",
-                defaultValue: "Downloading md2png %1$@ — %2$ld%%",
-                update.version.description,
-                progressPercent
-            )
-        case let .verifying(update):
-            return L10n.format(
-                "about.update_verifying_version",
-                defaultValue: "Verifying md2png %@…",
-                update.version.description
-            )
-        case let .opening(update):
-            return L10n.format(
-                "about.update_opening_version",
-                defaultValue: "Opening md2png %@…",
-                update.version.description
-            )
-        case .unknown, .upToDate, .runningNewerVersion,
-             .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleFailed,
-             .updateAvailable, .readyToInstall, .failed:
-            return L10n.text("accessibility.app", defaultValue: "md2png")
-        }
-    }
-
-    private func announceUpdate(_ message: String) {
-        guard let button = statusMenuController?.button else { return }
-        NSAccessibility.post(
-            element: button,
-            notification: .announcementRequested,
-            userInfo: [
-                .announcement: message,
-                .priority: NSAccessibilityPriorityLevel.medium.rawValue
-            ]
-        )
-    }
 }
