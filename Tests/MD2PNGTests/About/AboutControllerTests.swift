@@ -9,6 +9,10 @@ final class AboutControllerTests: XCTestCase {
     @MainActor
     func testAboutWindowHasStructuredLayout() throws {
         _ = NSApplication.shared
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = NSAppearance(named: .aqua)
+        defer { NSApp.appearance = previousAppearance }
+
         let controller = makeAboutController()
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
@@ -69,6 +73,34 @@ final class AboutControllerTests: XCTestCase {
         writeSnapshotIfRequested(
             environmentKey: "MD2PNG_ABOUT_SNAPSHOT_PATH",
             contentView: contentView
+        )
+    }
+
+    @MainActor
+    func testAboutWindowRendersWithDarkAppearance() throws {
+        _ = NSApplication.shared
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        defer { NSApp.appearance = previousAppearance }
+
+        let controller = makeAboutController()
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Changed\n• Dynamic update and changelog surfaces.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(
+            window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]),
+            .darkAqua
+        )
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_ABOUT_DARK_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(window.contentView)
         )
     }
 

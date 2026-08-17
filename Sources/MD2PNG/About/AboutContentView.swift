@@ -68,7 +68,7 @@ struct AboutContentView: View {
 
             Divider()
                 .padding(.horizontal, 28)
-                .padding(.top, 22)
+                .padding(.top, 14)
 
             releaseNotes
 
@@ -135,7 +135,9 @@ struct AboutContentView: View {
                         onSecondaryAction: onSecondaryUpdateAction
                     )
                     .frame(
-                        height: AboutLayout.detailedUpdateHeight,
+                        height: presentation.detail == nil
+                            ? AboutLayout.compactUpdateHeight
+                            : AboutLayout.detailedUpdateHeight,
                         alignment: .top
                     )
                     .padding(.top, 5)
@@ -193,7 +195,7 @@ struct AboutContentView: View {
             }
         }
         .padding(.horizontal, 28)
-        .padding(.top, 20)
+        .padding(.top, 12)
         .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -398,12 +400,12 @@ private struct AboutUpdateCard: View {
             alignment: .topLeading
         )
         .background(
-            Color(nsColor: .separatorColor).opacity(0.07),
+            Color.primary.opacity(0.06),
             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.2), lineWidth: 0.5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
         .help(L10n.text(
             "about.check_for_updates_help",
