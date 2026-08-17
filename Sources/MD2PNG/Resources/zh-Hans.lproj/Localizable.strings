@@ -42,10 +42,9 @@
 "example.sequence" = "时序图";
 "example.gantt" = "甘特时间线";
 
-"hotkey.render" = "渲染（Control-Command-X）";
-"hotkey.show_last_render" = "显示上次渲染（Control-Command-Z）";
-"shortcut.control_command_x" = "Control-Command-X";
-"shortcut.control_command_z" = "Control-Command-Z";
+"hotkey.render_title" = "渲染";
+"hotkey.show_last_render_title" = "显示上次渲染";
+"hotkey.command_format" = "%1$@（%2$@）";
 "hud.shortcut_conflict" = "全局快捷键不可用——请从 md2png 菜单执行同一命令";
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
 "hud.png_copied_again" = "PNG 已再次复制——请按 Command-V 粘贴";
