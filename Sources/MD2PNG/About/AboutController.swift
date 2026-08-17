@@ -58,9 +58,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         window?.contentViewController is NSHostingController<AboutContentView>
     }
     var displayedUpdateCardHeight: CGFloat {
-        contentModel.updatePresentation?.detail == nil
-            ? AboutLayout.compactUpdateHeight
-            : AboutLayout.detailedUpdateHeight
+        AboutLayout.detailedUpdateHeight
     }
     var displayedReleaseNotesRevision: Int { contentModel.releaseNotesRevision }
     var displayedReleaseNotesTitle: String {

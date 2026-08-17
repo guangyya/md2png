@@ -296,7 +296,7 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testAboutUpdateCardKeepsCompactAndDetailedHeightsInHostingBoundary() {
+    func testAboutUpdateCardKeepsStableHeightAcrossStatesInHostingBoundary() {
         _ = NSApplication.shared
         let metadata = AppMetadata(
             version: "0.1.0",
@@ -323,7 +323,7 @@ final class AboutControllerTests: XCTestCase {
         let expandedCardHeight = expandedController.displayedUpdateCardHeight
         let expandedWindowSize = expandedController.window?.contentView?.bounds.size
 
-        XCTAssertEqual(compactCardHeight, AboutLayout.compactUpdateHeight, accuracy: 0.5)
+        XCTAssertEqual(compactCardHeight, AboutLayout.detailedUpdateHeight, accuracy: 0.5)
         XCTAssertEqual(expandedCardHeight, AboutLayout.detailedUpdateHeight, accuracy: 0.5)
         XCTAssertEqual(compactWindowSize, AboutLayout.windowSize)
         XCTAssertEqual(expandedWindowSize, AboutLayout.windowSize)

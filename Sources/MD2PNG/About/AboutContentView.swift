@@ -3,7 +3,6 @@ import SwiftUI
 
 enum AboutLayout {
     static let windowSize = NSSize(width: 560, height: 490)
-    static let compactUpdateHeight: CGFloat = 36
     static let detailedUpdateHeight: CGFloat = 66
     static let updateRowHeight: CGFloat = 18
     static let updateRowFontSize: CGFloat = 12
@@ -135,9 +134,7 @@ struct AboutContentView: View {
                         onSecondaryAction: onSecondaryUpdateAction
                     )
                     .frame(
-                        height: presentation.detail == nil
-                            ? AboutLayout.compactUpdateHeight
-                            : AboutLayout.detailedUpdateHeight,
+                        height: AboutLayout.detailedUpdateHeight,
                         alignment: .top
                     )
                     .padding(.top, 5)
@@ -312,12 +309,6 @@ private struct AboutUpdateCard: View {
     let onPrimaryAction: (AboutUpdatePrimaryAction) -> Void
     let onSecondaryAction: (AboutUpdateSecondaryAction) -> Void
 
-    private var cardHeight: CGFloat {
-        presentation.detail == nil
-            ? AboutLayout.compactUpdateHeight
-            : AboutLayout.detailedUpdateHeight
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: AboutLayout.updateRowSpacing) {
@@ -395,9 +386,9 @@ private struct AboutUpdateCard: View {
         .padding(.bottom, 7)
         .frame(
             maxWidth: .infinity,
-            minHeight: cardHeight,
-            maxHeight: cardHeight,
-            alignment: .topLeading
+            minHeight: AboutLayout.detailedUpdateHeight,
+            maxHeight: AboutLayout.detailedUpdateHeight,
+            alignment: presentation.detail == nil ? .leading : .topLeading
         )
         .background(
             Color.primary.opacity(0.06),
