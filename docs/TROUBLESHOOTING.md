@@ -50,6 +50,12 @@ For known-good inputs, choose **Examples → Flowchart**, **Sequence Diagram**, 
 **Gantt Timeline** from the app. md2png uses the bundled Mermaid version and does
 not load diagram plugins from the network.
 
+After a Mermaid failure, the details dialog identifies the diagram number and a
+nearby Markdown line when available. It also distinguishes an unsupported or
+misspelled diagram type from other Mermaid syntax errors. Choose **Copy Error
+Details** to copy a privacy-safe support summary; the Markdown and raw parser
+message are never included.
+
 ## A code block has no expected highlighting
 
 Add a recognized language after the opening fence, for example `swift`, `json`,
@@ -113,12 +119,17 @@ diagnostic line, the smallest Markdown input that reproduces the issue, and a
 screenshot when appropriate. Remove confidential message content before filing
 a report.
 
-For an intermittent failure, reproduce it and choose **Save Diagnostic Logs…**
-in About. Select **Last Hour** unless the relevant event is older, save the JSON,
-and attach it to the report manually. The export contains privacy-safe
-operational metadata and version/system context; it does not contain Markdown,
-clipboard payloads, rendered images, full paths, or raw error messages. md2png
-never uploads the file automatically.
+For a renderer failure, first choose **About md2png → Diagnostics → Renderer
+Self-Test**. It uses a bundled input and leaves the clipboard untouched. Include
+whether the self-test passed. If an error-details dialog is visible, choose
+**Copy Error Details** and include the copied summary.
+
+For an intermittent failure, reproduce it and choose **About md2png →
+Diagnostics → Save Diagnostic Logs…**. Select **Last Hour** unless the relevant
+event is older, save the JSON, and attach it to the report manually. The export
+contains privacy-safe operational metadata and version/system context; it does
+not contain Markdown, clipboard payloads, rendered images, full paths, or raw
+error messages. md2png never uploads the file automatically.
 
 ## Delete local diagnostic logs
 

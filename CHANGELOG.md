@@ -9,8 +9,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Show actionable renderer error details with Mermaid diagram and Markdown line
+  context, recovery hints, and an explicit privacy-safe Copy Error Details action.
+- Run a bundled renderer self-test from About without reading or changing the
+  clipboard.
 - Save privacy-safe diagnostic logs for the last hour, 24 hours, or 7 days from
-  About, using an explicit local save panel with no automatic upload.
+  About → Diagnostics, using an explicit local save panel with no automatic upload.
 
 ## [0.8.0] - 2026-08-17
 

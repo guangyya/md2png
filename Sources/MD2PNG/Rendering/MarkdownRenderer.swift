@@ -195,15 +195,20 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     contentWorld: .page
                 )
                 guard self.recoveryState.isCurrent(execution) else { return }
-                guard let measurement = value as? [String: Any],
-                      let rawWidth = measurement["width"] as? NSNumber,
-                      let rawHeight = measurement["height"] as? NSNumber else {
+                guard let response = RendererJavaScriptResponse(value) else {
                     self.finish(execution, with: .failure(AppError.invalidRendererResponse))
                     return
                 }
 
-                let width = max(520, Int(ceil(rawWidth.doubleValue)))
-                let height = max(80, Int(ceil(rawHeight.doubleValue)))
+                guard case let .success(rawWidth, rawHeight) = response else {
+                    if case let .failure(failure) = response {
+                        self.finish(execution, with: .failure(failure))
+                    }
+                    return
+                }
+
+                let width = max(520, Int(ceil(rawWidth)))
+                let height = max(80, Int(ceil(rawHeight)))
                 guard width <= 1600, height <= 16_000 else {
                     self.finish(
                         execution,

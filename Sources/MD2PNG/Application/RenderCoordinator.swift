@@ -416,7 +416,10 @@ final class RenderCoordinator {
                     ),
                     error: error
                 )
-                self.onError(error)
+                self.onError(RendererErrorReport(
+                    failure: RendererFailure.from(error),
+                    operationID: operationID
+                ))
             }
         }
     }

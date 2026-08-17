@@ -48,6 +48,9 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(harness.writtenImages.count, 1)
         XCTAssertTrue(harness.writtenMarkdown.isEmpty)
         XCTAssertEqual(harness.errors.count, 1)
+        let report = try XCTUnwrap(harness.errors.first as? RendererErrorReport)
+        XCTAssertEqual(report.failure.kind, .unknown)
+        XCTAssertEqual(report.operationID.rawValue.count, 12)
         XCTAssertTrue(coordinator.state.hasLastSource)
 
         coordinator.showLastRender()

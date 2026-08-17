@@ -40,6 +40,23 @@ final class PackagedRenderSelfTestTests: XCTestCase {
         XCTAssertFalse(PackagedRenderSelfTestResources.validate(markdown: "# Incomplete"))
     }
 
+    func testSelfTestImplementationHasNoClipboardDependency() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "Sources/MD2PNG/Rendering/PackagedRenderSelfTest.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(source.contains("NSPasteboard"))
+        XCTAssertFalse(source.contains("Clipboard."))
+    }
+
     @MainActor
     func testImageValidatorAcceptsPlausiblePNGWithVisibleContent() throws {
         let image = try makeImage(
