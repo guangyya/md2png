@@ -5,6 +5,14 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Re-render the last Markdown with the current Theme and Output Width.
+
+### Changed
+
+- Scan a clearer menu and get more useful success and recovery messages.
+
 ## [0.7.0] - 2026-08-17
 
 ### Added

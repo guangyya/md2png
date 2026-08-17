@@ -97,5 +97,21 @@ final class LastSourceTests: XCTestCase {
             ),
             "其他应用已更改剪贴板。是否用上次的 Markdown 替换当前内容？"
         )
+        XCTAssertEqual(
+            L10n.text(
+                "confirmation.clipboard_changed.rerender",
+                defaultValue: "fallback",
+                bundle: english
+            ),
+            "Another app changed the clipboard. Replace it with a new PNG rendered from the last Markdown?"
+        )
+        XCTAssertEqual(
+            L10n.text(
+                "confirmation.clipboard_changed.rerender",
+                defaultValue: "fallback",
+                bundle: chinese
+            ),
+            "其他应用已更改剪贴板。是否用上次的 Markdown 重新渲染 PNG 并替换当前内容？"
+        )
     }
 }

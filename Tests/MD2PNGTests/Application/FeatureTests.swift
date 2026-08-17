@@ -63,7 +63,7 @@ final class FeatureTests: XCTestCase {
                 1_200,
                 3_400
             ),
-            "渲染内容过大（1200 × 3400）。请尝试缩短内容。"
+            "无法生成 1200 × 3400 的 PNG，剪贴板内容未改变。请缩短 Markdown 后重试。"
         )
 
         let changelog = """
@@ -83,6 +83,35 @@ final class FeatureTests: XCTestCase {
         )
     }
 
+    func testLocalizedFormatArgumentsMatchAndUsePositionsForMultipleValues() throws {
+        let english = try localizationStrings(
+            in: XCTUnwrap(L10n.localizedBundle(for: "en"))
+        )
+        let chinese = try localizationStrings(
+            in: XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+        )
+
+        for key in english.keys.sorted() {
+            let englishTokens = try formatTokens(in: XCTUnwrap(english[key]))
+            let chineseTokens = try formatTokens(in: XCTUnwrap(chinese[key]))
+            XCTAssertEqual(
+                englishTokens.sorted(),
+                chineseTokens.sorted(),
+                "Format arguments differ for \(key)"
+            )
+            if englishTokens.count > 1 {
+                XCTAssertTrue(
+                    englishTokens.allSatisfy { $0.position != nil },
+                    "Multiple values must use positional formats for \(key)"
+                )
+                XCTAssertTrue(
+                    chineseTokens.allSatisfy { $0.position != nil },
+                    "Multiple values must use positional formats for \(key)"
+                )
+            }
+        }
+    }
+
     func testRenderActivityRejectsReentryUntilFinished() {
         var activity = RenderActivityState()
 
@@ -95,7 +124,7 @@ final class FeatureTests: XCTestCase {
     }
 
     @MainActor
-    func testHUDLayoutSupportsTwoLinesAndVisibleFramePlacement() {
+    func testHUDLayoutSupportsMultilineRecoveryAndVisibleFramePlacement() {
         let short = HUDLayout.panelSize(for: "PNG copied")
         let long = HUDLayout.panelSize(for: String(repeating: "A longer error message ", count: 8))
 
@@ -206,12 +235,56 @@ final class FeatureTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testInvalidMermaidReturnsARecoveryMessageInsteadOfWebKitDetails() async throws {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        let result: Result<NSImage, Error> = await withCheckedContinuation { continuation in
+            renderer.render(
+                """
+                ```mermaid
+                flowchart LR
+                    A -->
+                ```
+                """
+            ) { continuation.resume(returning: $0) }
+        }
+
+        guard case let .failure(error) = result,
+              let appError = error as? AppError,
+              case .rendererFailed = appError else {
+            XCTFail("Expected a privacy-safe renderer failure, got \(result)")
+            return
+        }
+        XCTAssertEqual(
+            appError.errorDescription,
+            L10n.text(
+                "error.renderer_failed",
+                defaultValue: "Couldn’t render the Markdown. The clipboard is unchanged. Check the Markdown and try again."
+            )
+        )
+    }
+
     private func localizationStrings(in bundle: Bundle) throws -> [String: String] {
         let url = try XCTUnwrap(bundle.url(forResource: "Localizable", withExtension: "strings"))
         let data = try Data(contentsOf: url)
         return try XCTUnwrap(
             PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String]
         )
+    }
+
+    private func formatTokens(in value: String) throws -> [FormatToken] {
+        let expression = try NSRegularExpression(
+            pattern: #"%(?:(\d+)\$)?(@|ld|d|f)"#
+        )
+        let range = NSRange(value.startIndex..., in: value)
+        return expression.matches(in: value, range: range).map { match in
+            let position = Range(match.range(at: 1), in: value).flatMap {
+                Int(value[$0])
+            }
+            let typeRange = Range(match.range(at: 2), in: value)!
+            return FormatToken(position: position, type: String(value[typeRange]))
+        }
     }
 
     private func containsChromaticSyntaxColor(in image: NSImage) -> Bool {
@@ -233,5 +306,17 @@ final class FeatureTests: XCTestCase {
             }
         }
         return false
+    }
+}
+
+private struct FormatToken: Comparable {
+    let position: Int?
+    let type: String
+
+    static func < (lhs: FormatToken, rhs: FormatToken) -> Bool {
+        if lhs.position != rhs.position {
+            return (lhs.position ?? 0) < (rhs.position ?? 0)
+        }
+        return lhs.type < rhs.type
     }
 }

@@ -89,13 +89,19 @@ final class SystemLaunchAtLoginService: LaunchAtLoginServicing {
 
 enum LaunchAtLoginError: LocalizedError {
     case unavailable
+    case changeFailed
 
     var errorDescription: String? {
         switch self {
         case .unavailable:
             return L10n.text(
                 "error.launch_at_login_unavailable",
-                defaultValue: "Launch at Login is unavailable for this copy of md2png."
+                defaultValue: "Couldn’t change Launch at Login. Open System Settings and update Login Items manually."
+            )
+        case .changeFailed:
+            return L10n.text(
+                "error.launch_at_login_failed",
+                defaultValue: "Couldn’t change Launch at Login. Reopen md2png and try again."
             )
         }
     }
@@ -121,10 +127,18 @@ final class LaunchAtLoginController {
     func performPrimaryAction() throws -> LaunchAtLoginActionResult {
         switch status {
         case .notRegistered, .notFound:
-            try service.register()
+            do {
+                try service.register()
+            } catch {
+                throw LaunchAtLoginError.changeFailed
+            }
             return .statusChanged(status)
         case .enabled:
-            try service.unregister()
+            do {
+                try service.unregister()
+            } catch {
+                throw LaunchAtLoginError.changeFailed
+            }
             return .statusChanged(status)
         case .requiresApproval:
             openSystemSettings()

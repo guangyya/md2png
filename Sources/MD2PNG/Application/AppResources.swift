@@ -20,13 +20,13 @@ enum ExampleKind: Int, CaseIterable {
         case .short:
             return L10n.text(
                 "example.short",
-                defaultValue: "Short Sample",
+                defaultValue: "Short Example",
                 bundle: localizationBundle
             )
         case .long:
             return L10n.text(
                 "example.long",
-                defaultValue: "Long Sample",
+                defaultValue: "Long Example",
                 bundle: localizationBundle
             )
         case .formatting:
@@ -170,7 +170,11 @@ enum AppResources {
         guard let url = exampleURL(for: kind, resourcesURL: Bundle.main.resourceURL) else {
             throw AppError.exampleUnavailable(kind.menuTitle)
         }
-        return try String(contentsOf: url, encoding: .utf8)
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            throw AppError.exampleUnavailable(kind.menuTitle)
+        }
     }
 
     static func aboutChangelogURL(

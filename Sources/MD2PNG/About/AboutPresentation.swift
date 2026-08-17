@@ -215,7 +215,7 @@ struct AboutUpdatePresentation: Equatable {
                 tint: .blue,
                 title: L10n.format(
                     "about.update_available_transition",
-                    defaultValue: "Update available · %@ → %@",
+                    defaultValue: "Update available · %1$@ → %2$@",
                     bundle: localizationBundle,
                     update.installedVersion,
                     update.displayVersion
@@ -245,7 +245,7 @@ struct AboutUpdatePresentation: Equatable {
             let title = progressPercent.map {
                 L10n.format(
                     "about.update_downloading_progress",
-                    defaultValue: "Downloading md2png %@ — %ld%%",
+                    defaultValue: "Downloading md2png %1$@ — %2$ld%%",
                     bundle: localizationBundle,
                     update.displayVersion,
                     $0
@@ -283,7 +283,7 @@ struct AboutUpdatePresentation: Equatable {
             let title = progressPercent.map {
                 L10n.format(
                     "about.update_preparing_progress",
-                    defaultValue: "Preparing md2png %@ — %ld%%",
+                    defaultValue: "Preparing md2png %1$@ — %2$ld%%",
                     bundle: localizationBundle,
                     update.displayVersion,
                     $0
@@ -324,7 +324,7 @@ struct AboutUpdatePresentation: Equatable {
                 ),
                 detail: L10n.text(
                     "about.update_relaunch_memory_detail",
-                    defaultValue: "Relaunch clears Last Render and Last Source. The clipboard is unchanged.",
+                    defaultValue: "Relaunch clears Last Render and Last Markdown. The clipboard is unchanged.",
                     bundle: localizationBundle
                 ),
                 primaryAction: AboutUpdateActionPresentation(
@@ -443,7 +443,7 @@ struct AboutUpdatePresentation: Equatable {
                 symbolName: "arrow.down.circle",
                 title: L10n.format(
                     "about.update_downloading_progress",
-                    defaultValue: "Downloading md2png %@ — %ld%%",
+                    defaultValue: "Downloading md2png %1$@ — %2$ld%%",
                     bundle: localizationBundle,
                     update.version.description,
                     progressPercent
@@ -606,7 +606,7 @@ struct AboutUpdatePresentation: Equatable {
         case let (.some(date), .some(size)):
             return L10n.format(
                 "about.update_release_date_size",
-                defaultValue: "Released %@ · %@",
+                defaultValue: "Released %1$@ · %2$@",
                 bundle: localizationBundle,
                 date,
                 size

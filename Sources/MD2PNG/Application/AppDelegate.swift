@@ -1,5 +1,10 @@
 import AppKit
 
+private enum ClipboardOverwriteAction {
+    case rerenderLastMarkdown
+    case restoreLastMarkdown
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let renderer = MarkdownRenderer()
@@ -53,11 +58,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         },
         onTrySample: { [weak self] in self?.showSampleGuide() }
     )
-    private lazy var sampleGuideController = SampleGuideController(
-        onChoose: { [weak self] kind in
-            self?.renderBundledExample(kind)
+    private let injectedSampleGuidePresenter: (any SampleGuidePresenting)?
+    private lazy var sampleGuidePresenter: any SampleGuidePresenting = {
+        if let injectedSampleGuidePresenter {
+            return injectedSampleGuidePresenter
         }
-    )
+        return SampleGuideController(
+            onChoose: { [weak self] kind in
+                self?.renderBundledExample(kind)
+            }
+        )
+    }()
     private lazy var globalShortcutRouter = GlobalShortcutRouter(
         verify: { [weak self] command in
             self?.welcomeController.verifyShortcut(command) ?? false
@@ -79,7 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastRenderWidthPreset: RenderWidthPreset?
     private var lastSource = LastSourceState()
     private let clipboardPreviewView = ClipboardPreviewView()
+    private var statusMenuItems: [StatusMenuCommand: NSMenuItem] = [:]
     private var renderMenuItem: NSMenuItem!
+    private var rerenderLastMarkdownMenuItem: NSMenuItem!
     private var restoreLastMarkdownMenuItem: NSMenuItem!
     private var previewMenuItem: NSMenuItem!
     private var examplesMenuItem: NSMenuItem!
@@ -91,7 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var renderWidthPreset: RenderWidthPreset
     private var renderTheme: RenderTheme
     private var renderActivity = RenderActivityState()
+    private var clipboardContainsMarkdown = false
     private var isPresentingClipboardConfirmation = false
+    private var isSampleGuidePresentationScheduled = false
     private var isUpdateInstallPending = false
     private var isWaitingForUpdateDeferralBeforeTermination = false
     private var currentUpdateStatus = UpdateStatus()
@@ -99,8 +114,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isPreviewWindowVisible = false
     private var isWelcomeWindowVisible = false
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
+#if DEBUG
+    private(set) var clipboardMenuRefreshCountForTesting = 0
+#endif
 
-    override init() {
+    override convenience init() {
+        self.init(sampleGuidePresenter: nil)
+    }
+
+    init(sampleGuidePresenter: (any SampleGuidePresenting)?) {
+        injectedSampleGuidePresenter = sampleGuidePresenter
         let renderWidthPreference = RenderWidthPreference()
         self.renderWidthPreference = renderWidthPreference
         renderWidthPreset = renderWidthPreference.selectedPreset
@@ -212,48 +235,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
 
-        clipboardPreviewView.update(Clipboard.menuPreview(includeLabel: false))
         let clipboardPreviewMenuItem = NSMenuItem()
         clipboardPreviewMenuItem.view = clipboardPreviewView
         menu.addItem(clipboardPreviewMenuItem)
-        menu.addItem(.separator())
 
-        renderMenuItem = menu.addItem(
-            withTitle: L10n.text(
-                "menu.render",
-                defaultValue: "Render Clipboard as Image"
-            ),
+        renderMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .renderClipboard),
             action: #selector(renderClipboard),
             keyEquivalent: "x"
         )
         renderMenuItem.keyEquivalentModifierMask = [.command, .control]
         renderMenuItem.target = self
 
-        restoreLastMarkdownMenuItem = menu.addItem(
-            withTitle: L10n.text(
-                "menu.restore_last_markdown",
-                defaultValue: "Restore Last Markdown"
-            ),
-            action: #selector(restoreLastMarkdown),
-            keyEquivalent: ""
-        )
-        restoreLastMarkdownMenuItem.target = self
-        restoreLastMarkdownMenuItem.isEnabled = false
-
-        previewMenuItem = menu.addItem(
-            withTitle: L10n.text("menu.show_last_render", defaultValue: "Show Last Render"),
+        previewMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .showLastRender),
             action: #selector(showLastRender),
             keyEquivalent: "z"
         )
         previewMenuItem.keyEquivalentModifierMask = [.command, .control]
         previewMenuItem.target = self
-        previewMenuItem.isEnabled = false
-
-        menu.addItem(.separator())
-        let renderWidthTitle = L10n.text(
-            "menu.render_width",
-            defaultValue: "Output Width"
+        rerenderLastMarkdownMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .rerenderLastMarkdown),
+            action: #selector(rerenderLastMarkdown),
+            keyEquivalent: ""
         )
+        rerenderLastMarkdownMenuItem.target = self
+
+        restoreLastMarkdownMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .restoreLastMarkdown),
+            action: #selector(restoreLastMarkdown),
+            keyEquivalent: ""
+        )
+        restoreLastMarkdownMenuItem.target = self
+
+        let renderWidthTitle = StatusMenuPresentation.title(for: .outputWidth)
         renderWidthMenuItem = NSMenuItem(
             title: renderWidthTitle,
             action: nil,
@@ -272,9 +287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         renderWidthMenuItem.submenu = renderWidthMenu
         updateRenderWidthMenuSelection()
-        menu.addItem(renderWidthMenuItem)
 
-        let renderThemeTitle = L10n.text("menu.render_theme", defaultValue: "Theme")
+        let renderThemeTitle = StatusMenuPresentation.title(for: .theme)
         renderThemeMenuItem = NSMenuItem(
             title: renderThemeTitle,
             action: nil,
@@ -293,9 +307,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         renderThemeMenuItem.submenu = renderThemeMenu
         updateRenderThemeMenuSelection()
-        menu.addItem(renderThemeMenuItem)
 
-        let examplesTitle = L10n.text("menu.examples", defaultValue: "Examples")
+        let examplesTitle = StatusMenuPresentation.title(for: .examples)
         examplesMenuItem = NSMenuItem(title: examplesTitle, action: nil, keyEquivalent: "")
         let examplesMenu = NSMenu(title: examplesTitle)
         for kind in ExampleKind.allCases {
@@ -309,43 +322,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.target = self
         }
         examplesMenuItem.submenu = examplesMenu
-        menu.addItem(examplesMenuItem)
 
-        menu.addItem(.separator())
-        launchAtLoginMenuItem = menu.addItem(
-            withTitle: L10n.text(
-                "menu.enable_launch_at_login",
-                defaultValue: "Enable Launch at Login"
-            ),
+        launchAtLoginMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .launchAtLogin),
             action: #selector(performLaunchAtLoginAction),
             keyEquivalent: ""
         )
         launchAtLoginMenuItem.target = self
-        updateLaunchAtLoginMenu()
 
-        menu.addItem(.separator())
-        let welcomeItem = menu.addItem(
-            withTitle: L10n.text("menu.show_welcome", defaultValue: "Show Welcome"),
+        let welcomeItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .showWelcome),
             action: #selector(showWelcome),
             keyEquivalent: ""
         )
         welcomeItem.target = self
 
-        let aboutItem = menu.addItem(
-            withTitle: L10n.text("menu.about", defaultValue: "About md2png"),
+        let aboutItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .about),
             action: #selector(showAbout),
             keyEquivalent: ""
         )
         aboutItem.target = self
 
-        menu.addItem(.separator())
-        let quitItem = menu.addItem(
-            withTitle: L10n.text("menu.quit", defaultValue: "Quit md2png"),
+        let quitItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .quit),
             action: #selector(terminateFromStatusMenu),
             keyEquivalent: "q"
         )
         quitItem.target = self
+
+        statusMenuItems = [
+            .renderClipboard: renderMenuItem,
+            .showLastRender: previewMenuItem,
+            .rerenderLastMarkdown: rerenderLastMarkdownMenuItem,
+            .restoreLastMarkdown: restoreLastMarkdownMenuItem,
+            .theme: renderThemeMenuItem,
+            .outputWidth: renderWidthMenuItem,
+            .examples: examplesMenuItem,
+            .launchAtLogin: launchAtLoginMenuItem,
+            .showWelcome: welcomeItem,
+            .about: aboutItem,
+            .quit: quitItem
+        ]
+        for section in StatusMenuLayout.sections {
+            menu.addItem(.separator())
+            for command in section {
+                guard let item = statusMenuItems[command] else { continue }
+                item.identifier = NSUserInterfaceItemIdentifier(command.rawValue)
+                menu.addItem(item)
+            }
+        }
+
         statusItem.menu = menu
+        refreshClipboardMenuState()
+        updateLaunchAtLoginMenu()
 
         updateStatusObserverID = updateController.observeStatus { [weak self] status in
             self?.applyUpdateStatus(status)
@@ -353,8 +383,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        sampleGuideController.dismiss()
-        clipboardPreviewView.update(Clipboard.menuPreview(includeLabel: false))
+        sampleGuidePresenter.dismiss()
+        refreshClipboardMenuState()
         updateLaunchAtLoginMenu()
     }
 
@@ -379,12 +409,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
     }
 
+    @objc private func rerenderLastMarkdown() {
+        guard !renderActivity.isRendering,
+              !isUpdateInstallPending,
+              !isPresentingClipboardConfirmation,
+              let markdown = lastSource.markdown,
+              confirmClipboardOverwriteIfNeeded(for: .rerenderLastMarkdown) else { return }
+        render(markdown)
+    }
+
     @objc private func restoreLastMarkdown() {
         guard !renderActivity.isRendering,
               !isUpdateInstallPending,
               !isPresentingClipboardConfirmation,
               let markdown = lastSource.markdown,
-              confirmClipboardOverwriteIfNeeded() else { return }
+              confirmClipboardOverwriteIfNeeded(for: .restoreLastMarkdown) else { return }
         do {
             let changeCount = try Clipboard.write(markdown: markdown)
             lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
@@ -486,7 +525,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         markdown: markdown,
                         clipboardChangeCount: changeCount
                     )
-                    self.previewMenuItem.isEnabled = true
                     self.hud.show(
                         L10n.text(
                             "hud.png_copied",
@@ -511,26 +549,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateRenderingUI(isRendering: Bool) {
-        let allowsRenderActions = !isRendering && !isUpdateInstallPending
-        renderMenuItem.isEnabled = allowsRenderActions
-        renderMenuItem.title = isRendering
-            ? L10n.text("menu.rendering", defaultValue: "Rendering…")
-            : L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
-        examplesMenuItem.isEnabled = allowsRenderActions
-        renderWidthMenuItem.isEnabled = allowsRenderActions
-        renderThemeMenuItem.isEnabled = allowsRenderActions
-        updateLastSourceActionAvailability()
+        assert(isRendering == renderActivity.isRendering)
+        applyStatusMenuPresentation()
         updateStatusItemAppearance()
     }
 
-    private func updateLastSourceActionAvailability() {
-        let isEnabled = lastSource.isAvailable
-            && !renderActivity.isRendering
-            && !isUpdateInstallPending
-        restoreLastMarkdownMenuItem.isEnabled = isEnabled
+    private func refreshClipboardMenuState() {
+#if DEBUG
+        clipboardMenuRefreshCountForTesting += 1
+#endif
+        let state = Clipboard.menuState(includeLabel: false)
+        clipboardContainsMarkdown = state.containsMarkdown
+        clipboardPreviewView.update(state.preview)
+        applyStatusMenuPresentation()
     }
 
-    private func confirmClipboardOverwriteIfNeeded() -> Bool {
+    private func applyStatusMenuPresentation() {
+        guard !statusMenuItems.isEmpty else { return }
+        let presentation = StatusMenuPresentation(state: StatusMenuState(
+            clipboardContainsMarkdown: clipboardContainsMarkdown,
+            hasLastSource: lastSource.isAvailable,
+            hasLastRender: lastImage != nil,
+            isRendering: renderActivity.isRendering,
+            isUpdateInstallPending: isUpdateInstallPending
+        ))
+        for (command, item) in statusMenuItems where command != .launchAtLogin {
+            let itemPresentation = presentation[command]
+            item.title = itemPresentation.title
+            item.isEnabled = itemPresentation.isEnabled
+        }
+    }
+
+    private func confirmClipboardOverwriteIfNeeded(
+        for action: ClipboardOverwriteAction
+    ) -> Bool {
         guard lastSource.requiresConfirmation(
             currentClipboardChangeCount: Clipboard.changeCount
         ) else {
@@ -546,14 +598,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             "confirmation.clipboard_changed.title",
             defaultValue: "Clipboard Changed"
         )
-        alert.informativeText = L10n.text(
-            "confirmation.clipboard_changed.restore",
-            defaultValue: "Another app changed the clipboard. Replace it with the last Markdown?"
-        )
-        alert.addButton(withTitle: L10n.text(
-            "common.replace",
-            defaultValue: "Replace"
-        ))
+        alert.informativeText = switch action {
+        case .rerenderLastMarkdown:
+            L10n.text(
+                "confirmation.clipboard_changed.rerender",
+                defaultValue: "Another app changed the clipboard. Replace it with a new PNG rendered from the last Markdown?"
+            )
+        case .restoreLastMarkdown:
+            L10n.text(
+                "confirmation.clipboard_changed.restore",
+                defaultValue: "Another app changed the clipboard. Replace it with the last Markdown?"
+            )
+        }
+        let primaryButtonTitle = switch action {
+        case .rerenderLastMarkdown:
+            L10n.text(
+                "confirmation.render_and_replace",
+                defaultValue: "Render and Replace"
+            )
+        case .restoreLastMarkdown:
+            L10n.text(
+                "common.replace",
+                defaultValue: "Replace"
+            )
+        }
+        alert.addButton(withTitle: primaryButtonTitle)
         let cancelButton = alert.addButton(withTitle: L10n.text(
             "common.cancel",
             defaultValue: "Cancel"
@@ -631,18 +700,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func showSampleGuide() {
+        guard !isSampleGuidePresentationScheduled else { return }
+        isSampleGuidePresentationScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isSampleGuidePresentationScheduled = false
+            self.presentSampleGuide()
+        }
+    }
+
+    private func presentSampleGuide() {
         guard !renderActivity.isRendering,
               !isUpdateInstallPending,
               !isPresentingClipboardConfirmation,
               let button = statusItem.button else { return }
-        sampleGuideController.show(
+        let clipboardState = Clipboard.menuState(includeLabel: false)
+        let statusMenuPresentation = StatusMenuPresentation(state: StatusMenuState(
+            clipboardContainsMarkdown: clipboardState.containsMarkdown,
+            hasLastSource: lastSource.isAvailable,
+            hasLastRender: lastImage != nil,
+            isRendering: false,
+            isUpdateInstallPending: false
+        ))
+        sampleGuidePresenter.show(
             relativeTo: button,
             menuState: SampleGuideMenuState(
-                canRestoreLastMarkdown: restoreLastMarkdownMenuItem.isEnabled,
-                canShowLastRender: previewMenuItem.isEnabled
+                statusMenuPresentation: statusMenuPresentation,
+                launchAtLoginPresentation: launchAtLoginController.presentation
             )
         )
     }
+
+#if DEBUG
+    func prepareWelcomeSampleGuidePathForTesting() {
+        configureStatusItem()
+        isWelcomeWindowVisible = true
+    }
+
+    func triggerWelcomeSampleGuideForTesting() {
+        welcomeController.trySampleForTesting()
+    }
+
+    var welcomeLaunchAtLoginRefreshCountForTesting: Int {
+        welcomeController.launchAtLoginRefreshCountForTesting
+    }
+
+    func cleanUpWelcomeSampleGuidePathForTesting() {
+        isWelcomeWindowVisible = false
+        if let updateStatusObserverID {
+            updateController.removeStatusObserver(updateStatusObserverID)
+            self.updateStatusObserverID = nil
+        }
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
+    }
+#endif
 
     @objc private func terminateFromStatusMenu() {
         NSApp.terminate(nil)
@@ -677,7 +791,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         alert.informativeText = L10n.text(
             "update.confirm_relaunch_detail",
-            defaultValue: "Relaunching clears Last Render and Last Source because they exist only in memory. Your clipboard will not be changed."
+            defaultValue: "Relaunching clears Last Render and Last Markdown because they exist only in memory. Your clipboard will not be changed."
         )
         alert.addButton(withTitle: L10n.text(
             "about.update_install_relaunch",
@@ -721,7 +835,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.hud.show(
                     L10n.format(
                         "update.relaunch_not_updated",
-                        defaultValue: "Update to %@ did not complete — still running %@. Open About md2png to retry.",
+                        defaultValue: "Update to %1$@ did not complete — still running %2$@. Open About md2png to retry.",
                         expectedVersion,
                         runningVersion
                     ),
@@ -934,7 +1048,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if let progressPercent {
                 return L10n.format(
                     "about.update_downloading_progress",
-                    defaultValue: "Downloading md2png %@ — %ld%%",
+                    defaultValue: "Downloading md2png %1$@ — %2$ld%%",
                     update.displayVersion,
                     progressPercent
                 )
@@ -948,7 +1062,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if let progressPercent {
                 return L10n.format(
                     "about.update_preparing_progress",
-                    defaultValue: "Preparing md2png %@ — %ld%%",
+                    defaultValue: "Preparing md2png %1$@ — %2$ld%%",
                     update.displayVersion,
                     progressPercent
                 )
@@ -967,7 +1081,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case let .downloading(update, progressPercent):
             return L10n.format(
                 "about.update_downloading_progress",
-                defaultValue: "Downloading md2png %@ — %ld%%",
+                defaultValue: "Downloading md2png %1$@ — %2$ld%%",
                 update.version.description,
                 progressPercent
             )

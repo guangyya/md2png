@@ -71,7 +71,7 @@ struct AppMetadata {
         guard let sourceCommit else {
             return L10n.format(
                 "about.version_build",
-                defaultValue: "Version %@  •  Build %@",
+                defaultValue: "Version %1$@  •  Build %2$@",
                 bundle: localizationBundle,
                 version,
                 build
@@ -79,7 +79,7 @@ struct AppMetadata {
         }
         return L10n.format(
             "about.version_build_commit",
-            defaultValue: "Version %@  •  Build %@  •  Commit %@",
+            defaultValue: "Version %1$@  •  Build %2$@  •  Commit %3$@",
             bundle: localizationBundle,
             version,
             build,
@@ -96,7 +96,7 @@ struct AppMetadata {
         if let sourceCommit {
             return L10n.format(
                 "about.version_info_commit",
-                defaultValue: "md2png %@ (%@) · commit %@ · %@ · macOS %@ · %@",
+                defaultValue: "md2png %1$@ (%2$@) · commit %3$@ · %4$@ · macOS %5$@ · %6$@",
                 bundle: localizationBundle,
                 version,
                 build,
@@ -108,7 +108,7 @@ struct AppMetadata {
         }
         return L10n.format(
             "about.version_info",
-            defaultValue: "md2png %@ (%@) · %@ · macOS %@ · %@",
+            defaultValue: "md2png %1$@ (%2$@) · %3$@ · macOS %4$@ · %5$@",
             bundle: localizationBundle,
             version,
             build,

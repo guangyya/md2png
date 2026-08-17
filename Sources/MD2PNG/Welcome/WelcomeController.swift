@@ -369,6 +369,9 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let copy: WelcomeCopy
     private let onVisibilityChange: (Bool) -> Void
     private let onTrySample: () -> Void
+#if DEBUG
+    private(set) var launchAtLoginRefreshCountForTesting = 0
+#endif
     private let shortcutVerificationState = WelcomeShortcutVerificationState()
     private let launchAtLoginState: WelcomeLaunchAtLoginState
     private let visibleFrameProvider: @MainActor () -> NSRect?
@@ -490,6 +493,9 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     }
 
     func refreshLaunchAtLogin() {
+#if DEBUG
+        launchAtLoginRefreshCountForTesting += 1
+#endif
         launchAtLoginState.refresh()
     }
 
