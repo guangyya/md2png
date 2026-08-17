@@ -225,6 +225,10 @@ private final class DiagnosticLogStore: @unchecked Sendable {
         defer { try? handle.close() }
         try handle.seekToEnd()
         try handle.write(contentsOf: data)
+        try? fileManager.setAttributes(
+            [.modificationDate: event.timestamp],
+            ofItemAtPath: fileURL.path
+        )
         try enforceFileCount(keeping: fileURL)
     }
 
@@ -351,7 +355,7 @@ private final class DiagnosticLogStore: @unchecked Sendable {
     }
 
     private func fileSize(at url: URL) throws -> Int {
-        let values = try url.resourceValues(forKeys: [.fileSizeKey])
-        return values.fileSize ?? 0
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        return (attributes[.size] as? NSNumber)?.intValue ?? 0
     }
 }

@@ -91,8 +91,7 @@ final class DiagnosticLoggerTests: XCTestCase {
         await logger.flush()
 
         let files = try diagnosticFiles(in: directoryURL)
-        XCTAssertFalse(files.isEmpty)
-        XCTAssertLessThanOrEqual(files.count, 2)
+        XCTAssertEqual(files.count, 2)
         for file in files {
             let size = try XCTUnwrap(
                 file.resourceValues(forKeys: [.fileSizeKey]).fileSize
