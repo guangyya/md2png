@@ -195,10 +195,6 @@ final class GlobalHotKeyRegistrar {
         self.makeSession = makeSession
     }
 
-    isolated deinit {
-        session?.invalidate()
-    }
-
     @discardableResult
     func replace(
         registrations: [GlobalHotKey.Registration]
