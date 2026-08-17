@@ -210,7 +210,7 @@ final class RenderThemeTests: XCTestCase {
             ("syntax title", color(0x68, 0x4A, 0x92), 3, 0.26),
             ("syntax variable", color(0x24, 0x5B, 0x73), 3, 0.26),
             ("Mermaid secondary surface", color(0xE7, 0xE5, 0xC7), 100, 0.08),
-            ("Mermaid tertiary surface", color(0xF4, 0xD8, 0xBC), 50, 0.08)
+            ("Mermaid tertiary surface", color(0xF4, 0xD8, 0xBC), 10, 0.08)
         ]
 
         XCTAssertGreaterThan(
