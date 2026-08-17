@@ -68,6 +68,13 @@ kept. Logging failures do not interrupt rendering or change the clipboard. The
 app does not upload, copy, save elsewhere, or reveal these logs automatically;
 sharing diagnostics always requires a separate explicit user action.
 
+In **About md2png**, **Save Diagnostic Logs…** lets the user explicitly choose
+the last hour, 24 hours, or 7 days and then choose a destination with the macOS
+save panel. The saved JSON contains the same allowlisted events plus app/build,
+macOS, architecture, and the selected time interval. Saving does not read or
+change the clipboard, contact a server, or upload the resulting file. The user
+decides whether and how to share it.
+
 To delete all local diagnostics, quit md2png, choose **Go > Go to Folder…** in
 Finder, enter `~/Library/Logs/md2png`, and delete the `Diagnostics` folder. The
 folder is recreated only when a later diagnostic event is recorded.

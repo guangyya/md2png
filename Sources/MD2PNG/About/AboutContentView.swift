@@ -19,6 +19,7 @@ final class AboutContentModel: ObservableObject {
     @Published private(set) var updatePresentation: AboutUpdatePresentation?
     @Published private(set) var updateFeatureAvailable = false
     @Published private(set) var didCopyVersion = false
+    @Published private(set) var diagnosticSaveState = AboutDiagnosticSaveState.idle
     @Published private(set) var releaseNotesRevision = 0
 
     init(metadata: AppMetadata = .current()) {
@@ -29,6 +30,7 @@ final class AboutContentModel: ObservableObject {
         self.metadata = metadata
         self.updateFeatureAvailable = updateFeatureAvailable
         didCopyVersion = false
+        diagnosticSaveState = .idle
         releaseNotesRevision += 1
     }
 
@@ -50,6 +52,18 @@ final class AboutContentModel: ObservableObject {
     func showCopyReady() {
         didCopyVersion = false
     }
+
+    func showDiagnosticSaveStarted() {
+        diagnosticSaveState = .saving
+    }
+
+    func showDiagnosticSaveSucceeded() {
+        diagnosticSaveState = .saved
+    }
+
+    func showDiagnosticSaveReady() {
+        diagnosticSaveState = .idle
+    }
 }
 
 struct AboutContentView: View {
@@ -59,6 +73,7 @@ struct AboutContentView: View {
     let onPrimaryUpdateAction: (AboutUpdatePrimaryAction) -> Void
     let onSecondaryUpdateAction: (AboutUpdateSecondaryAction) -> Void
     let onCopyVersion: () -> Void
+    let onSaveDiagnosticLogs: (DiagnosticExportWindow) -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -217,6 +232,34 @@ struct AboutContentView: View {
             }
 
             Spacer()
+
+            Menu {
+                ForEach(DiagnosticExportWindow.allCases, id: \.rawValue) { window in
+                    Button(window.aboutMenuTitle) {
+                        onSaveDiagnosticLogs(window)
+                    }
+                }
+            } label: {
+                Label(
+                    AboutDiagnosticSavePresentation.buttonTitle(
+                        for: model.diagnosticSaveState
+                    ),
+                    systemImage: AboutDiagnosticSavePresentation.symbolName(
+                        for: model.diagnosticSaveState
+                    )
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(model.diagnosticSaveState == .saved
+                    ? Color.green
+                    : Color.accentColor)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(model.diagnosticSaveState == .saving)
+            .help(L10n.text(
+                "about.diagnostic_logs_help",
+                defaultValue: "Saves privacy-safe local operational logs. Nothing is uploaded."
+            ))
 
             Button(
                 L10n.text("about.done", defaultValue: "Done"),

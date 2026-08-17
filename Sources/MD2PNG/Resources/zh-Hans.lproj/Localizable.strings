@@ -190,6 +190,17 @@
 "about.update_no_compatible_release" = "没有找到兼容的更新。";
 "about.copy_version_info" = "复制版本信息";
 "about.version_info_copied" = "已复制";
+"about.save_diagnostic_logs" = "保存诊断日志…";
+"about.diagnostic_logs_saving" = "正在保存…";
+"about.diagnostic_logs_saved" = "已保存";
+"about.diagnostic_logs_help" = "保存经过隐私保护的本地运行日志，不会上传任何内容。";
+"about.diagnostic_logs_last_hour" = "最近 1 小时";
+"about.diagnostic_logs_last_24_hours" = "最近 24 小时";
+"about.diagnostic_logs_last_7_days" = "最近 7 天";
+"about.diagnostic_logs_save_title" = "保存诊断日志";
+"about.diagnostic_logs_save_message" = "仅保存经过隐私保护的运行元数据，不会上传任何内容。";
+"about.diagnostic_logs_save_failed_title" = "无法保存诊断日志";
+"about.diagnostic_logs_save_failed_message" = "日志可能暂时不可用，或者所选位置不可写。请选择其他位置后重试。";
 "about.version_info" = "md2png %1$@ (%2$@) · %3$@ · macOS %4$@ · %5$@";
 "about.version_info_commit" = "md2png %1$@ (%2$@) · commit %3$@ · %4$@ · macOS %5$@ · %6$@";
 "about.done" = "完成";

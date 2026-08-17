@@ -69,10 +69,184 @@ final class AboutControllerTests: XCTestCase {
         XCTAssertTrue(controller.displayedVersionInfo.contains("0.1.0 (1)"))
         XCTAssertTrue(controller.displayedVersionBuild.contains("Commit a1b2c3d"))
         XCTAssertTrue(controller.displayedVersionInfo.contains("commit a1b2c3d"))
+        XCTAssertEqual(
+            controller.displayedDiagnosticSaveButtonTitle,
+            L10n.text(
+                "about.save_diagnostic_logs",
+                defaultValue: "Save Diagnostic Logs…"
+            )
+        )
+        XCTAssertTrue(controller.displayedDiagnosticSaveButtonIsEnabled)
 
         writeSnapshotIfRequested(
             environmentKey: "MD2PNG_ABOUT_SNAPSHOT_PATH",
             contentView: contentView
+        )
+    }
+
+    @MainActor
+    func testSavingDiagnosticLogsUsesSelectedWindowAndKeepsSensitiveValuesOut() async throws {
+        _ = NSApplication.shared
+        let rootURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "md2png-about-diagnostic-save-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: rootURL,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let now = Date(timeIntervalSince1970: 1_787_000_000)
+        let logger = makeDiagnosticLogger(
+            directoryURL: rootURL.appendingPathComponent("logs", isDirectory: true),
+            now: now
+        )
+        let canary = "PRIVATE_MARKDOWN /Users/private/secret.md?token=hidden"
+        logger.record(
+            category: .renderer,
+            stage: .renderCompletion,
+            result: .failed,
+            level: .error,
+            error: NSError(
+                domain: canary,
+                code: 71,
+                userInfo: [NSLocalizedDescriptionKey: canary]
+            )
+        )
+        await logger.flush()
+
+        let destinationURL = rootURL.appendingPathComponent("saved-diagnostics.json")
+        var suggestedFileName = ""
+        var didPresentFailure = false
+        let controller = AboutController(
+            updateController: UpdateController(),
+            diagnosticLogger: logger,
+            diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies(
+                chooseDestination: { _, suggestion in
+                    suggestedFileName = suggestion
+                    return destinationURL
+                },
+                writeExport: { export, url in
+                    try export.encodedData().write(to: url, options: .atomic)
+                },
+                presentFailure: { _ in didPresentFailure = true }
+            )
+        )
+
+        let result = await controller.saveDiagnosticLogsForTesting(
+            window: .lastHour
+        )
+
+        XCTAssertEqual(result, .saved)
+        XCTAssertFalse(didPresentFailure)
+        XCTAssertTrue(suggestedFileName.hasPrefix("md2png-diagnostics-"))
+        XCTAssertTrue(suggestedFileName.hasSuffix("-last-hour.json"))
+        XCTAssertEqual(
+            controller.displayedDiagnosticSaveButtonTitle,
+            L10n.text("about.diagnostic_logs_saved", defaultValue: "Saved")
+        )
+        let data = try Data(contentsOf: destinationURL)
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertFalse(text.contains(canary))
+        XCTAssertFalse(text.contains(rootURL.path))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let export = try decoder.decode(DiagnosticExport.self, from: data)
+        XCTAssertEqual(export.interval.selection, .lastHour)
+        XCTAssertEqual(export.interval.end, now)
+        XCTAssertEqual(export.events.count, 1)
+        XCTAssertEqual(export.events.first?.error?.domain, "redacted")
+        XCTAssertEqual(export.events.first?.error?.code, 71)
+    }
+
+    @MainActor
+    func testCancellingDiagnosticSaveDoesNotExportOrShowAnError() async throws {
+        _ = NSApplication.shared
+        let unavailableURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "md2png-about-diagnostic-unavailable-\(UUID().uuidString)"
+        )
+        try Data("not-a-directory".utf8).write(to: unavailableURL)
+        defer { try? FileManager.default.removeItem(at: unavailableURL) }
+        let logger = makeDiagnosticLogger(
+            directoryURL: unavailableURL,
+            now: Date(timeIntervalSince1970: 1_787_000_000)
+        )
+        var didPresentFailure = false
+        let controller = AboutController(
+            updateController: UpdateController(),
+            diagnosticLogger: logger,
+            diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies(
+                chooseDestination: { _, _ in nil },
+                writeExport: { _, _ in
+                    XCTFail("A cancelled save must not write an export")
+                },
+                presentFailure: { _ in didPresentFailure = true }
+            )
+        )
+
+        let result = await controller.saveDiagnosticLogsForTesting(
+            window: .last24Hours
+        )
+
+        XCTAssertEqual(result, .cancelled)
+        XCTAssertFalse(didPresentFailure)
+        XCTAssertEqual(
+            controller.displayedDiagnosticSaveButtonTitle,
+            L10n.text(
+                "about.save_diagnostic_logs",
+                defaultValue: "Save Diagnostic Logs…"
+            )
+        )
+        XCTAssertTrue(controller.displayedDiagnosticSaveButtonIsEnabled)
+    }
+
+    @MainActor
+    func testDiagnosticSaveFailureIsGenericAndRestoresTheAction() async {
+        _ = NSApplication.shared
+        var didPresentFailure = false
+        let controller = AboutController(
+            updateController: UpdateController(),
+            diagnosticLogger: .disabled,
+            diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies(
+                chooseDestination: { _, _ in
+                    FileManager.default.temporaryDirectory.appendingPathComponent(
+                        "unused-diagnostic-export.json"
+                    )
+                },
+                writeExport: { _, _ in throw AboutDiagnosticSaveTestError.writeFailed },
+                presentFailure: { _ in didPresentFailure = true }
+            )
+        )
+
+        let result = await controller.saveDiagnosticLogsForTesting(
+            window: .last7Days
+        )
+
+        XCTAssertEqual(result, .failed)
+        XCTAssertTrue(didPresentFailure)
+        XCTAssertEqual(
+            controller.displayedDiagnosticSaveButtonTitle,
+            L10n.text(
+                "about.save_diagnostic_logs",
+                defaultValue: "Save Diagnostic Logs…"
+            )
+        )
+        XCTAssertTrue(controller.displayedDiagnosticSaveButtonIsEnabled)
+    }
+
+    func testDiagnosticExportFileNamesAreSafeAndDescribeTheWindow() {
+        let date = Date(timeIntervalSince1970: 0)
+        XCTAssertEqual(
+            DiagnosticExportFileName.make(window: .lastHour, date: date),
+            "md2png-diagnostics-19700101-000000-last-hour.json"
+        )
+        XCTAssertEqual(
+            DiagnosticExportFileName.make(window: .last24Hours, date: date),
+            "md2png-diagnostics-19700101-000000-last-24-hours.json"
+        )
+        XCTAssertEqual(
+            DiagnosticExportFileName.make(window: .last7Days, date: date),
+            "md2png-diagnostics-19700101-000000-last-7-days.json"
         )
     }
 
@@ -539,6 +713,30 @@ final class AboutControllerTests: XCTestCase {
         return AboutController(updateController: updateController)
     }
 
+    private func makeDiagnosticLogger(
+        directoryURL: URL,
+        now: Date
+    ) -> DiagnosticLogger {
+        DiagnosticLogger(configuration: DiagnosticLoggerConfiguration(
+            directoryURL: directoryURL,
+            retentionPolicy: .standard,
+            includesVerboseEvents: true,
+            isEnabled: true,
+            now: { now },
+            applicationInfo: DiagnosticApplicationInfo(
+                name: "md2png",
+                version: "0.9.0",
+                build: "9",
+                sourceCommit: "abcdef0",
+                configuration: "debug"
+            ),
+            systemInfo: DiagnosticSystemInfo(
+                macOSVersion: "26.0.0",
+                architecture: "arm64"
+            )
+        ))
+    }
+
     @MainActor
     private func writeSnapshotIfRequested(
         environmentKey: String,
@@ -553,6 +751,10 @@ final class AboutControllerTests: XCTestCase {
             try? png.write(to: URL(fileURLWithPath: outputPath))
         }
     }
+}
+
+private enum AboutDiagnosticSaveTestError: Error {
+    case writeFailed
 }
 
 @MainActor

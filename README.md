@@ -91,7 +91,7 @@ A GFM table needs a separator row:
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
-| About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and copyable diagnostics |
+| About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and saves privacy-safe diagnostic logs |
 
 The top of the menu contains a compact, read-only preview of the current
 clipboard. Standard preserves the original output sizing; Compact wraps prose

@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Save privacy-safe diagnostic logs from About when troubleshooting.
+
 ## [0.8.0] - 2026-08-17
 
 ### Added
