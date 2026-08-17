@@ -439,6 +439,7 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(copying.cardTravel, -1)
         XCTAssertEqual(copying.imageReveal, 0)
         XCTAssertEqual(copying.detailIndex, 0)
+        XCTAssertFalse(copying.showsCompletedJourney)
         XCTAssertEqual(rendering.cardTravel, 0)
         XCTAssertEqual(rendering.keyPress, 1)
         XCTAssertGreaterThan(rendering.imageReveal, 0.5)
@@ -447,7 +448,17 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(pasting.imageReveal, 1)
         XCTAssertEqual(pasting.pastePrompt, 1)
         XCTAssertEqual(pasting.detailIndex, 2)
+        XCTAssertFalse(pasting.showsCompletedJourney)
         XCTAssertEqual(WelcomeAnimationProgress.reducedMotion.imageReveal, 1)
+        XCTAssertTrue(WelcomeAnimationProgress.reducedMotion.showsCompletedJourney)
+        XCTAssertEqual(
+            WelcomeCompletedJourneyStage.all.map(\.phase),
+            [.copy, .render, .paste]
+        )
+        XCTAssertEqual(
+            WelcomeCompletedJourneyStage.all.map(\.cardOffset),
+            [-154, 0, 154]
+        )
     }
 
     func testSampleGuideRevealsTheMenuHierarchyInOrder() {

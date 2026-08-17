@@ -21,6 +21,7 @@ struct WelcomeAnimationProgress: Equatable {
     let pastePrompt: CGFloat
     let activityOpacity: CGFloat
     let detailIndex: Int
+    let showsCompletedJourney: Bool
 
     static let reducedMotion = WelcomeAnimationProgress(phase: .complete)
 
@@ -33,6 +34,7 @@ struct WelcomeAnimationProgress: Equatable {
             pastePrompt = 0
             activityOpacity = 1
             detailIndex = 0
+            showsCompletedJourney = false
         case .render:
             cardTravel = 0
             keyPress = 1
@@ -40,6 +42,7 @@ struct WelcomeAnimationProgress: Equatable {
             pastePrompt = 0
             activityOpacity = 1
             detailIndex = 1
+            showsCompletedJourney = false
         case .paste:
             cardTravel = 1
             keyPress = 0
@@ -47,6 +50,7 @@ struct WelcomeAnimationProgress: Equatable {
             pastePrompt = 1
             activityOpacity = 1
             detailIndex = 2
+            showsCompletedJourney = false
         case .complete:
             cardTravel = 1
             keyPress = 0
@@ -54,8 +58,23 @@ struct WelcomeAnimationProgress: Equatable {
             pastePrompt = 0.72
             activityOpacity = 0.82
             detailIndex = 2
+            showsCompletedJourney = true
         }
     }
+}
+
+struct WelcomeCompletedJourneyStage: Equatable, Identifiable {
+    let phase: WelcomeWorkflowPhase
+    let cardOffset: CGFloat
+
+    var id: Int { phase.rawValue }
+    var progress: WelcomeAnimationProgress { WelcomeAnimationProgress(phase: phase) }
+
+    static let all = [
+        WelcomeCompletedJourneyStage(phase: .copy, cardOffset: -154),
+        WelcomeCompletedJourneyStage(phase: .render, cardOffset: 0),
+        WelcomeCompletedJourneyStage(phase: .paste, cardOffset: 154)
+    ]
 }
 
 struct WelcomeWorkflowDemo: View {
@@ -227,19 +246,19 @@ private struct WelcomeWorkflowScene: View {
                     title: copy.copyStepTitle,
                     symbol: "doc.on.doc.fill",
                     color: WelcomeDemoPalette.cyan,
-                    isActive: progress.detailIndex == 0
+                    isActive: progress.showsCompletedJourney || progress.detailIndex == 0
                 )
                 WelcomeStageLabel(
                     title: copy.renderStepTitle,
                     symbol: "command",
                     color: WelcomeDemoPalette.violet,
-                    isActive: progress.detailIndex == 1
+                    isActive: progress.showsCompletedJourney || progress.detailIndex == 1
                 )
                 WelcomeStageLabel(
                     title: copy.pasteStepTitle,
                     symbol: "photo.fill",
                     color: WelcomeDemoPalette.pink,
-                    isActive: progress.detailIndex == 2
+                    isActive: progress.showsCompletedJourney || progress.detailIndex == 2
                 )
             }
 
@@ -312,8 +331,16 @@ private struct WelcomeTransformTrack: View {
             }
             .frame(width: 358)
 
+            ForEach(WelcomeCompletedJourneyStage.all) { stage in
+                WelcomeTransformCard(progress: stage.progress)
+                    .offset(x: stage.cardOffset)
+                    .opacity(progress.showsCompletedJourney ? 1 : 0)
+                    .scaleEffect(progress.showsCompletedJourney ? 1 : 0.92)
+            }
+
             WelcomeTransformCard(progress: progress)
                 .offset(x: 154 * progress.cardTravel)
+                .opacity(progress.showsCompletedJourney ? 0 : 1)
 
             WelcomeShortcutBadge()
                 .offset(y: 28)
