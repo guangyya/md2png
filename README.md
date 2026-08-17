@@ -108,11 +108,12 @@ screen, and identifies the preset and PNG pixel dimensions in its title. Its
 toolbar can copy the image again, save it explicitly, open it in Preview, fit it
 to the window, inspect one PNG pixel per display backing pixel, and zoom without
 changing the generated image or clipboard contents.
-The welcome guide opens once on first launch and can be reopened from the menu;
-it includes an optional, state-aware Launch at Login control. Its sample button
-opens a status-item menu guide that first shows the main menu,
-then reveals Examples; rendering starts only after the user chooses a sample. While the guide is
-open, md2png appears in Command-Tab so the window cannot become unreachable;
+The welcome guide opens once on first launch and can be reopened from the menu.
+It scrolls within smaller displays and at larger accessibility text sizes, and
+includes an optional, state-aware Launch at Login control. Its sample button
+opens a status-item menu guide that first shows the main menu, then reveals
+Examples; rendering starts only after the user chooses a sample. While the guide
+is open, md2png appears in Command-Tab so the window cannot become unreachable;
 closing the guide returns the app to its menu bar-only mode.
 Launch at Login always reflects the effective macOS state with an explicit
 action. If approval is required, the single menu row becomes **Allow Launch at
