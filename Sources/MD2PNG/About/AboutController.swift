@@ -1,9 +1,10 @@
 import AppKit
+import SwiftUI
 
 @MainActor
 final class AboutController: NSWindowController {
     private let updateController: UpdateController
-    private let aboutView = AboutContentView()
+    private let contentModel = AboutContentModel()
     private var updateStatusObserverID: UUID?
     private var projectURL: URL?
     private var updateFeatureAvailable = false
@@ -12,42 +13,65 @@ final class AboutController: NSWindowController {
 
 #if DEBUG
     var displayedBuildConfiguration: AppBuildConfiguration {
-        aboutView.displayedBuildConfiguration
+        contentModel.metadata.buildConfiguration
     }
-    var displayedProjectButtonTitle: String { aboutView.displayedProjectButtonTitle }
-    var displayedProjectButtonIsHidden: Bool { aboutView.displayedProjectButtonIsHidden }
-    var displayedUpdateButtonTitle: String { aboutView.displayedUpdateButtonTitle }
-    var displayedUpdateButtonIsHidden: Bool { aboutView.displayedUpdateButtonIsHidden }
-    var displayedUpdateButtonIsEnabled: Bool { aboutView.displayedUpdateButtonIsEnabled }
-    var displayedUpdateStatus: String { aboutView.displayedUpdateStatus }
-    var displayedUpdateDetail: String { aboutView.displayedUpdateDetail }
+    var displayedProjectButtonTitle: String {
+        L10n.text("about.open_project", defaultValue: "Open Project")
+    }
+    var displayedProjectButtonIsHidden: Bool { contentModel.metadata.projectURL == nil }
+    var displayedUpdateButtonTitle: String {
+        contentModel.updatePresentation?.primaryAction?.title ?? ""
+    }
+    var displayedUpdateButtonIsHidden: Bool {
+        !contentModel.updateFeatureAvailable
+            || contentModel.updatePresentation?.isVisible != true
+    }
+    var displayedUpdateButtonIsEnabled: Bool {
+        contentModel.updatePresentation?.primaryAction?.isEnabled ?? false
+    }
+    var displayedUpdateStatus: String {
+        contentModel.updatePresentation?.title ?? ""
+    }
+    var displayedUpdateDetail: String {
+        contentModel.updatePresentation?.detail ?? ""
+    }
     var displayedUpdateDetailMaximumNumberOfLines: Int {
-        aboutView.displayedUpdateDetailMaximumNumberOfLines
+        2
     }
     var displayedUpdateDetailLineBreakMode: NSLineBreakMode {
-        aboutView.displayedUpdateDetailLineBreakMode
+        .byWordWrapping
     }
     var displayedReleasesFallbackIsHidden: Bool {
-        aboutView.displayedReleasesFallbackIsHidden
+        contentModel.updatePresentation?.secondaryAction == nil
     }
     var displayedSecondaryUpdateButtonTitle: String {
-        aboutView.displayedSecondaryUpdateButtonTitle
+        contentModel.updatePresentation?.secondaryAction?.title ?? ""
     }
     var displayedCopyVersionButtonToolTip: String? {
-        aboutView.displayedCopyVersionButtonToolTip
+        contentModel.didCopyVersion
+            ? L10n.text("about.version_info_copied", defaultValue: "Copied")
+            : L10n.text("about.copy_version_info", defaultValue: "Copy Version Info")
     }
-    var displayedVersionBuild: String { aboutView.displayedVersionBuild }
+    var displayedVersionBuild: String { contentModel.metadata.versionBuildText() }
     var displayedVersionInfo: String { versionInfo }
-    var releaseNotesVisibleOrigin: NSPoint { aboutView.releaseNotesVisibleOrigin }
-    var displayedUpdateCardFrame: NSRect { aboutView.displayedUpdateCardFrame }
-    var displayedReleaseHeadingFrame: NSRect { aboutView.displayedReleaseHeadingFrame }
-    var displayedDescriptionFrame: NSRect { aboutView.displayedDescriptionFrame }
+    var usesSwiftUIHostingBoundary: Bool {
+        window?.contentViewController is NSHostingController<AboutContentView>
+    }
+    var displayedUpdateCardHeight: CGFloat {
+        contentModel.updatePresentation?.detail == nil
+            ? AboutLayout.compactUpdateHeight
+            : AboutLayout.detailedUpdateHeight
+    }
+    var displayedReleaseNotesRevision: Int { contentModel.releaseNotesRevision }
+    var displayedUpdateStatusIsSelectable: Bool {
+        updateStatusTextField?.isSelectable == true
+    }
     var displayedUpdateStatusSelectedRange: NSRange? {
-        aboutView.displayedUpdateStatusSelectedRange
+        updateStatusTextField?.currentEditor()?.selectedRange
     }
 
     func selectAllUpdateStatusForTesting() {
-        aboutView.selectAllUpdateStatusForTesting()
+        updateStatusTextField?.selectText(nil)
     }
 #endif
 
@@ -63,8 +87,21 @@ final class AboutController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
-        window.contentView = aboutView
-        bindContentActions()
+        window.contentViewController = NSHostingController(
+            rootView: AboutContentView(
+                model: contentModel,
+                onOpenProject: { [weak self] in self?.openProject() },
+                onPrimaryUpdateAction: { [weak self] action in
+                    self?.performUpdateAction(action)
+                },
+                onSecondaryUpdateAction: { [weak self] action in
+                    self?.performSecondaryUpdateAction(action)
+                },
+                onCopyVersion: { [weak self] in self?.copyVersionInfo() },
+                onClose: { [weak self] in self?.closeAbout() }
+            )
+        )
+        window.setContentSize(AboutLayout.windowSize)
         updateStatusObserverID = updateController.observeStatus { [weak self] status in
             self?.applyUpdateStatus(status)
         }
@@ -80,7 +117,7 @@ final class AboutController: NSWindowController {
             GitHubRepository.init(projectURL:)
         ) != nil && updateController.allowsUpdatePresentation
         versionInfo = metadata.versionInfo()
-        aboutView.apply(
+        contentModel.apply(
             metadata: metadata,
             updateFeatureAvailable: updateFeatureAvailable
         )
@@ -92,19 +129,6 @@ final class AboutController: NSWindowController {
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         window?.contentView?.layoutSubtreeIfNeeded()
-        aboutView.updateReleaseNotesLayout()
-    }
-
-    private func bindContentActions() {
-        aboutView.onOpenProject = { [weak self] in self?.openProject() }
-        aboutView.onPrimaryUpdateAction = { [weak self] action in
-            self?.performUpdateAction(action)
-        }
-        aboutView.onSecondaryUpdateAction = { [weak self] action in
-            self?.performSecondaryUpdateAction(action)
-        }
-        aboutView.onCopyVersion = { [weak self] in self?.copyVersionInfo() }
-        aboutView.onClose = { [weak self] in self?.closeAbout() }
     }
 
     private func openProject() {
@@ -142,7 +166,7 @@ final class AboutController: NSWindowController {
             allowsInteractiveCheck: updateController.allowsInteractiveCheck,
             canDownload: updateController.canDownload
         )
-        aboutView.apply(
+        contentModel.apply(
             updatePresentation: presentation,
             updateFeatureAvailable: updateFeatureAvailable
         )
@@ -154,7 +178,7 @@ final class AboutController: NSWindowController {
         guard pasteboard.setString(versionInfo, forType: .string) else { return }
 
         copyResetWorkItem?.cancel()
-        aboutView.showCopySucceeded()
+        contentModel.showCopySucceeded()
         let workItem = DispatchWorkItem { [weak self] in
             self?.resetCopyVersionButton()
         }
@@ -165,11 +189,31 @@ final class AboutController: NSWindowController {
     private func resetCopyVersionButton() {
         copyResetWorkItem?.cancel()
         copyResetWorkItem = nil
-        aboutView.showCopyReady()
+        contentModel.showCopyReady()
     }
 
     private func closeAbout() {
         copyResetWorkItem?.cancel()
         close()
     }
+
+#if DEBUG
+    private var updateStatusTextField: NSTextField? {
+        findUpdateStatusTextField(in: window?.contentView)
+    }
+
+    private func findUpdateStatusTextField(in view: NSView?) -> NSTextField? {
+        guard let view else { return nil }
+        if let textField = view as? NSTextField,
+           textField.identifier?.rawValue == "AboutUpdateStatusLabel" {
+            return textField
+        }
+        for subview in view.subviews {
+            if let textField = findUpdateStatusTextField(in: subview) {
+                return textField
+            }
+        }
+        return nil
+    }
+#endif
 }

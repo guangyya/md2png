@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 enum AboutLayout {
     static let windowSize = NSSize(width: 560, height: 490)
@@ -6,528 +7,218 @@ enum AboutLayout {
     static let detailedUpdateHeight: CGFloat = 66
 }
 
-final class BuildBadgeView: NSView {
-    private let textLabel = NSTextField(labelWithString: "")
-    private(set) var configuration: AppBuildConfiguration = .debug
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.cornerRadius = 7
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1
-
-        textLabel.font = .systemFont(ofSize: 10, weight: .semibold)
-        textLabel.alignment = .center
-        textLabel.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(textLabel)
-
-        NSLayoutConstraint.activate([
-            textLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            textLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            textLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
-            textLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -3)
-        ])
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var intrinsicContentSize: NSSize {
-        let labelSize = textLabel.intrinsicContentSize
-        return NSSize(width: labelSize.width + 16, height: labelSize.height + 6)
-    }
-
-    func configure(_ configuration: AppBuildConfiguration) {
-        self.configuration = configuration
-        textLabel.stringValue = configuration.displayName()
-        let tintColor: NSColor
-        switch configuration {
-        case .debug:
-            tintColor = .systemOrange
-        case .release:
-            tintColor = .systemBlue
-        }
-        textLabel.textColor = tintColor
-        layer?.backgroundColor = tintColor.withAlphaComponent(0.12).cgColor
-        layer?.borderColor = tintColor.withAlphaComponent(0.38).cgColor
-        toolTip = configuration.displayName()
-        invalidateIntrinsicContentSize()
-    }
-}
-
-final class UpdateStatusCardView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.cornerRadius = 8
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 0.5
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var wantsUpdateLayer: Bool { true }
-
-    override func updateLayer() {
-        layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.07).cgColor
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.20).cgColor
-    }
-}
-
-final class SelectAllOnDoubleClickTextField: NSTextField {
-    override func mouseDown(with event: NSEvent) {
-        super.mouseDown(with: event)
-        if event.clickCount == 2 {
-            selectText(nil)
-        }
-    }
-}
-
 @MainActor
-final class AboutContentView: NSView {
-    var onOpenProject: (() -> Void)?
-    var onPrimaryUpdateAction: ((AboutUpdatePrimaryAction) -> Void)?
-    var onSecondaryUpdateAction: ((AboutUpdateSecondaryAction) -> Void)?
-    var onCopyVersion: (() -> Void)?
-    var onClose: (() -> Void)?
+final class AboutContentModel: ObservableObject {
+    @Published private(set) var metadata: AppMetadata
+    @Published private(set) var updatePresentation: AboutUpdatePresentation?
+    @Published private(set) var updateFeatureAvailable = false
+    @Published private(set) var didCopyVersion = false
+    @Published private(set) var releaseNotesRevision = 0
 
-    private let versionLabel = NSTextField(labelWithString: "")
-    private let buildBadgeView = BuildBadgeView()
-    private let descriptionLabel = NSTextField(wrappingLabelWithString: "")
-    private let releaseHeadingLabel = NSTextField(labelWithString: "")
-    private let releaseNotesView = NSTextView()
-    private let notesScrollView = NSScrollView()
-    private let updateSlot = NSView()
-    private let updateRow = UpdateStatusCardView()
-    private let updateStatusIcon = NSImageView()
-    private let updateStatusLabel = SelectAllOnDoubleClickTextField(labelWithString: "")
-    private let updateDetailLabel = NSTextField(wrappingLabelWithString: "")
-    private let updateActionButton = NSButton()
-    private let secondaryUpdateButton = NSButton()
-    private let projectTitle = NSTextField(labelWithString: "")
-    private let projectButton = NSButton()
-    private let copyVersionButton = NSButton()
-    private var updateRowHeightConstraint: NSLayoutConstraint!
-    private var primaryUpdateAction: AboutUpdatePrimaryAction?
-    private var secondaryUpdateAction: AboutUpdateSecondaryAction?
-
-    init() {
-        super.init(frame: NSRect(origin: .zero, size: AboutLayout.windowSize))
-        configureContent()
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    init(metadata: AppMetadata = .current()) {
+        self.metadata = metadata
     }
 
     func apply(metadata: AppMetadata, updateFeatureAvailable: Bool) {
-        buildBadgeView.configure(metadata.buildConfiguration)
-        versionLabel.stringValue = metadata.versionBuildText()
-        releaseHeadingLabel.stringValue = L10n.format(
-            "about.whats_new",
-            defaultValue: "What’s new in %@",
-            metadata.version
-        )
-        applyReleaseNotesStyle(metadata.releaseNotes)
-        projectTitle.isHidden = metadata.projectURL == nil
-        projectButton.isHidden = metadata.projectURL == nil
-        projectButton.title = L10n.text(
-            "about.open_project",
-            defaultValue: "Open Project"
-        )
-        projectButton.toolTip = metadata.projectURL?.absoluteString
-        updateSlot.isHidden = !updateFeatureAvailable
-        updateRow.toolTip = L10n.text(
-            "about.check_for_updates_help",
-            defaultValue: "Checks the signed update feed only when you choose Check for Updates."
-        )
-        showCopyReady()
+        self.metadata = metadata
+        self.updateFeatureAvailable = updateFeatureAvailable
+        didCopyVersion = false
+        releaseNotesRevision += 1
     }
 
     func apply(
-        updatePresentation presentation: AboutUpdatePresentation,
+        updatePresentation: AboutUpdatePresentation,
         updateFeatureAvailable: Bool
     ) {
-        updateSlot.isHidden = !updateFeatureAvailable
-        guard updateFeatureAvailable, presentation.isVisible else {
-            updateRow.isHidden = true
-            primaryUpdateAction = nil
-            secondaryUpdateAction = nil
-            return
-        }
-
-        updateRow.isHidden = false
-        updateStatusIcon.image = NSImage(
-            systemSymbolName: presentation.symbolName,
-            accessibilityDescription: nil
-        )
-        updateStatusIcon.contentTintColor = presentation.tint.color
-        updateStatusLabel.stringValue = presentation.title
-        updateStatusLabel.setAccessibilityLabel(
-            presentation.detail.map { "\(presentation.title). \($0)" }
-                ?? presentation.title
-        )
-        updateStatusLabel.toolTip = presentation.detail ?? presentation.title
-        updateDetailLabel.isHidden = presentation.detail == nil
-        updateDetailLabel.stringValue = presentation.detail ?? ""
-        updateDetailLabel.toolTip = presentation.detail
-        updateRowHeightConstraint.constant = presentation.detail == nil
-            ? AboutLayout.compactUpdateHeight
-            : AboutLayout.detailedUpdateHeight
-
-        primaryUpdateAction = presentation.primaryAction?.action
-        updateActionButton.isHidden = presentation.primaryAction == nil
-        updateActionButton.title = presentation.primaryAction?.title ?? ""
-        updateActionButton.isEnabled = presentation.primaryAction?.isEnabled ?? false
-        updateActionButton.isBordered = false
-        updateActionButton.bezelColor = nil
-        updateActionButton.font = .systemFont(
-            ofSize: 12,
-            weight: presentation.primaryAction?.isEmphasized == true ? .semibold : .regular
-        )
-        updateActionButton.contentTintColor = presentation.primaryAction?.isEnabled == true
-            ? .linkColor
-            : .secondaryLabelColor
-        updateActionButton.toolTip = presentation.primaryAction?.toolTip
-
-        secondaryUpdateAction = presentation.secondaryAction?.action
-        secondaryUpdateButton.isHidden = presentation.secondaryAction == nil
-        secondaryUpdateButton.title = presentation.secondaryAction?.title ?? ""
+        self.updatePresentation = updatePresentation
+        self.updateFeatureAvailable = updateFeatureAvailable
     }
 
     func showCopySucceeded() {
-        copyVersionButton.contentTintColor = .systemGreen
-        copyVersionButton.image = NSImage(
-            systemSymbolName: "checkmark.circle.fill",
-            accessibilityDescription: nil
-        )
-        copyVersionButton.toolTip = L10n.text(
-            "about.version_info_copied",
-            defaultValue: "Copied"
-        )
+        didCopyVersion = true
     }
 
     func showCopyReady() {
-        let copyLabel = L10n.text(
+        didCopyVersion = false
+    }
+}
+
+struct AboutContentView: View {
+    @ObservedObject var model: AboutContentModel
+
+    let onOpenProject: () -> Void
+    let onPrimaryUpdateAction: (AboutUpdatePrimaryAction) -> Void
+    let onSecondaryUpdateAction: (AboutUpdateSecondaryAction) -> Void
+    let onCopyVersion: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            Divider()
+                .padding(.horizontal, 28)
+                .padding(.top, 22)
+
+            releaseNotes
+
+            footer
+        }
+        .frame(
+            width: AboutLayout.windowSize.width,
+            height: AboutLayout.windowSize.height
+        )
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 20) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 88)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 10) {
+                    Text("md2png")
+                        .font(.system(size: 27, weight: .semibold))
+
+                    AboutBuildBadge(configuration: model.metadata.buildConfiguration)
+                }
+
+                Text(L10n.text(
+                    "about.description",
+                    defaultValue: "Turn clipboard Markdown into a polished PNG — locally and privately."
+                ))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
+
+                HStack(spacing: 6) {
+                    Text(model.metadata.versionBuildText())
+                        .font(.system(size: 12, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    Button(action: onCopyVersion) {
+                        Image(systemName: model.didCopyVersion
+                            ? "checkmark.circle.fill"
+                            : "doc.on.doc")
+                            .foregroundStyle(model.didCopyVersion
+                                ? Color.green
+                                : Color(nsColor: .secondaryLabelColor))
+                    }
+                    .buttonStyle(.plain)
+                    .help(copyVersionHelp)
+                    .accessibilityLabel(copyVersionLabel)
+                }
+
+                if model.updateFeatureAvailable,
+                   let presentation = model.updatePresentation,
+                   presentation.isVisible {
+                    AboutUpdateCard(
+                        presentation: presentation,
+                        onPrimaryAction: onPrimaryUpdateAction,
+                        onSecondaryAction: onSecondaryUpdateAction
+                    )
+                    .frame(
+                        height: AboutLayout.detailedUpdateHeight,
+                        alignment: .top
+                    )
+                    .padding(.top, 5)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 28)
+    }
+
+    private var releaseNotes: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.format(
+                "about.whats_new",
+                defaultValue: "What’s new in %@",
+                model.metadata.version
+            ))
+                .font(.system(size: 15, weight: .semibold))
+
+            ScrollView {
+                Text(styledReleaseNotes)
+                    .font(.system(size: 13))
+                    .lineSpacing(2)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+            }
+            .id(model.releaseNotesRevision)
+            .frame(maxHeight: .infinity)
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 20)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        HStack(spacing: 10) {
+            if model.metadata.projectURL != nil {
+                Text(L10n.text("about.project", defaultValue: "Project"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Button(action: onOpenProject) {
+                    Label(
+                        L10n.text("about.open_project", defaultValue: "Open Project"),
+                        systemImage: "arrow.up.right.square"
+                    )
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(model.metadata.projectURL?.absoluteString ?? "")
+            }
+
+            Spacer()
+
+            Button(
+                L10n.text("about.done", defaultValue: "Done"),
+                action: onClose
+            )
+            .keyboardShortcut(.defaultAction)
+            .frame(minWidth: 80)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 18)
+        .padding(.bottom, 24)
+    }
+
+    private var copyVersionLabel: String {
+        L10n.text(
             "about.copy_version_info",
             defaultValue: "Copy Version Info"
         )
-        copyVersionButton.title = ""
-        copyVersionButton.toolTip = copyLabel
-        copyVersionButton.setAccessibilityLabel(copyLabel)
-        copyVersionButton.contentTintColor = .secondaryLabelColor
-        copyVersionButton.image = NSImage(
-            systemSymbolName: "doc.on.doc",
-            accessibilityDescription: nil
-        )
     }
 
-    func updateReleaseNotesLayout() {
-        let width = max(1, notesScrollView.contentSize.width)
-        releaseNotesView.setFrameSize(NSSize(
-            width: width,
-            height: notesScrollView.contentSize.height
-        ))
-        releaseNotesView.textContainer?.containerSize = NSSize(
-            width: width,
-            height: .greatestFiniteMagnitude
-        )
-        if let textContainer = releaseNotesView.textContainer {
-            releaseNotesView.layoutManager?.ensureLayout(for: textContainer)
-            if let layoutManager = releaseNotesView.layoutManager {
-                let usedHeight = layoutManager.usedRect(for: textContainer).height
-                releaseNotesView.setFrameSize(NSSize(
-                    width: width,
-                    height: max(notesScrollView.contentSize.height, usedHeight + 24)
-                ))
-            }
-        }
-        releaseNotesView.setSelectedRange(NSRange(location: 0, length: 0))
-        notesScrollView.contentView.scroll(to: .zero)
-        notesScrollView.reflectScrolledClipView(notesScrollView.contentView)
+    private var copyVersionHelp: String {
+        model.didCopyVersion
+            ? L10n.text("about.version_info_copied", defaultValue: "Copied")
+            : copyVersionLabel
     }
 
-#if DEBUG
-    var displayedBuildConfiguration: AppBuildConfiguration { buildBadgeView.configuration }
-    var displayedProjectButtonTitle: String { projectButton.title }
-    var displayedProjectButtonIsHidden: Bool { projectButton.isHidden }
-    var displayedUpdateButtonTitle: String { updateActionButton.title }
-    var displayedUpdateButtonIsHidden: Bool { updateRow.isHidden }
-    var displayedUpdateButtonIsEnabled: Bool { updateActionButton.isEnabled }
-    var displayedUpdateStatus: String { updateStatusLabel.stringValue }
-    var displayedUpdateDetail: String { updateDetailLabel.stringValue }
-    var displayedUpdateDetailMaximumNumberOfLines: Int {
-        updateDetailLabel.maximumNumberOfLines
-    }
-    var displayedUpdateDetailLineBreakMode: NSLineBreakMode {
-        updateDetailLabel.lineBreakMode
-    }
-    var displayedReleasesFallbackIsHidden: Bool { secondaryUpdateButton.isHidden }
-    var displayedSecondaryUpdateButtonTitle: String { secondaryUpdateButton.title }
-    var displayedCopyVersionButtonToolTip: String? { copyVersionButton.toolTip }
-    var displayedVersionBuild: String { versionLabel.stringValue }
-    var releaseNotesVisibleOrigin: NSPoint { notesScrollView.contentView.bounds.origin }
-    var displayedUpdateCardFrame: NSRect { frameInContent(updateRow) }
-    var displayedReleaseHeadingFrame: NSRect { frameInContent(releaseHeadingLabel) }
-    var displayedDescriptionFrame: NSRect { frameInContent(descriptionLabel) }
-    var displayedUpdateStatusSelectedRange: NSRange? {
-        updateStatusLabel.currentEditor()?.selectedRange
-    }
-
-    func selectAllUpdateStatusForTesting() {
-        updateStatusLabel.selectText(nil)
-    }
-
-    private func frameInContent(_ view: NSView) -> NSRect {
-        guard let superview = view.superview else { return .zero }
-        return superview.convert(view.frame, to: self)
-    }
-#endif
-
-    private func configureContent() {
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-
-        let iconView = NSImageView(image: NSApp.applicationIconImage)
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-
-        let titleLabel = NSTextField(labelWithString: "md2png")
-        titleLabel.font = .systemFont(ofSize: 27, weight: .semibold)
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        let titleRow = NSStackView(views: [titleLabel, buildBadgeView])
-        titleRow.orientation = .horizontal
-        titleRow.alignment = .centerY
-        titleRow.spacing = 10
-        titleRow.translatesAutoresizingMaskIntoConstraints = false
-
-        versionLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        versionLabel.textColor = .secondaryLabelColor
-        versionLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        copyVersionButton.title = ""
-        copyVersionButton.target = self
-        copyVersionButton.action = #selector(copyVersionRequested)
-        copyVersionButton.isBordered = false
-        copyVersionButton.controlSize = .small
-        copyVersionButton.imagePosition = .imageOnly
-        copyVersionButton.translatesAutoresizingMaskIntoConstraints = false
-        showCopyReady()
-
-        let versionRow = NSStackView(views: [versionLabel, copyVersionButton])
-        versionRow.orientation = .horizontal
-        versionRow.alignment = .centerY
-        versionRow.spacing = 6
-        versionRow.translatesAutoresizingMaskIntoConstraints = false
-
-        updateSlot.translatesAutoresizingMaskIntoConstraints = false
-        updateRow.translatesAutoresizingMaskIntoConstraints = false
-
-        updateStatusIcon.imageScaling = .scaleProportionallyDown
-        updateStatusIcon.translatesAutoresizingMaskIntoConstraints = false
-
-        updateStatusLabel.font = .systemFont(ofSize: 11.5)
-        updateStatusLabel.isSelectable = true
-        updateStatusLabel.maximumNumberOfLines = 1
-        updateStatusLabel.lineBreakMode = .byTruncatingTail
-        updateStatusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        updateStatusLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        updateDetailLabel.font = .systemFont(ofSize: 10.5)
-        updateDetailLabel.textColor = .secondaryLabelColor
-        updateDetailLabel.maximumNumberOfLines = 2
-        updateDetailLabel.lineBreakMode = .byWordWrapping
-        updateDetailLabel.preferredMaxLayoutWidth = 351
-        updateDetailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        updateDetailLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        updateActionButton.target = self
-        updateActionButton.action = #selector(primaryUpdateActionRequested)
-        updateActionButton.bezelStyle = .rounded
-        updateActionButton.controlSize = .small
-        updateActionButton.translatesAutoresizingMaskIntoConstraints = false
-
-        secondaryUpdateButton.title = L10n.text(
-            "about.view_all_releases",
-            defaultValue: "View Releases"
-        )
-        secondaryUpdateButton.target = self
-        secondaryUpdateButton.action = #selector(secondaryUpdateActionRequested)
-        secondaryUpdateButton.isBordered = false
-        secondaryUpdateButton.font = .systemFont(ofSize: 11)
-        secondaryUpdateButton.contentTintColor = .linkColor
-        secondaryUpdateButton.translatesAutoresizingMaskIntoConstraints = false
-
-        for view in [
-            updateStatusIcon, updateStatusLabel, updateDetailLabel,
-            secondaryUpdateButton, updateActionButton
-        ] {
-            updateRow.addSubview(view)
-        }
-        updateSlot.addSubview(updateRow)
-
-        descriptionLabel.stringValue = L10n.text(
-            "about.description",
-            defaultValue: "Turn clipboard Markdown into a polished PNG — locally and privately."
-        )
-        descriptionLabel.font = .systemFont(ofSize: 12)
-        descriptionLabel.textColor = .secondaryLabelColor
-        descriptionLabel.maximumNumberOfLines = 1
-        descriptionLabel.lineBreakMode = .byTruncatingTail
-        descriptionLabel.preferredMaxLayoutWidth = 396
-        descriptionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        let headerText = NSStackView(views: [titleRow, descriptionLabel, versionRow, updateSlot])
-        headerText.orientation = .vertical
-        headerText.alignment = .leading
-        headerText.spacing = 5
-        headerText.setCustomSpacing(2, after: titleRow)
-        headerText.setCustomSpacing(10, after: versionRow)
-        headerText.translatesAutoresizingMaskIntoConstraints = false
-
-        let divider = NSBox()
-        divider.boxType = .separator
-        divider.translatesAutoresizingMaskIntoConstraints = false
-
-        releaseHeadingLabel.font = .systemFont(ofSize: 15, weight: .semibold)
-        releaseHeadingLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        releaseNotesView.isEditable = false
-        releaseNotesView.isSelectable = true
-        releaseNotesView.drawsBackground = false
-        releaseNotesView.font = .systemFont(ofSize: 13)
-        releaseNotesView.textColor = .labelColor
-        releaseNotesView.textContainerInset = NSSize(width: 12, height: 10)
-        releaseNotesView.isRichText = false
-        releaseNotesView.isHorizontallyResizable = false
-        releaseNotesView.isVerticallyResizable = true
-        releaseNotesView.autoresizingMask = [.width]
-        releaseNotesView.textContainer?.widthTracksTextView = true
-        releaseNotesView.frame = NSRect(x: 0, y: 0, width: 480, height: 205)
-
-        notesScrollView.documentView = releaseNotesView
-        notesScrollView.hasVerticalScroller = true
-        notesScrollView.autohidesScrollers = true
-        notesScrollView.drawsBackground = true
-        notesScrollView.backgroundColor = .controlBackgroundColor
-        notesScrollView.borderType = .noBorder
-        notesScrollView.wantsLayer = true
-        notesScrollView.layer?.cornerRadius = 10
-        notesScrollView.layer?.cornerCurve = .continuous
-        notesScrollView.layer?.borderWidth = 1
-        notesScrollView.layer?.borderColor = NSColor.separatorColor.cgColor
-        notesScrollView.translatesAutoresizingMaskIntoConstraints = false
-
-        projectTitle.stringValue = L10n.text("about.project", defaultValue: "Project")
-        projectTitle.font = .systemFont(ofSize: 12, weight: .semibold)
-        projectTitle.textColor = .secondaryLabelColor
-        projectTitle.translatesAutoresizingMaskIntoConstraints = false
-
-        projectButton.target = self
-        projectButton.action = #selector(openProjectRequested)
-        projectButton.isBordered = false
-        projectButton.font = .systemFont(ofSize: 12)
-        projectButton.contentTintColor = .linkColor
-        projectButton.alignment = .left
-        projectButton.image = NSImage(
-            systemSymbolName: "arrow.up.right.square",
-            accessibilityDescription: nil
-        )
-        projectButton.imagePosition = .imageLeading
-        projectButton.translatesAutoresizingMaskIntoConstraints = false
-
-        let closeButton = NSButton(
-            title: L10n.text("about.done", defaultValue: "Done"),
-            target: self,
-            action: #selector(closeRequested)
-        )
-        closeButton.keyEquivalent = "\r"
-        closeButton.bezelStyle = .rounded
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-
-        for view in [
-            iconView, headerText, divider, releaseHeadingLabel, notesScrollView,
-            projectTitle, projectButton, closeButton
-        ] {
-            addSubview(view)
-        }
-
-        updateRowHeightConstraint = updateRow.heightAnchor.constraint(
-            equalToConstant: AboutLayout.compactUpdateHeight
-        )
-
-        NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
-            iconView.topAnchor.constraint(equalTo: topAnchor, constant: 28),
-            iconView.widthAnchor.constraint(equalToConstant: 88),
-            iconView.heightAnchor.constraint(equalToConstant: 88),
-
-            headerText.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 20),
-            headerText.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -28),
-            headerText.topAnchor.constraint(equalTo: iconView.topAnchor),
-
-            descriptionLabel.widthAnchor.constraint(equalTo: headerText.widthAnchor),
-            descriptionLabel.heightAnchor.constraint(equalToConstant: 20),
-            updateSlot.widthAnchor.constraint(equalTo: headerText.widthAnchor),
-            updateSlot.heightAnchor.constraint(equalToConstant: AboutLayout.detailedUpdateHeight),
-            updateRow.leadingAnchor.constraint(equalTo: updateSlot.leadingAnchor),
-            updateRow.trailingAnchor.constraint(equalTo: updateSlot.trailingAnchor),
-            updateRow.topAnchor.constraint(equalTo: updateSlot.topAnchor),
-            updateRowHeightConstraint,
-
-            updateStatusIcon.leadingAnchor.constraint(equalTo: updateRow.leadingAnchor, constant: 10),
-            updateStatusIcon.topAnchor.constraint(equalTo: updateRow.topAnchor, constant: 9),
-            updateStatusIcon.widthAnchor.constraint(equalToConstant: 18),
-            updateStatusIcon.heightAnchor.constraint(equalToConstant: 18),
-
-            updateStatusLabel.leadingAnchor.constraint(equalTo: updateStatusIcon.trailingAnchor, constant: 7),
-            updateStatusLabel.centerYAnchor.constraint(equalTo: updateStatusIcon.centerYAnchor),
-            updateStatusLabel.trailingAnchor.constraint(lessThanOrEqualTo: secondaryUpdateButton.leadingAnchor, constant: -8),
-
-            updateDetailLabel.leadingAnchor.constraint(equalTo: updateStatusLabel.leadingAnchor),
-            updateDetailLabel.trailingAnchor.constraint(equalTo: updateRow.trailingAnchor, constant: -10),
-            updateDetailLabel.topAnchor.constraint(equalTo: updateStatusLabel.bottomAnchor, constant: 3),
-            updateDetailLabel.bottomAnchor.constraint(lessThanOrEqualTo: updateRow.bottomAnchor, constant: -7),
-
-            secondaryUpdateButton.centerYAnchor.constraint(equalTo: updateStatusIcon.centerYAnchor),
-            secondaryUpdateButton.trailingAnchor.constraint(equalTo: updateActionButton.leadingAnchor, constant: -8),
-
-            updateActionButton.centerYAnchor.constraint(equalTo: updateStatusIcon.centerYAnchor),
-            updateActionButton.trailingAnchor.constraint(equalTo: updateRow.trailingAnchor, constant: -10),
-
-            divider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
-            divider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -28),
-            divider.topAnchor.constraint(greaterThanOrEqualTo: iconView.bottomAnchor, constant: 22),
-            divider.topAnchor.constraint(equalTo: headerText.bottomAnchor, constant: 22),
-
-            releaseHeadingLabel.leadingAnchor.constraint(equalTo: divider.leadingAnchor),
-            releaseHeadingLabel.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 20),
-
-            notesScrollView.leadingAnchor.constraint(equalTo: divider.leadingAnchor),
-            notesScrollView.trailingAnchor.constraint(equalTo: divider.trailingAnchor),
-            notesScrollView.topAnchor.constraint(equalTo: releaseHeadingLabel.bottomAnchor, constant: 10),
-            notesScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 160),
-            notesScrollView.bottomAnchor.constraint(equalTo: projectTitle.topAnchor, constant: -18),
-
-            projectTitle.leadingAnchor.constraint(equalTo: divider.leadingAnchor),
-            projectButton.leadingAnchor.constraint(equalTo: projectTitle.trailingAnchor, constant: 10),
-            projectButton.centerYAnchor.constraint(equalTo: projectTitle.centerYAnchor),
-            projectButton.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -16),
-
-            closeButton.trailingAnchor.constraint(equalTo: divider.trailingAnchor),
-            closeButton.centerYAnchor.constraint(equalTo: projectTitle.centerYAnchor),
-            closeButton.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -24),
-            closeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 80)
-        ])
-    }
-
-    private func applyReleaseNotesStyle(_ notes: String) {
+    private var styledReleaseNotes: AttributedString {
         let headings = Set([
             L10n.text("release_section.added", defaultValue: "Added"),
             L10n.text("release_section.changed", defaultValue: "Changed"),
@@ -536,59 +227,200 @@ final class AboutContentView: NSView {
             L10n.text("release_section.deprecated", defaultValue: "Deprecated"),
             L10n.text("release_section.security", defaultValue: "Security")
         ])
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 2
-        paragraphStyle.paragraphSpacing = 4
-        let output = NSMutableAttributedString()
-        let lines = notes.components(separatedBy: .newlines)
+        let lines = model.metadata.releaseNotes.components(separatedBy: .newlines)
+        var output = AttributedString()
 
         for (index, line) in lines.enumerated() {
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: headings.contains(line)
-                    ? NSFont.systemFont(ofSize: 13, weight: .semibold)
-                    : NSFont.systemFont(ofSize: 13),
-                .foregroundColor: headings.contains(line)
-                    ? NSColor.labelColor
-                    : NSColor.textColor,
-                .paragraphStyle: paragraphStyle
-            ]
-            output.append(NSAttributedString(string: line, attributes: attributes))
+            var attributedLine = AttributedString(line)
+            attributedLine.font = headings.contains(line)
+                ? .system(size: 13, weight: .semibold)
+                : .system(size: 13)
+            attributedLine.foregroundColor = headings.contains(line)
+                ? Color.primary
+                : Color(nsColor: .textColor)
+            output.append(attributedLine)
             if index < lines.count - 1 {
-                output.append(NSAttributedString(string: "\n", attributes: attributes))
+                output.append(AttributedString("\n"))
             }
         }
-        releaseNotesView.textStorage?.setAttributedString(output)
+
+        return output
+    }
+}
+
+private struct AboutBuildBadge: View {
+    let configuration: AppBuildConfiguration
+
+    var body: some View {
+        Text(configuration.displayName())
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(configuration.badgeColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                configuration.badgeColor.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(configuration.badgeColor.opacity(0.38), lineWidth: 1)
+            }
+            .help(configuration.displayName())
+    }
+}
+
+private struct AboutUpdateCard: View {
+    let presentation: AboutUpdatePresentation
+    let onPrimaryAction: (AboutUpdatePrimaryAction) -> Void
+    let onSecondaryAction: (AboutUpdateSecondaryAction) -> Void
+
+    private var cardHeight: CGFloat {
+        presentation.detail == nil
+            ? AboutLayout.compactUpdateHeight
+            : AboutLayout.detailedUpdateHeight
     }
 
-    @objc private func openProjectRequested() {
-        onOpenProject?()
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: presentation.symbolName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .foregroundStyle(presentation.tint.color)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    AboutSelectableStatusLabel(
+                        text: presentation.title,
+                        accessibilityLabel: statusAccessibilityLabel,
+                        toolTip: presentation.detail ?? presentation.title
+                    )
+                    .frame(minWidth: 1, minHeight: 18)
+                    .layoutPriority(1)
+
+                    if let secondaryAction = presentation.secondaryAction {
+                        Button(secondaryAction.title) {
+                            onSecondaryAction(secondaryAction.action)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.accentColor)
+                    }
+
+                    if let primaryAction = presentation.primaryAction {
+                        Button(primaryAction.title) {
+                            onPrimaryAction(primaryAction.action)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(
+                            size: 12,
+                            weight: primaryAction.isEmphasized ? .semibold : .regular
+                        ))
+                        .foregroundStyle(primaryAction.isEnabled
+                            ? Color.accentColor
+                            : Color(nsColor: .secondaryLabelColor))
+                        .disabled(!primaryAction.isEnabled)
+                        .help(primaryAction.toolTip ?? primaryAction.title)
+                    }
+                }
+
+                if let detail = presentation.detail {
+                    Text(detail)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(detail)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 9)
+        .padding(.bottom, 7)
+        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight)
+        .background(
+            Color(nsColor: .separatorColor).opacity(0.07),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.2), lineWidth: 0.5)
+        }
+        .help(L10n.text(
+            "about.check_for_updates_help",
+            defaultValue: "Checks the signed update feed only when you choose Check for Updates."
+        ))
     }
 
-    @objc private func primaryUpdateActionRequested() {
-        guard let primaryUpdateAction else { return }
-        onPrimaryUpdateAction?(primaryUpdateAction)
+    private var statusAccessibilityLabel: String {
+        presentation.detail.map { "\(presentation.title). \($0)" }
+            ?? presentation.title
+    }
+}
+
+private final class SelectAllOnDoubleClickTextField: NSTextField {
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        if event.clickCount == 2 {
+            selectText(nil)
+        }
+    }
+}
+
+private struct AboutSelectableStatusLabel: NSViewRepresentable {
+    static let identifier = NSUserInterfaceItemIdentifier("AboutUpdateStatusLabel")
+
+    let text: String
+    let accessibilityLabel: String
+    let toolTip: String
+
+    func makeNSView(context: Context) -> NSTextField {
+        let textField = SelectAllOnDoubleClickTextField(labelWithString: "")
+        textField.identifier = Self.identifier
+        textField.font = .systemFont(ofSize: 11.5)
+        textField.isSelectable = true
+        textField.maximumNumberOfLines = 1
+        textField.lineBreakMode = .byTruncatingTail
+        textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return textField
     }
 
-    @objc private func secondaryUpdateActionRequested() {
-        guard let secondaryUpdateAction else { return }
-        onSecondaryUpdateAction?(secondaryUpdateAction)
+    func updateNSView(_ textField: NSTextField, context: Context) {
+        textField.stringValue = text
+        textField.setAccessibilityLabel(accessibilityLabel)
+        textField.toolTip = toolTip
     }
 
-    @objc private func copyVersionRequested() {
-        onCopyVersion?()
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView textField: NSTextField,
+        context: Context
+    ) -> CGSize? {
+        let intrinsicSize = textField.intrinsicContentSize
+        return CGSize(
+            width: min(proposal.width ?? intrinsicSize.width, intrinsicSize.width),
+            height: max(18, intrinsicSize.height)
+        )
     }
+}
 
-    @objc private func closeRequested() {
-        onClose?()
+private extension AppBuildConfiguration {
+    var badgeColor: Color {
+        switch self {
+        case .debug: .orange
+        case .release: .blue
+        }
     }
 }
 
 private extension AboutUpdateTint {
-    var color: NSColor {
+    var color: Color {
         switch self {
-        case .green: .systemGreen
-        case .blue: .systemBlue
-        case .orange: .systemOrange
+        case .green: .green
+        case .blue: .blue
+        case .orange: .orange
         }
     }
 }
