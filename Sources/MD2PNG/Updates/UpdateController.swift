@@ -211,6 +211,7 @@ final class UpdateController {
     private let session: any UpdateSession
     private let channel: () -> UpdateChannel
     private let openWebPage: (URL) -> Bool
+    private let diagnosticLogger: DiagnosticLogger
     private var statusObservers: [UUID: StatusObserver] = [:]
 
 #if DEBUG
@@ -254,6 +255,7 @@ final class UpdateController {
 
     init(
         service: UpdateService = UpdateService(),
+        diagnosticLogger: DiagnosticLogger = .disabled,
         channel: @escaping () -> UpdateChannel = { .current() },
         installedVersion: @escaping () -> String? = {
             Bundle.main.object(
@@ -278,6 +280,7 @@ final class UpdateController {
     ) {
         self.channel = channel
         self.openWebPage = openWebPage
+        self.diagnosticLogger = diagnosticLogger
 
         if let updateDriver {
             session = SparkleUpdateSession(
@@ -401,6 +404,11 @@ final class UpdateController {
     }
 
     func viewFullReleaseNotes() {
+        diagnosticLogger.record(
+            category: .releases,
+            stage: .fullReleaseNotesOpen,
+            result: .started
+        )
         session.viewFullReleaseNotes()
     }
 
@@ -413,6 +421,11 @@ final class UpdateController {
     }
 
     func viewReleasesFallback() {
+        diagnosticLogger.record(
+            category: .releases,
+            stage: .releasesOpen,
+            result: .started
+        )
 #if DEBUG
         if usesPackagedTestingStatusOverride,
            let releasesURL = ProjectLinks.githubRepository?.releasesURL {

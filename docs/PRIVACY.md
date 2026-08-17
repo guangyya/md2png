@@ -50,6 +50,28 @@ Markdown action requires confirmation before replacing that newer content.
 - No Accessibility permission is required for the basic workflow.
 - No GitHub credential is embedded in the app.
 
+## Local diagnostic logs
+
+md2png keeps a small rolling diagnostic log on the Mac to help identify app
+lifecycle, renderer, WebKit recovery, clipboard-type and ownership, shortcut,
+bundled-resource, and user-initiated Releases failures. Log entries use a fixed,
+typed schema and may contain timestamps, stages and outcomes, elapsed times,
+image dimensions, aggregate counts, a random short render-operation ID, and
+allowlisted error domains and numeric codes. They do not contain Markdown,
+clipboard text or payloads, rendered bytes, file contents, full paths, URL query
+strings, response bodies, device or account identifiers, or raw error messages.
+
+Logs stay on the device under
+`~/Library/Logs/md2png/Diagnostics`. Writes are serialized on a background queue,
+files expire after 7 days, each file is limited to 1 MB, and at most 5 files are
+kept. Logging failures do not interrupt rendering or change the clipboard. The
+app does not upload, copy, save elsewhere, or reveal these logs automatically;
+sharing diagnostics always requires a separate explicit user action.
+
+To delete all local diagnostics, quit md2png, choose **Go > Go to Folder…** in
+Finder, enter `~/Library/Logs/md2png`, and delete the `Diagnostics` folder. The
+folder is recreated only when a later diagnostic event is recorded.
+
 ## Network behavior
 
 md2png makes no update request at launch, when About opens, on a background

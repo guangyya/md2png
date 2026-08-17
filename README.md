@@ -151,6 +151,9 @@ reference for tables, highlighted code, and multiple diagrams in one image.
   being fetched.
 - No analytics, telemetry, advertising, account integration, bot, or
   service-specific API is included.
+- A bounded local diagnostic log records only allowlisted operational metadata;
+  it never stores Markdown, clipboard payloads, rendered images, or full paths,
+  and it is never uploaded automatically.
 - Opening **About md2png** does not make an update request. Choosing **Check for
   Updates…** fetches the signed public appcast without a GitHub account or
   credential; no Markdown, clipboard data, or system profile is included.
