@@ -471,6 +471,39 @@ final class WelcomeTests: XCTestCase {
             WelcomeCompletedJourneyStage.all.map(\.shortcutKeys),
             [["⌘", "C"], ["⌃", "⌘", "X"], ["⌘", "V"]]
         )
+
+        let copyPulse = WelcomeCardMotion(
+            progress: copying,
+            copyEmphasis: 1,
+            isSettled: false
+        )
+        XCTAssertGreaterThan(copyPulse.scale, 1)
+        XCTAssertLessThan(copyPulse.verticalOffset, 0)
+        XCTAssertGreaterThan(copyPulse.copyGlowOpacity, 0)
+
+        let settledRender = WelcomeCardMotion(
+            progress: rendering,
+            copyEmphasis: 1,
+            isSettled: true
+        )
+        XCTAssertEqual(settledRender.rotation, 0)
+        XCTAssertEqual(settledRender.scale, 1)
+        XCTAssertEqual(settledRender.verticalOffset, 0)
+        XCTAssertEqual(settledRender.copyGlowOpacity, 0)
+    }
+
+    func testWelcomeReplayAndShortcutContrastStylesKeepControlsDistinct() {
+        XCTAssertEqual(WelcomeWorkflowLayout.stageWidth, 128)
+        XCTAssertEqual(WelcomeWorkflowLayout.stageOffset, 154)
+        XCTAssertGreaterThan(WelcomeWorkflowLayout.trackHeight / 2, 40)
+        XCTAssertGreaterThan(WelcomeWorkflowLayout.detailTopPadding, 0)
+
+        let standard = WelcomeShortcutContrastStyle(contrast: .standard)
+        let increased = WelcomeShortcutContrastStyle(contrast: .increased)
+        XCTAssertGreaterThanOrEqual(standard.containerBorderOpacity, 0.25)
+        XCTAssertGreaterThanOrEqual(standard.keyBorderOpacity, 0.3)
+        XCTAssertGreaterThan(increased.containerBorderWidth, standard.containerBorderWidth)
+        XCTAssertGreaterThan(increased.keyBorderWidth, standard.keyBorderWidth)
     }
 
     func testSampleGuideRevealsTheMenuHierarchyInOrder() {
