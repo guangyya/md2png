@@ -452,8 +452,13 @@ final class UpdateControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testSparkleProbeRunsOnlyAfterExplicitCheckAndShowsUIOnlyForAnUpdate() throws {
+    func testSparkleProbeAndDownloadRequireSeparateExplicitActions() throws {
         let driver = FakeUpdateDriver()
+        let update = UpdateTestFixtures.seamlessUpdate(
+            installedVersion: "0.6.0",
+            version: "0.7.0",
+            build: "7"
+        )
         let defaults = UpdateTestFixtures.makeDefaults()
         defer { UpdateTestFixtures.removeDefaults(defaults) }
         let controller = UpdateController(
@@ -469,15 +474,36 @@ final class UpdateControllerTests: XCTestCase {
 
         controller.checkAgain()
         XCTAssertEqual(driver.probeCount, 1)
+        XCTAssertEqual(driver.probedInstalledVersions, ["0.6.0"])
         XCTAssertTrue(controller.status.isChecking)
-        driver.complete(.updateAvailable(displayVersion: "0.7.0"))
+        driver.complete(.updateAvailable(update))
 
         XCTAssertEqual(
             controller.status.phase,
-            .sparkleUpdateAvailable(displayVersion: "0.7.0")
+            .sparkleUpdateAvailable(update)
         )
         XCTAssertFalse(controller.status.isChecking)
-        XCTAssertEqual(driver.standardUICount, 1)
+        XCTAssertEqual(driver.downloadRequests, [])
+
+        controller.downloadAvailableUpdate()
+        XCTAssertEqual(driver.downloadRequests, ["7"])
+        XCTAssertEqual(
+            controller.status.phase,
+            .sparkleDownloading(update, progressPercent: 0)
+        )
+
+        driver.send(.downloading(received: 2, expected: 4))
+        XCTAssertEqual(
+            controller.status.phase,
+            .sparkleDownloading(update, progressPercent: 50)
+        )
+        driver.send(.extracting(progress: 0.75))
+        XCTAssertEqual(
+            controller.status.phase,
+            .sparkleExtracting(update, progressPercent: 75)
+        )
+        driver.send(.readyToInstall)
+        XCTAssertEqual(controller.status.phase, .sparkleReadyToInstall(update))
     }
 
     @MainActor
@@ -496,7 +522,95 @@ final class UpdateControllerTests: XCTestCase {
         driver.complete(.noUpdate(reason: .onLatestVersion, latestDisplayVersion: "0.6.0"))
 
         XCTAssertEqual(controller.status.phase, .upToDate(version: SemanticVersion("0.6.0")!))
-        XCTAssertEqual(driver.standardUICount, 0)
+        XCTAssertEqual(driver.downloadRequests, [])
+    }
+
+    @MainActor
+    func testSparkleInstallRespectsGateAndMarksExpectedRelaunchVersion() throws {
+        let driver = FakeUpdateDriver()
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let update = UpdateTestFixtures.seamlessUpdate()
+        let allowsInstall = LockedBox(false)
+        let acceptedCount = LockedBox(0)
+        let endedCount = LockedBox(0)
+        let controller = UpdateController(
+            channel: { .stableGitHubReleases(repository: self.repository) },
+            installedVersion: { "0.7.0" },
+            defaults: defaults,
+            now: { Date(timeIntervalSince1970: 1_000) },
+            updateDriver: driver,
+            beforeInstallAndRelaunch: { _ in allowsInstall.value },
+            onInstallAccepted: {
+                acceptedCount.set(acceptedCount.value + 1)
+            },
+            onInstallEndedWithoutRelaunch: {
+                endedCount.set(endedCount.value + 1)
+            }
+        )
+
+        controller.checkAgain()
+        driver.complete(.updateAvailable(update))
+        controller.downloadAvailableUpdate()
+        driver.send(.readyToInstall)
+
+        controller.installLater()
+        XCTAssertEqual(driver.deferCount, 1)
+        XCTAssertEqual(controller.status.phase, .sparkleReadyToInstall(update))
+
+        controller.installAndRelaunch()
+        XCTAssertEqual(driver.installCount, 0)
+        XCTAssertNil(defaults.string(forKey: UpdateRelaunchMarker.expectedVersionKey))
+
+        allowsInstall.set(true)
+        controller.installAndRelaunch()
+        XCTAssertEqual(driver.installCount, 1)
+        XCTAssertEqual(acceptedCount.value, 1)
+        XCTAssertEqual(
+            defaults.string(forKey: UpdateRelaunchMarker.expectedVersionKey),
+            "0.8.0"
+        )
+        driver.send(.installing)
+        XCTAssertEqual(controller.status.phase, .sparkleInstalling(update))
+        driver.send(.failed(message: "Authorization cancelled"))
+        XCTAssertEqual(
+            controller.status.phase,
+            .sparkleFailed(message: "Authorization cancelled", update: update)
+        )
+        XCTAssertEqual(endedCount.value, 1)
+        XCTAssertNil(defaults.string(forKey: UpdateRelaunchMarker.expectedVersionKey))
+    }
+
+    @MainActor
+    func testTerminationWaitsForPreparedInstallerCancellation() {
+        let driver = FakeUpdateDriver()
+        driver.completesDeferralImmediately = false
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let update = UpdateTestFixtures.seamlessUpdate()
+        let terminationCompletionCount = LockedBox(0)
+        let controller = UpdateController(
+            channel: { .stableGitHubReleases(repository: self.repository) },
+            installedVersion: { "0.7.0" },
+            defaults: defaults,
+            updateDriver: driver
+        )
+        controller.setStatusForTesting(UpdateStatus(
+            phase: .sparkleReadyToInstall(update)
+        ))
+
+        controller.installLater()
+        let waitsForCancellation = controller
+            .cancelPreparedInstallationForApplicationTermination {
+                terminationCompletionCount.set(
+                    terminationCompletionCount.value + 1
+                )
+            }
+
+        XCTAssertTrue(waitsForCancellation)
+        XCTAssertEqual(terminationCompletionCount.value, 0)
+        driver.completeDeferral()
+        XCTAssertEqual(terminationCompletionCount.value, 1)
     }
 
     @MainActor
@@ -519,7 +633,7 @@ final class UpdateControllerTests: XCTestCase {
         }
         XCTAssertTrue(message.contains("newer version of macOS"))
         XCTAssertEqual(releasesURL, repository.releasesURL)
-        XCTAssertEqual(driver.standardUICount, 0)
+        XCTAssertEqual(driver.downloadRequests, [])
     }
 
     @MainActor
@@ -577,21 +691,67 @@ final class UpdateControllerTests: XCTestCase {
 @MainActor
 private final class FakeUpdateDriver: UpdateDriving {
     private var completion: (@MainActor (UpdateProbeResult) -> Void)?
+    private var eventHandler: (@MainActor (UpdateDriverEvent) -> Void)?
     private(set) var probeCount = 0
-    private(set) var standardUICount = 0
+    private(set) var probedInstalledVersions: [String] = []
+    private(set) var downloadRequests: [String] = []
+    private(set) var cancelCount = 0
+    private(set) var deferCount = 0
+    private(set) var installCount = 0
+    var completesDeferralImmediately = true
+    private var deferCompletion: (@MainActor () -> Void)?
 
-    func probe(completion: @escaping @MainActor (UpdateProbeResult) -> Void) {
+    func setEventHandler(_ handler: @escaping @MainActor (UpdateDriverEvent) -> Void) {
+        eventHandler = handler
+    }
+
+    func probe(
+        installedVersion: String,
+        completion: @escaping @MainActor (UpdateProbeResult) -> Void
+    ) {
         probeCount += 1
+        probedInstalledVersions.append(installedVersion)
         self.completion = completion
     }
 
-    func showStandardUpdateUI() {
-        standardUICount += 1
+    func downloadUpdate(expectedBuildVersion: String) {
+        downloadRequests.append(expectedBuildVersion)
+    }
+
+    func cancelDownload() {
+        cancelCount += 1
+    }
+
+    func deferInstallation(
+        completion: (@MainActor () -> Void)?
+    ) -> Bool {
+        deferCount += 1
+        if completesDeferralImmediately {
+            completion?()
+        } else {
+            deferCompletion = completion
+        }
+        return true
+    }
+
+    func installAndRelaunch() -> Bool {
+        installCount += 1
+        return true
     }
 
     func complete(_ result: UpdateProbeResult) {
         let completion = completion
         self.completion = nil
         completion?(result)
+    }
+
+    func send(_ event: UpdateDriverEvent) {
+        eventHandler?(event)
+    }
+
+    func completeDeferral() {
+        let completion = deferCompletion
+        deferCompletion = nil
+        completion?()
     }
 }

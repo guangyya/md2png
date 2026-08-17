@@ -205,8 +205,8 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 			exit 1; \
 		fi; \
 		case "$(TEST_UPDATE_STATE)" in \
-			up-to-date|check-failed|download-failed|ready-to-install) ;; \
-			*) echo "TEST_UPDATE_STATE must be up-to-date, check-failed, download-failed, or ready-to-install"; exit 1 ;; \
+			up-to-date|check-failed|download-failed|ready-to-install|seamless-update-available|seamless-ready-to-install) ;; \
+			*) echo "TEST_UPDATE_STATE must be up-to-date, check-failed, download-failed, ready-to-install, seamless-update-available, or seamless-ready-to-install"; exit 1 ;; \
 		esac; \
 		/usr/bin/plutil -insert MD2PNGTestUpdateState -string "$(TEST_UPDATE_STATE)" "$(CONTENTS)/Info.plist"; \
 	fi

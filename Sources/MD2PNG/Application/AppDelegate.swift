@@ -25,9 +25,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.setPreviewWindowVisible(isVisible)
         }
     )
-    private let updateController = UpdateController(
+    private lazy var updateController = UpdateController(
         updateDriver: SparkleUpdateDriver {
             UpdateChannel.current().repository?.appcastURL
+        },
+        beforeInstallAndRelaunch: { [weak self] update in
+            self?.approveInstallAndRelaunch(update) ?? false
+        },
+        onInstallAccepted: { [weak self] in
+            self?.setUpdateInstallPending(true)
+        },
+        onInstallEndedWithoutRelaunch: { [weak self] in
+            self?.setUpdateInstallPending(false)
         }
     )
     private lazy var aboutController = AboutController(updateController: updateController)
@@ -83,6 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var renderTheme: RenderTheme
     private var renderActivity = RenderActivityState()
     private var isPresentingClipboardConfirmation = false
+    private var isUpdateInstallPending = false
+    private var isWaitingForUpdateDeferralBeforeTermination = false
     private var currentUpdateStatus = UpdateStatus()
     private var updateStatusObserverID: UUID?
     private var isPreviewWindowVisible = false
@@ -118,6 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
+        presentRelaunchResultIfNeeded()
         let registrations: [GlobalHotKey.Registration] = [
             .render { [weak self] in self?.globalShortcutRouter.handle(.render) },
             .showLastRender { [weak self] in
@@ -158,6 +170,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         guard statusItem != nil else { return }
         updateLaunchAtLoginMenu()
+    }
+
+    func applicationShouldTerminate(
+        _ sender: NSApplication
+    ) -> NSApplication.TerminateReply {
+        if isUpdateInstallPending {
+            return .terminateNow
+        }
+        if isWaitingForUpdateDeferralBeforeTermination {
+            return .terminateLater
+        }
+
+        isWaitingForUpdateDeferralBeforeTermination = true
+        let waitsForDeferral = updateController
+            .cancelPreparedInstallationForApplicationTermination { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self,
+                          self.isWaitingForUpdateDeferralBeforeTermination else {
+                        return
+                    }
+                    self.isWaitingForUpdateDeferralBeforeTermination = false
+                    sender.reply(toApplicationShouldTerminate: true)
+                }
+            }
+        if waitsForDeferral {
+            return .terminateLater
+        }
+        isWaitingForUpdateDeferralBeforeTermination = false
+        return .terminateNow
     }
 
     private func configureStatusItem() {
@@ -319,6 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func renderClipboard() {
         guard !renderActivity.isRendering,
+              !isUpdateInstallPending,
               !isPresentingClipboardConfirmation else { return }
         do {
             let markdown = try Clipboard.markdownText()
@@ -339,6 +381,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func restoreLastMarkdown() {
         guard !renderActivity.isRendering,
+              !isUpdateInstallPending,
               !isPresentingClipboardConfirmation,
               let markdown = lastSource.markdown,
               confirmClipboardOverwriteIfNeeded() else { return }
@@ -364,6 +407,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func renderBundledExample(_ kind: ExampleKind) {
         guard !renderActivity.isRendering,
+              !isUpdateInstallPending,
               !isPresentingClipboardConfirmation else { return }
         do {
             let example = try AppResources.exampleMarkdown(for: kind)
@@ -409,7 +453,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ markdown: String,
         showsPreviewOnSuccess: Bool = false
     ) {
-        guard renderActivity.begin() else { return }
+        guard !isUpdateInstallPending, renderActivity.begin() else { return }
         let requestedWidthPreset = renderWidthPreset
         let requestedTheme = renderTheme
         updateRenderingUI(isRendering: true)
@@ -467,19 +511,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateRenderingUI(isRendering: Bool) {
-        renderMenuItem.isEnabled = !isRendering
+        let allowsRenderActions = !isRendering && !isUpdateInstallPending
+        renderMenuItem.isEnabled = allowsRenderActions
         renderMenuItem.title = isRendering
             ? L10n.text("menu.rendering", defaultValue: "Rendering…")
             : L10n.text("menu.render", defaultValue: "Render Clipboard as Image")
-        examplesMenuItem.isEnabled = !isRendering
-        renderWidthMenuItem.isEnabled = !isRendering
-        renderThemeMenuItem.isEnabled = !isRendering
+        examplesMenuItem.isEnabled = allowsRenderActions
+        renderWidthMenuItem.isEnabled = allowsRenderActions
+        renderThemeMenuItem.isEnabled = allowsRenderActions
         updateLastSourceActionAvailability()
         updateStatusItemAppearance()
     }
 
     private func updateLastSourceActionAvailability() {
-        let isEnabled = lastSource.isAvailable && !renderActivity.isRendering
+        let isEnabled = lastSource.isAvailable
+            && !renderActivity.isRendering
+            && !isUpdateInstallPending
         restoreLastMarkdownMenuItem.isEnabled = isEnabled
     }
 
@@ -585,6 +632,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func showSampleGuide() {
         guard !renderActivity.isRendering,
+              !isUpdateInstallPending,
               !isPresentingClipboardConfirmation,
               let button = statusItem.button else { return }
         sampleGuideController.show(
@@ -602,6 +650,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func show(_ error: Error) {
         hud.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", style: .error)
+    }
+
+    private func approveInstallAndRelaunch(_ update: SeamlessUpdate) -> Bool {
+        guard !renderActivity.isRendering,
+              !isUpdateInstallPending,
+              !isPresentingClipboardConfirmation else {
+            hud.show(
+                L10n.text(
+                    "update.finish_render_before_install",
+                    defaultValue: "Finish the current render, then choose Install and Relaunch again."
+                ),
+                symbol: "hourglass",
+                style: .error
+            )
+            return false
+        }
+        guard lastImage != nil || lastSource.isAvailable else { return true }
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = L10n.format(
+            "update.confirm_relaunch_title",
+            defaultValue: "Install md2png %@ and relaunch?",
+            update.displayVersion
+        )
+        alert.informativeText = L10n.text(
+            "update.confirm_relaunch_detail",
+            defaultValue: "Relaunching clears Last Render and Last Source because they exist only in memory. Your clipboard will not be changed."
+        )
+        alert.addButton(withTitle: L10n.text(
+            "about.update_install_relaunch",
+            defaultValue: "Install and Relaunch"
+        ))
+        alert.addButton(withTitle: L10n.text(
+            "about.update_later",
+            defaultValue: "Later"
+        ))
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func setUpdateInstallPending(_ isPending: Bool) {
+        isUpdateInstallPending = isPending
+        guard renderMenuItem != nil else { return }
+        updateRenderingUI(isRendering: renderActivity.isRendering)
+    }
+
+    private func presentRelaunchResultIfNeeded() {
+        let runningVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? ""
+        guard let result = UpdateRelaunchMarker().reconcile(
+            runningVersion: runningVersion
+        ) else {
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            switch result {
+            case let .updated(version):
+                self.hud.show(
+                    L10n.format(
+                        "update.updated_to_version",
+                        defaultValue: "Updated to version %@",
+                        version
+                    ),
+                    symbol: "checkmark.circle.fill"
+                )
+            case let .notUpdated(expectedVersion, runningVersion):
+                self.hud.show(
+                    L10n.format(
+                        "update.relaunch_not_updated",
+                        defaultValue: "Update to %@ did not complete — still running %@. Open About md2png to retry.",
+                        expectedVersion,
+                        runningVersion
+                    ),
+                    symbol: "exclamationmark.triangle.fill",
+                    style: .error
+                )
+            }
+        }
     }
 
     private func applyUpdateStatus(_ status: UpdateStatus) {
@@ -627,12 +755,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "update.accessibility.running_newer",
                 defaultValue: "This md2png build is newer than the latest published version."
             ))
-        case let .sparkleUpdateAvailable(displayVersion):
+        case let .sparkleUpdateAvailable(update):
             announceUpdate(L10n.format(
                 "update.accessibility.available",
                 defaultValue: "md2png %@ is available.",
-                displayVersion
+                update.displayVersion
             ))
+        case let .sparkleDownloading(update, _):
+            if case .sparkleDownloading = previousPhase { return }
+            announceUpdate(L10n.format(
+                "update.accessibility.downloading",
+                defaultValue: "Downloading md2png %@.",
+                update.displayVersion
+            ))
+        case let .sparkleExtracting(update, _):
+            announceUpdate(L10n.format(
+                "update.accessibility.preparing",
+                defaultValue: "Preparing md2png %@ for installation.",
+                update.displayVersion
+            ))
+        case let .sparkleReadyToInstall(update):
+            let message = L10n.format(
+                "update.accessibility.ready_to_relaunch",
+                defaultValue: "md2png %@ is ready to install and relaunch.",
+                update.displayVersion
+            )
+            if aboutController.window?.isVisible != true {
+                hud.show(message, symbol: "arrow.down.app.fill")
+            }
+            announceUpdate(message)
+        case let .sparkleInstalling(update):
+            announceUpdate(L10n.format(
+                "update.accessibility.installing",
+                defaultValue: "Installing md2png %@ and relaunching.",
+                update.displayVersion
+            ))
+        case let .sparkleFailed(message, _):
+            if previousPhase.isDownloadActive,
+               aboutController.window?.isVisible != true {
+                let recoveryMessage = L10n.format(
+                    "update.hud.failed",
+                    defaultValue: "%@ Open About md2png to retry.",
+                    message
+                )
+                hud.show(
+                    recoveryMessage,
+                    symbol: "exclamationmark.triangle.fill",
+                    style: .error
+                )
+            }
+            announceUpdate(message)
         case let .updateAvailable(update):
             if previousPhase.isDownloadActive {
                 let message = L10n.text(
@@ -710,17 +882,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ))
             return
         }
+        if isUpdateInstallPending {
+            button.image = NSImage(
+                systemSymbolName: "arrow.triangle.2.circlepath",
+                accessibilityDescription: nil
+            )
+            button.setAccessibilityLabel(L10n.text(
+                "update.install_pending_accessibility",
+                defaultValue: "md2png — update installation is starting"
+            ))
+            return
+        }
 
         let symbolName: String?
         switch currentUpdateStatus.phase {
-        case .downloading:
+        case .sparkleDownloading, .downloading:
             symbolName = "arrow.down.circle"
-        case .verifying:
+        case .sparkleExtracting, .verifying:
             symbolName = "checkmark.shield"
+        case .sparkleInstalling:
+            symbolName = "arrow.triangle.2.circlepath"
         case .opening:
             symbolName = "opticaldiscdrive"
         case .unknown, .upToDate, .runningNewerVersion,
-             .sparkleUpdateAvailable, .updateAvailable, .readyToInstall, .failed:
+             .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleFailed,
+             .updateAvailable, .readyToInstall, .failed:
             symbolName = nil
         }
 
@@ -744,6 +930,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var updateAccessibilityStatus: String {
         switch currentUpdateStatus.phase {
+        case let .sparkleDownloading(update, progressPercent):
+            if let progressPercent {
+                return L10n.format(
+                    "about.update_downloading_progress",
+                    defaultValue: "Downloading md2png %@ — %ld%%",
+                    update.displayVersion,
+                    progressPercent
+                )
+            }
+            return L10n.format(
+                "about.update_downloading_version",
+                defaultValue: "Downloading md2png %@…",
+                update.displayVersion
+            )
+        case let .sparkleExtracting(update, progressPercent):
+            if let progressPercent {
+                return L10n.format(
+                    "about.update_preparing_progress",
+                    defaultValue: "Preparing md2png %@ — %ld%%",
+                    update.displayVersion,
+                    progressPercent
+                )
+            }
+            return L10n.format(
+                "about.update_preparing_version",
+                defaultValue: "Preparing md2png %@…",
+                update.displayVersion
+            )
+        case let .sparkleInstalling(update):
+            return L10n.format(
+                "about.update_installing_version",
+                defaultValue: "Installing md2png %@…",
+                update.displayVersion
+            )
         case let .downloading(update, progressPercent):
             return L10n.format(
                 "about.update_downloading_progress",
@@ -764,7 +984,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 update.version.description
             )
         case .unknown, .upToDate, .runningNewerVersion,
-             .sparkleUpdateAvailable, .updateAvailable, .readyToInstall, .failed:
+             .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleFailed,
+             .updateAvailable, .readyToInstall, .failed:
             return L10n.text("accessibility.app", defaultValue: "md2png")
         }
     }

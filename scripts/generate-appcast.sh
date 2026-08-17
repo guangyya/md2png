@@ -42,6 +42,27 @@ cleanup() {
 }
 trap cleanup EXIT
 
+previous_appcast="$staging_dir/appcast.xml"
+previous_appcast_url="${project_url}/releases/latest/download/appcast.xml"
+if /usr/bin/curl \
+  --fail \
+  --location \
+  --proto '=https' \
+  --proto-redir '=https' \
+  --silent \
+  --show-error \
+  --output "$previous_appcast" \
+  "$previous_appcast_url"; then
+  "$node_binary" "$appcast_validator" validate-feed \
+    --file "$previous_appcast" \
+    --public-key "$public_key"
+elif [[ "$version" = "0.7.0" ]]; then
+  rm -f "$previous_appcast"
+else
+  echo "The previous signed appcast could not be loaded; refusing to truncate update history." >&2
+  exit 1
+fi
+
 archive_name="$(basename "$release_zip")"
 archive_basename="${archive_name%.zip}"
 cp "$release_zip" "$staging_dir/$archive_name"
@@ -55,6 +76,7 @@ printf '%s' "$private_key" | "$generate_appcast" \
   --embed-release-notes \
   --maximum-versions 3 \
   --maximum-deltas 0 \
+  --full-release-notes-url "${project_url}/releases" \
   --link "${project_url}/releases/tag/v${version}" \
   -o "$appcast" \
   "$staging_dir"

@@ -4,7 +4,12 @@ enum UpdatePhase: Equatable, Sendable {
     case unknown
     case upToDate(version: SemanticVersion)
     case runningNewerVersion(version: String)
-    case sparkleUpdateAvailable(displayVersion: String)
+    case sparkleUpdateAvailable(SeamlessUpdate)
+    case sparkleDownloading(SeamlessUpdate, progressPercent: Int?)
+    case sparkleExtracting(SeamlessUpdate, progressPercent: Int?)
+    case sparkleReadyToInstall(SeamlessUpdate)
+    case sparkleInstalling(SeamlessUpdate)
+    case sparkleFailed(message: String, update: SeamlessUpdate?)
     case updateAvailable(AvailableUpdate)
     case downloading(AvailableUpdate, progressPercent: Int)
     case verifying(AvailableUpdate)
@@ -19,11 +24,30 @@ enum UpdatePhase: Equatable, Sendable {
 
     var isDownloadActive: Bool {
         switch self {
-        case .downloading, .verifying, .opening:
+        case .sparkleDownloading, .sparkleExtracting,
+             .downloading, .verifying, .opening:
             return true
         case .unknown, .upToDate, .runningNewerVersion,
-             .sparkleUpdateAvailable, .updateAvailable, .readyToInstall, .failed:
+             .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleInstalling,
+             .sparkleFailed, .updateAvailable, .readyToInstall, .failed:
             return false
+        }
+    }
+
+    var seamlessUpdate: SeamlessUpdate? {
+        switch self {
+        case let .sparkleUpdateAvailable(update),
+             let .sparkleDownloading(update, _),
+             let .sparkleExtracting(update, _),
+             let .sparkleReadyToInstall(update),
+             let .sparkleInstalling(update):
+            return update
+        case let .sparkleFailed(_, update):
+            return update
+        case .unknown, .upToDate, .runningNewerVersion,
+             .updateAvailable, .downloading, .verifying, .opening,
+             .readyToInstall, .failed:
+            return nil
         }
     }
 
@@ -37,7 +61,9 @@ enum UpdatePhase: Equatable, Sendable {
             return update
         case let .failed(_, _, _, update):
             return update
-        case .unknown, .upToDate, .runningNewerVersion, .sparkleUpdateAvailable:
+        case .unknown, .upToDate, .runningNewerVersion,
+             .sparkleUpdateAvailable, .sparkleDownloading, .sparkleExtracting,
+             .sparkleReadyToInstall, .sparkleInstalling, .sparkleFailed:
             return nil
         }
     }
@@ -62,6 +88,8 @@ enum DebugUpdateMockState: String {
     case checkFailed = "check-failed"
     case downloadFailed = "download-failed"
     case readyToInstall = "ready-to-install"
+    case seamlessUpdateAvailable = "seamless-update-available"
+    case seamlessReadyToInstall = "seamless-ready-to-install"
 
     private static let fixtureVersion = SemanticVersion("0.1.0")!
     private static let fixtureAssetName = "md2png-debug-update-fixture.dmg"
@@ -115,7 +143,44 @@ enum DebugUpdateMockState: String {
                 retryAt: nil,
                 availableUpdate: update
             ))
+        case .seamlessUpdateAvailable:
+            return UpdateStatus(phase: .sparkleUpdateAvailable(
+                fixtureSeamlessUpdate(
+                    installedVersion: installedVersion,
+                    releasesURL: repository?.releasesURL
+                )
+            ))
+        case .seamlessReadyToInstall:
+            return UpdateStatus(phase: .sparkleReadyToInstall(
+                fixtureSeamlessUpdate(
+                    installedVersion: installedVersion,
+                    releasesURL: repository?.releasesURL
+                )
+            ))
         }
+    }
+
+    private func fixtureSeamlessUpdate(
+        installedVersion: String?,
+        releasesURL: URL?
+    ) -> SeamlessUpdate {
+        let targetVersion = "0.8.0"
+        return SeamlessUpdate(
+            installedVersion: installedVersion ?? "0.7.0",
+            displayVersion: targetVersion,
+            buildVersion: "8",
+            publishedAt: Date(timeIntervalSince1970: 1_787_000_000),
+            contentLength: 4_200_000,
+            releaseNotes: [
+                SeamlessUpdateReleaseNotes(
+                    version: targetVersion,
+                    publishedAt: Date(timeIntervalSince1970: 1_787_000_000),
+                    text: "Added\n- Preview signed release notes in About.\n- Install and relaunch without opening a DMG."
+                )
+            ],
+            historyIsTruncated: false,
+            fullReleaseNotesURL: releasesURL
+        )
     }
 
     private func fixtureUpdate() -> AvailableUpdate? {
@@ -152,9 +217,16 @@ final class UpdateController {
     private let revealFile: (URL) -> Void
     private let openWebPage: (URL) -> Bool
     private let now: () -> Date
+    private let beforeInstallAndRelaunch: @MainActor (SeamlessUpdate) -> Bool
+    private let onInstallAccepted: @MainActor () -> Void
+    private let onInstallEndedWithoutRelaunch: @MainActor () -> Void
+    private let relaunchMarker: UpdateRelaunchMarker
     private var checkTask: Task<Void, Never>?
     private var downloadTask: Task<Void, Never>?
     private var cooldownTask: Task<Void, Never>?
+    private var installRequestAccepted = false
+    private var isDeferringPreparedInstallation = false
+    private var deferredInstallationTerminationCompletion: (@MainActor () -> Void)?
     private var statusObservers: [UUID: StatusObserver] = [:]
 #if DEBUG
     private var usesTestingStatusOverride = false
@@ -169,7 +241,12 @@ final class UpdateController {
         }
     }
 
-    var isUpdating: Bool { status.isChecking || checkTask != nil || downloadTask != nil }
+    var isUpdating: Bool {
+        status.isChecking
+            || status.phase.isDownloadActive
+            || checkTask != nil
+            || downloadTask != nil
+    }
 
     var allowsUpdatePresentation: Bool {
 #if DEBUG
@@ -210,7 +287,12 @@ final class UpdateController {
         now: @escaping () -> Date = Date.init,
         automaticCheckInterval: TimeInterval = UpdateController.automaticCheckInterval,
         manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown,
-        updateDriver: UpdateDriving? = nil
+        updateDriver: UpdateDriving? = nil,
+        beforeInstallAndRelaunch: @escaping @MainActor (SeamlessUpdate) -> Bool = { _ in
+            true
+        },
+        onInstallAccepted: @escaping @MainActor () -> Void = {},
+        onInstallEndedWithoutRelaunch: @escaping @MainActor () -> Void = {}
     ) {
         self.service = service
         self.updateDriver = updateDriver
@@ -220,6 +302,10 @@ final class UpdateController {
         self.revealFile = revealFile
         self.openWebPage = openWebPage
         self.now = now
+        self.beforeInstallAndRelaunch = beforeInstallAndRelaunch
+        self.onInstallAccepted = onInstallAccepted
+        self.onInstallEndedWithoutRelaunch = onInstallEndedWithoutRelaunch
+        relaunchMarker = UpdateRelaunchMarker(defaults: defaults)
         checkPolicy = UpdateCheckPolicy(
             defaults: defaults,
             automaticCheckInterval: automaticCheckInterval,
@@ -239,6 +325,9 @@ final class UpdateController {
             status = mockStatus
         }
 #endif
+        updateDriver?.setEventHandler { [weak self] event in
+            self?.handleUpdateDriverEvent(event)
+        }
     }
 
     deinit {
@@ -327,7 +416,8 @@ final class UpdateController {
 #if DEBUG
         guard !usesTestingStatusOverride else { return }
 #endif
-        guard checkTask == nil, downloadTask == nil else { return }
+        guard checkTask == nil, downloadTask == nil,
+              !status.phase.isDownloadActive else { return }
         guard let configuration = configurationOrShowFailure() else { return }
         let currentDate = now()
         guard checkPolicy.canMakeRequest(at: currentDate) else {
@@ -356,6 +446,18 @@ final class UpdateController {
     }
 
     func downloadAvailableUpdate() {
+        if let update = status.phase.seamlessUpdate,
+           updateDriver != nil {
+            switch status.phase {
+            case .sparkleUpdateAvailable, .sparkleFailed:
+                break
+            default:
+                return
+            }
+            status.phase = .sparkleDownloading(update, progressPercent: 0)
+            updateDriver?.downloadUpdate(expectedBuildVersion: update.buildVersion)
+            return
+        }
         guard checkTask == nil, downloadTask == nil,
               let update = status.phase.availableUpdate,
               canDownload(update) else {
@@ -368,13 +470,52 @@ final class UpdateController {
         }
     }
 
-    func showStandardUpdateUI() {
-        guard case .sparkleUpdateAvailable = status.phase else { return }
-        updateDriver?.showStandardUpdateUI()
+    func cancelUpdate() {
+        if case .sparkleDownloading = status.phase {
+            updateDriver?.cancelDownload()
+            return
+        }
+        downloadTask?.cancel()
     }
 
-    func cancelUpdate() {
-        downloadTask?.cancel()
+    func installAndRelaunch() {
+        guard case let .sparkleReadyToInstall(update) = status.phase,
+              !isDeferringPreparedInstallation,
+              beforeInstallAndRelaunch(update) else {
+            return
+        }
+        guard updateDriver?.installAndRelaunch() == true else { return }
+        relaunchMarker.mark(expectedVersion: update.displayVersion, at: now())
+        installRequestAccepted = true
+        onInstallAccepted()
+    }
+
+    func installLater() {
+        guard case .sparkleReadyToInstall = status.phase,
+              !isDeferringPreparedInstallation else { return }
+        _ = beginDeferringPreparedInstallation()
+    }
+
+    func cancelPreparedInstallationForApplicationTermination(
+        completion: @escaping @MainActor () -> Void
+    ) -> Bool {
+        guard !installRequestAccepted else { return false }
+        if isDeferringPreparedInstallation {
+            deferredInstallationTerminationCompletion = completion
+            return true
+        }
+        guard case .sparkleReadyToInstall = status.phase else { return false }
+        return beginDeferringPreparedInstallation(
+            terminationCompletion: completion
+        )
+    }
+
+    func viewFullReleaseNotes() {
+        guard let url = status.phase.seamlessUpdate?.fullReleaseNotesURL else {
+            viewReleasesFallback()
+            return
+        }
+        _ = openWebPage(url)
     }
 
     func openDownloadedUpdate() {
@@ -431,7 +572,7 @@ final class UpdateController {
         status = checkingStatus
         publishManualCheckAvailability(at: requestDate)
 
-        updateDriver.probe { [weak self] result in
+        updateDriver.probe(installedVersion: installedVersion) { [weak self] result in
             self?.finishSparkleProbe(
                 result,
                 repository: repository,
@@ -447,8 +588,8 @@ final class UpdateController {
     ) {
         let phase: UpdatePhase
         switch result {
-        case let .updateAvailable(displayVersion):
-            phase = .sparkleUpdateAvailable(displayVersion: displayVersion)
+        case let .updateAvailable(update):
+            phase = .sparkleUpdateAvailable(update)
         case let .noUpdate(reason, latestDisplayVersion):
             phase = phaseForNoUpdate(
                 reason: reason,
@@ -464,11 +605,65 @@ final class UpdateController {
                 availableUpdate: nil
             )
         }
-
         finishCheck(with: phase)
-        if case .sparkleUpdateAvailable = phase {
-            updateDriver?.showStandardUpdateUI()
+    }
+
+    private func handleUpdateDriverEvent(_ event: UpdateDriverEvent) {
+        let currentUpdate = status.phase.seamlessUpdate
+        switch event {
+        case let .updateChanged(update):
+            finishAcceptedInstallWithoutRelaunch()
+            status.phase = .sparkleUpdateAvailable(update)
+        case let .downloading(received, expected):
+            guard let update = currentUpdate else { return }
+            let progressPercent = expected.flatMap { expected -> Int? in
+                guard expected > 0 else { return nil }
+                return min(max(Int((Double(received) / Double(expected)) * 100), 0), 100)
+            }
+            status.phase = .sparkleDownloading(update, progressPercent: progressPercent)
+        case let .extracting(progress):
+            guard let update = currentUpdate else { return }
+            let progressPercent = min(max(Int(progress * 100), 0), 100)
+            status.phase = .sparkleExtracting(update, progressPercent: progressPercent)
+        case .readyToInstall:
+            guard let update = currentUpdate else { return }
+            status.phase = .sparkleReadyToInstall(update)
+        case .installing:
+            guard let update = currentUpdate else { return }
+            status.phase = .sparkleInstalling(update)
+        case .cancelled:
+            guard let update = currentUpdate else { return }
+            status.phase = .sparkleUpdateAvailable(update)
+        case let .failed(message):
+            finishAcceptedInstallWithoutRelaunch()
+            status.phase = .sparkleFailed(message: message, update: currentUpdate)
         }
+    }
+
+    private func finishAcceptedInstallWithoutRelaunch() {
+        guard installRequestAccepted else { return }
+        installRequestAccepted = false
+        relaunchMarker.clearPendingResult()
+        onInstallEndedWithoutRelaunch()
+    }
+
+    private func beginDeferringPreparedInstallation(
+        terminationCompletion: (@MainActor () -> Void)? = nil
+    ) -> Bool {
+        isDeferringPreparedInstallation = true
+        deferredInstallationTerminationCompletion = terminationCompletion
+        let didBegin = updateDriver?.deferInstallation { [weak self] in
+            guard let self else { return }
+            self.isDeferringPreparedInstallation = false
+            let completion = self.deferredInstallationTerminationCompletion
+            self.deferredInstallationTerminationCompletion = nil
+            completion?()
+        } == true
+        if !didBegin {
+            isDeferringPreparedInstallation = false
+            deferredInstallationTerminationCompletion = nil
+        }
+        return didBegin
     }
 
     private func phaseForNoUpdate(

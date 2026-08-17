@@ -371,6 +371,90 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testAboutSeamlessUpdateFixtureShowsSignedNotesAndKeepsActionsOffline() throws {
+        _ = NSApplication.shared
+        let update = UpdateTestFixtures.seamlessUpdate()
+        let availableController = makeAboutController(
+            phase: .sparkleUpdateAvailable(update)
+        )
+        availableController.show(metadata: AppMetadata(
+            version: "0.7.0",
+            build: "7",
+            buildConfiguration: .debug,
+            releaseNotes: "Installed release notes",
+            projectURL: testProjectURL
+        ))
+        defer { availableController.close() }
+
+        XCTAssertEqual(availableController.displayedUpdateButtonTitle, "Download Update")
+        XCTAssertFalse(availableController.displayedUpdateButtonIsEnabled)
+        XCTAssertEqual(availableController.displayedReleaseNotesTitle, "What’s new in 0.8.0")
+        XCTAssertTrue(availableController.displayedReleaseNotesText.contains("Seamless updates"))
+        XCTAssertFalse(availableController.displayedReleaseNotesText.contains("Installed release notes"))
+        XCTAssertTrue(availableController.displaysFullReleaseNotesAction)
+
+        let readyController = makeAboutController(
+            phase: .sparkleReadyToInstall(update)
+        )
+        readyController.show(metadata: AppMetadata(
+            version: "0.7.0",
+            build: "7",
+            buildConfiguration: .debug,
+            releaseNotes: "Installed release notes",
+            projectURL: testProjectURL
+        ))
+        defer { readyController.close() }
+
+        XCTAssertEqual(readyController.displayedUpdateButtonTitle, "Install and Relaunch")
+        XCTAssertFalse(readyController.displayedUpdateButtonIsEnabled)
+        XCTAssertEqual(readyController.displayedSecondaryUpdateButtonTitle, "Later")
+        XCTAssertEqual(
+            readyController.displayedUpdateDetail,
+            L10n.text(
+                "about.update_relaunch_memory_detail",
+                defaultValue: "Relaunch clears Last Render and Last Source. The clipboard is unchanged."
+            )
+        )
+
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_ABOUT_SEAMLESS_READY_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(readyController.window?.contentView)
+        )
+
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_ABOUT_SEAMLESS_UPDATE_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(availableController.window?.contentView)
+        )
+    }
+
+    @MainActor
+    func testClosingReadyAboutExplicitlyCancelsInstallOnQuit() {
+        _ = NSApplication.shared
+        let driver = AboutCloseUpdateDriver()
+        let updateController = UpdateController(
+            channel: { .stableGitHubReleases(
+                repository: GitHubRepository(projectURL: self.testProjectURL)!
+            ) },
+            updateDriver: driver
+        )
+        updateController.setStatusForTesting(UpdateStatus(
+            phase: .sparkleReadyToInstall(UpdateTestFixtures.seamlessUpdate())
+        ))
+        let controller = AboutController(updateController: updateController)
+        controller.show(metadata: AppMetadata(
+            version: "0.7.0",
+            build: "7",
+            buildConfiguration: .debug,
+            releaseNotes: "Installed release notes",
+            projectURL: testProjectURL
+        ))
+
+        controller.close()
+
+        XCTAssertEqual(driver.deferCount, 1)
+    }
+
+    @MainActor
     func testAboutReleaseNotesResetScrollIdentityEveryTimeWindowIsShown() {
         _ = NSApplication.shared
         let controller = makeAboutController()
@@ -431,4 +515,29 @@ final class AboutControllerTests: XCTestCase {
             try? png.write(to: URL(fileURLWithPath: outputPath))
         }
     }
+}
+
+@MainActor
+private final class AboutCloseUpdateDriver: UpdateDriving {
+    private(set) var deferCount = 0
+
+    func setEventHandler(_ handler: @escaping @MainActor (UpdateDriverEvent) -> Void) {}
+
+    func probe(
+        installedVersion: String,
+        completion: @escaping @MainActor (UpdateProbeResult) -> Void
+    ) {}
+
+    func downloadUpdate(expectedBuildVersion: String) {}
+
+    func cancelDownload() {}
+
+    func deferInstallation(
+        completion: (@MainActor () -> Void)?
+    ) -> Bool {
+        deferCount += 1
+        return true
+    }
+
+    func installAndRelaunch() -> Bool { false }
 }

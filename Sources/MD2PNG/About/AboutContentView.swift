@@ -30,6 +30,9 @@ final class AboutContentModel: ObservableObject {
         updatePresentation: AboutUpdatePresentation,
         updateFeatureAvailable: Bool
     ) {
+        if self.updatePresentation?.releaseNotes != updatePresentation.releaseNotes {
+            releaseNotesRevision += 1
+        }
         self.updatePresentation = updatePresentation
         self.updateFeatureAvailable = updateFeatureAvailable
     }
@@ -139,21 +142,37 @@ struct AboutContentView: View {
 
     private var releaseNotes: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.format(
-                "about.whats_new",
-                defaultValue: "What’s new in %@",
-                model.metadata.version
-            ))
+            Text(displayedReleaseNotesTitle)
                 .font(.system(size: 15, weight: .semibold))
 
             ScrollView {
-                Text(styledReleaseNotes)
-                    .font(.system(size: 13))
-                    .lineSpacing(2)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(styledReleaseNotes)
+                        .font(.system(size: 13))
+                        .lineSpacing(2)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if model.updatePresentation?.releaseNotes?
+                        .showsFullReleaseNotesAction == true {
+                        Button {
+                            onSecondaryUpdateAction(.viewFullReleaseNotes)
+                        } label: {
+                            Label(
+                                L10n.text(
+                                    "about.view_full_release_notes",
+                                    defaultValue: "View Full Release Notes"
+                                ),
+                                systemImage: "arrow.up.right.square"
+                            )
+                            .font(.system(size: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
             }
             .id(model.releaseNotesRevision)
             .frame(maxHeight: .infinity)
@@ -212,6 +231,14 @@ struct AboutContentView: View {
         )
     }
 
+    private var displayedReleaseNotesTitle: String {
+        model.updatePresentation?.releaseNotes?.title ?? L10n.format(
+            "about.whats_new",
+            defaultValue: "What’s new in %@",
+            model.metadata.version
+        )
+    }
+
     private var copyVersionHelp: String {
         model.didCopyVersion
             ? L10n.text("about.version_info_copied", defaultValue: "Copied")
@@ -227,7 +254,9 @@ struct AboutContentView: View {
             L10n.text("release_section.deprecated", defaultValue: "Deprecated"),
             L10n.text("release_section.security", defaultValue: "Security")
         ])
-        let lines = model.metadata.releaseNotes.components(separatedBy: .newlines)
+        let releaseNotes = model.updatePresentation?.releaseNotes?.text
+            ?? model.metadata.releaseNotes
+        let lines = releaseNotes.components(separatedBy: .newlines)
         var output = AttributedString()
 
         for (index, line) in lines.enumerated() {
