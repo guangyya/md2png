@@ -38,7 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.setUpdateInstallPending(false)
         }
     )
-    private lazy var aboutController = AboutController(updateController: updateController)
+    private lazy var aboutController = AboutController(
+        updateController: updateController,
+        diagnosticLogger: diagnosticLogger
+    )
     private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
     private lazy var welcomeController = WelcomeController(

@@ -190,6 +190,17 @@
 "about.update_no_compatible_release" = "No compatible update was found.";
 "about.copy_version_info" = "Copy Version Info";
 "about.version_info_copied" = "Copied";
+"about.save_diagnostic_logs" = "Save Diagnostic Logs…";
+"about.diagnostic_logs_saving" = "Saving…";
+"about.diagnostic_logs_saved" = "Saved";
+"about.diagnostic_logs_help" = "Saves privacy-safe local operational logs. Nothing is uploaded.";
+"about.diagnostic_logs_last_hour" = "Last Hour";
+"about.diagnostic_logs_last_24_hours" = "Last 24 Hours";
+"about.diagnostic_logs_last_7_days" = "Last 7 Days";
+"about.diagnostic_logs_save_title" = "Save Diagnostic Logs";
+"about.diagnostic_logs_save_message" = "Saves privacy-safe operational metadata only. Nothing is uploaded.";
+"about.diagnostic_logs_save_failed_title" = "Couldn’t Save Diagnostic Logs";
+"about.diagnostic_logs_save_failed_message" = "The logs may be unavailable, or the selected location may not be writable. Choose another location and try again.";
 "about.version_info" = "md2png %1$@ (%2$@) · %3$@ · macOS %4$@ · %5$@";
 "about.version_info_commit" = "md2png %1$@ (%2$@) · commit %3$@ · %4$@ · macOS %5$@ · %6$@";
 "about.done" = "Done";

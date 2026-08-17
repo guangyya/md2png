@@ -111,7 +111,14 @@ or code-signature failure.
 Open **About md2png** and use the copy icon beside the version. Include that
 diagnostic line, the smallest Markdown input that reproduces the issue, and a
 screenshot when appropriate. Remove confidential message content before filing
-a report. md2png does not upload its local operational logs automatically.
+a report.
+
+For an intermittent failure, reproduce it and choose **Save Diagnostic Logs…**
+in About. Select **Last Hour** unless the relevant event is older, save the JSON,
+and attach it to the report manually. The export contains privacy-safe
+operational metadata and version/system context; it does not contain Markdown,
+clipboard payloads, rendered images, full paths, or raw error messages. md2png
+never uploads the file automatically.
 
 ## Delete local diagnostic logs
 

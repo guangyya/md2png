@@ -4,12 +4,15 @@ import SwiftUI
 @MainActor
 final class AboutController: NSWindowController, NSWindowDelegate {
     private let updateController: UpdateController
+    private let diagnosticLogger: DiagnosticLogger
+    private let diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies
     private let contentModel = AboutContentModel()
     private var updateStatusObserverID: UUID?
     private var projectURL: URL?
     private var updateFeatureAvailable = false
     private var versionInfo = ""
     private var copyResetWorkItem: DispatchWorkItem?
+    private var diagnosticSaveResetWorkItem: DispatchWorkItem?
 
 #if DEBUG
     var displayedBuildConfiguration: AppBuildConfiguration {
@@ -54,6 +57,14 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     }
     var displayedVersionBuild: String { contentModel.metadata.versionBuildText() }
     var displayedVersionInfo: String { versionInfo }
+    var displayedDiagnosticSaveButtonTitle: String {
+        AboutDiagnosticSavePresentation.buttonTitle(
+            for: contentModel.diagnosticSaveState
+        )
+    }
+    var displayedDiagnosticSaveButtonIsEnabled: Bool {
+        contentModel.diagnosticSaveState != .saving
+    }
     var usesSwiftUIHostingBoundary: Bool {
         window?.contentViewController is NSHostingController<AboutContentView>
     }
@@ -80,10 +91,22 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     func selectAllUpdateStatusForTesting() {
         updateStatusTextField?.selectText(nil)
     }
+
+    func saveDiagnosticLogsForTesting(
+        window: DiagnosticExportWindow
+    ) async -> AboutDiagnosticSaveResult {
+        await saveDiagnosticLogs(window: window)
+    }
 #endif
 
-    init(updateController: UpdateController = UpdateController()) {
+    init(
+        updateController: UpdateController = UpdateController(),
+        diagnosticLogger: DiagnosticLogger = .shared,
+        diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies = .live()
+    ) {
         self.updateController = updateController
+        self.diagnosticLogger = diagnosticLogger
+        self.diagnosticSaveDependencies = diagnosticSaveDependencies
         let window = PreviewWindow(
             contentRect: NSRect(origin: .zero, size: AboutLayout.windowSize),
             styleMask: [.titled, .closable],
@@ -106,6 +129,11 @@ final class AboutController: NSWindowController, NSWindowDelegate {
                     self?.performSecondaryUpdateAction(action)
                 },
                 onCopyVersion: { [weak self] in self?.copyVersionInfo() },
+                onSaveDiagnosticLogs: { [weak self] window in
+                    Task { @MainActor in
+                        await self?.saveDiagnosticLogs(window: window)
+                    }
+                },
                 onClose: { [weak self] in self?.closeAbout() }
             )
         )
@@ -131,6 +159,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         )
         applyUpdateStatus(updateController.status)
         resetCopyVersionButton()
+        resetDiagnosticSaveButton()
 
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -204,8 +233,55 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         contentModel.showCopyReady()
     }
 
+    private func saveDiagnosticLogs(
+        window: DiagnosticExportWindow
+    ) async -> AboutDiagnosticSaveResult {
+        guard contentModel.diagnosticSaveState != .saving else {
+            return .cancelled
+        }
+        diagnosticSaveResetWorkItem?.cancel()
+        diagnosticSaveResetWorkItem = nil
+        contentModel.showDiagnosticSaveStarted()
+
+        let suggestedFileName = DiagnosticExportFileName.make(window: window)
+        guard let destinationURL = await diagnosticSaveDependencies.chooseDestination(
+            self.window,
+            suggestedFileName
+        ) else {
+            contentModel.showDiagnosticSaveReady()
+            return .cancelled
+        }
+
+        do {
+            let export = try await diagnosticLogger.export(window: window)
+            try await diagnosticSaveDependencies.writeExport(export, destinationURL)
+            contentModel.showDiagnosticSaveSucceeded()
+            scheduleDiagnosticSaveReset()
+            return .saved
+        } catch {
+            contentModel.showDiagnosticSaveReady()
+            diagnosticSaveDependencies.presentFailure(self.window)
+            return .failed
+        }
+    }
+
+    private func scheduleDiagnosticSaveReset() {
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.resetDiagnosticSaveButton()
+        }
+        diagnosticSaveResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: workItem)
+    }
+
+    private func resetDiagnosticSaveButton() {
+        diagnosticSaveResetWorkItem?.cancel()
+        diagnosticSaveResetWorkItem = nil
+        contentModel.showDiagnosticSaveReady()
+    }
+
     private func closeAbout() {
         copyResetWorkItem?.cancel()
+        diagnosticSaveResetWorkItem?.cancel()
         close()
     }
 
