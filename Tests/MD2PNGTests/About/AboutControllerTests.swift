@@ -38,7 +38,8 @@ final class AboutControllerTests: XCTestCase {
             window.contentRect(forFrameRect: window.frame).size,
             NSSize(width: 560, height: 490)
         )
-        XCTAssertGreaterThanOrEqual(contentView.subviews.count, 8)
+        XCTAssertTrue(controller.usesSwiftUIHostingBoundary)
+        XCTAssertEqual(contentView.bounds.size, AboutLayout.windowSize)
         XCTAssertEqual(controller.displayedBuildConfiguration, .debug)
         XCTAssertEqual(
             controller.displayedProjectButtonTitle,
@@ -166,11 +167,10 @@ final class AboutControllerTests: XCTestCase {
             L10n.text("about.update_retry_check", defaultValue: "Try Again")
         )
         XCTAssertFalse(controller.displayedReleasesFallbackIsHidden)
-        XCTAssertEqual(controller.displayedDescriptionFrame.height, 20, accuracy: 0.5)
         XCTAssertEqual(
-            controller.displayedDescriptionFrame.maxX,
-            controller.displayedUpdateCardFrame.maxX,
-            accuracy: 2.5
+            controller.displayedUpdateCardHeight,
+            AboutLayout.detailedUpdateHeight,
+            accuracy: 0.5
         )
 
         writeSnapshotIfRequested(
@@ -244,6 +244,7 @@ final class AboutControllerTests: XCTestCase {
                 defaultValue: "Downloaded — open the DMG and drag md2png into Applications."
             )
         )
+        XCTAssertTrue(controller.displayedUpdateStatusIsSelectable)
         controller.selectAllUpdateStatusForTesting()
         XCTAssertEqual(
             controller.displayedUpdateStatusSelectedRange,
@@ -257,7 +258,7 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testAboutUpdateCardResizesWithoutMovingChangelog() {
+    func testAboutUpdateCardKeepsCompactAndDetailedHeightsInHostingBoundary() {
         _ = NSApplication.shared
         let metadata = AppMetadata(
             version: "0.1.0",
@@ -269,9 +270,8 @@ final class AboutControllerTests: XCTestCase {
 
         let compactController = makeAboutController()
         compactController.show(metadata: metadata)
-        let compactCardFrame = compactController.displayedUpdateCardFrame
-        let compactDescriptionFrame = compactController.displayedDescriptionFrame
-        let compactHeadingFrame = compactController.displayedReleaseHeadingFrame
+        let compactCardHeight = compactController.displayedUpdateCardHeight
+        let compactWindowSize = compactController.window?.contentView?.bounds.size
         compactController.close()
 
         let expandedController = makeAboutController(phase: .failed(
@@ -282,28 +282,14 @@ final class AboutControllerTests: XCTestCase {
         ))
         expandedController.show(metadata: metadata)
         defer { expandedController.close() }
-        let expandedCardFrame = expandedController.displayedUpdateCardFrame
-        let expandedDescriptionFrame = expandedController.displayedDescriptionFrame
-        let expandedHeadingFrame = expandedController.displayedReleaseHeadingFrame
+        let expandedCardHeight = expandedController.displayedUpdateCardHeight
+        let expandedWindowSize = expandedController.window?.contentView?.bounds.size
 
-        XCTAssertEqual(compactCardFrame.height, 36, accuracy: 0.5)
-        XCTAssertEqual(expandedCardFrame.height, 66, accuracy: 0.5)
-        XCTAssertGreaterThan(compactDescriptionFrame.minY, compactCardFrame.maxY)
-        XCTAssertEqual(
-            compactDescriptionFrame.height,
-            expandedDescriptionFrame.height,
-            accuracy: 0.5
-        )
-        XCTAssertEqual(
-            compactHeadingFrame.origin.y,
-            expandedHeadingFrame.origin.y,
-            accuracy: 0.5
-        )
-        XCTAssertEqual(
-            compactHeadingFrame.height,
-            expandedHeadingFrame.height,
-            accuracy: 0.5
-        )
+        XCTAssertEqual(compactCardHeight, AboutLayout.compactUpdateHeight, accuracy: 0.5)
+        XCTAssertEqual(expandedCardHeight, AboutLayout.detailedUpdateHeight, accuracy: 0.5)
+        XCTAssertEqual(compactWindowSize, AboutLayout.windowSize)
+        XCTAssertEqual(expandedWindowSize, AboutLayout.windowSize)
+        XCTAssertTrue(expandedController.usesSwiftUIHostingBoundary)
     }
 
     @MainActor
@@ -385,7 +371,7 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testAboutReleaseNotesStartScrolledToTop() {
+    func testAboutReleaseNotesResetScrollIdentityEveryTimeWindowIsShown() {
         _ = NSApplication.shared
         let controller = makeAboutController()
         let notes = (["Added"] + (1...30).map { "• Change \($0)" })
@@ -399,7 +385,16 @@ final class AboutControllerTests: XCTestCase {
         ))
         defer { controller.close() }
 
-        XCTAssertEqual(controller.releaseNotesVisibleOrigin, .zero)
+        let initialRevision = controller.displayedReleaseNotesRevision
+        controller.show(metadata: AppMetadata(
+            version: "0.1.1",
+            build: "2",
+            buildConfiguration: .debug,
+            releaseNotes: "Fixed\n• Reset release notes to their beginning.",
+            projectURL: testProjectURL
+        ))
+
+        XCTAssertEqual(controller.displayedReleaseNotesRevision, initialRevision + 1)
     }
 
     @MainActor
