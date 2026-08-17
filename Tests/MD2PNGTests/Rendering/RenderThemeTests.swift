@@ -61,6 +61,9 @@ final class RenderThemeTests: XCTestCase {
             )
             XCTAssertEqual(background.alphaComponent, 1, accuracy: 0.001, theme.rawValue)
             XCTAssertTrue(containsVisibleForeground(in: image), theme.rawValue)
+            if theme == .warmPaper {
+                try assertWarmPaperPalette(in: image)
+            }
         }
 
         let referenceSize = try XCTUnwrap(renderedSizes.first)
@@ -104,6 +107,7 @@ final class RenderThemeTests: XCTestCase {
         ```swift
         struct RenderRequest {
             let theme: String
+            let label = "Warm Paper"
             let isLocal = true
         }
         ```
@@ -174,6 +178,144 @@ final class RenderThemeTests: XCTestCase {
             }
         }
         return false
+    }
+
+    private func assertWarmPaperPalette(
+        in image: NSImage,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let background = color(0xFA, 0xF8, 0xF3)
+        let codeSurface = color(0xEC, 0xE7, 0xDE)
+        let codeText = color(0x34, 0x2F, 0x29)
+        let renderedColors: [(name: String, color: NSColor, minimumPixels: Int)] = [
+            ("code surface", codeSurface, 100),
+            ("syntax keyword", color(0x96, 0x37, 0x43), 3),
+            ("syntax string", color(0x6C, 0x4D, 0x13), 3),
+            ("syntax title", color(0x68, 0x4A, 0x92), 3),
+            ("syntax variable", color(0x24, 0x5B, 0x73), 3),
+            ("Mermaid secondary surface", color(0xE7, 0xE5, 0xC7), 100),
+            ("Mermaid tertiary surface", color(0xF4, 0xD8, 0xBC), 50)
+        ]
+
+        XCTAssertGreaterThan(
+            colorDistance(background, codeSurface),
+            0.18,
+            "Warm Paper code blocks must remain visually distinct from the page",
+            file: file,
+            line: line
+        )
+        assertContrast(
+            codeText,
+            against: codeSurface,
+            atLeast: 7,
+            message: "Warm Paper code text",
+            file: file,
+            line: line
+        )
+        for expected in renderedColors.dropFirst() where expected.name.hasPrefix("syntax") {
+            assertContrast(
+                expected.color,
+                against: codeSurface,
+                atLeast: 4.5,
+                message: expected.name,
+                file: file,
+                line: line
+            )
+        }
+        assertContrast(
+            color(0x3D, 0x34, 0x28),
+            against: color(0xE7, 0xE5, 0xC7),
+            atLeast: 4.5,
+            message: "Warm Paper Mermaid secondary surface",
+            file: file,
+            line: line
+        )
+        assertContrast(
+            color(0x3D, 0x34, 0x28),
+            against: color(0xF4, 0xD8, 0xBC),
+            atLeast: 4.5,
+            message: "Warm Paper Mermaid tertiary surface",
+            file: file,
+            line: line
+        )
+
+        let tiff = try XCTUnwrap(image.tiffRepresentation, file: file, line: line)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff), file: file, line: line)
+        // Small syntax glyphs are antialiased into their code-block background.
+        let renderedColorTolerance: CGFloat = 0.26
+        var hitCounts = Array(repeating: 0, count: renderedColors.count)
+        var nearestDistances = Array(
+            repeating: CGFloat.greatestFiniteMagnitude,
+            count: renderedColors.count
+        )
+
+        scan: for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+                guard let sample = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    continue
+                }
+                for index in renderedColors.indices {
+                    let distance = colorDistance(sample, renderedColors[index].color)
+                    nearestDistances[index] = min(nearestDistances[index], distance)
+                    if hitCounts[index] < renderedColors[index].minimumPixels
+                        && distance < renderedColorTolerance {
+                        hitCounts[index] += 1
+                    }
+                }
+                if renderedColors.indices.allSatisfy({
+                    hitCounts[$0] >= renderedColors[$0].minimumPixels
+                }) {
+                    break scan
+                }
+            }
+        }
+
+        for index in renderedColors.indices {
+            XCTAssertGreaterThanOrEqual(
+                hitCounts[index],
+                renderedColors[index].minimumPixels,
+                "Warm Paper render is missing the expected \(renderedColors[index].name) color; "
+                    + "nearest distance: \(nearestDistances[index])",
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func assertContrast(
+        _ foreground: NSColor,
+        against background: NSColor,
+        atLeast minimumRatio: CGFloat,
+        message: String,
+        file: StaticString,
+        line: UInt
+    ) {
+        XCTAssertGreaterThanOrEqual(
+            contrastRatio(foreground, background),
+            minimumRatio,
+            message,
+            file: file,
+            line: line
+        )
+    }
+
+    private func contrastRatio(_ lhs: NSColor, _ rhs: NSColor) -> CGFloat {
+        let lhsLuminance = relativeLuminance(lhs)
+        let rhsLuminance = relativeLuminance(rhs)
+        return (max(lhsLuminance, rhsLuminance) + 0.05)
+            / (min(lhsLuminance, rhsLuminance) + 0.05)
+    }
+
+    private func relativeLuminance(_ color: NSColor) -> CGFloat {
+        func linearized(_ component: CGFloat) -> CGFloat {
+            component <= 0.04045
+                ? component / 12.92
+                : pow((component + 0.055) / 1.055, 2.4)
+        }
+        return linearized(color.redComponent) * 0.2126
+            + linearized(color.greenComponent) * 0.7152
+            + linearized(color.blueComponent) * 0.0722
     }
 
     private func assertColor(
