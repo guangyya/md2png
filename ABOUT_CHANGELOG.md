@@ -5,6 +5,8 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-17
+
 ### Added
 
 - Choose Clean Light, Warm Paper, or Dark for every Markdown render.

@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-17
+
 ### Added
 
 - Add bundled Clean Light, Warm Paper, and Dark render themes with coordinated
