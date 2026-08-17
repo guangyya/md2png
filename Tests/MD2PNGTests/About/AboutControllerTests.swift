@@ -9,6 +9,10 @@ final class AboutControllerTests: XCTestCase {
     @MainActor
     func testAboutWindowHasStructuredLayout() throws {
         _ = NSApplication.shared
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = NSAppearance(named: .aqua)
+        defer { NSApp.appearance = previousAppearance }
+
         let controller = makeAboutController()
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
@@ -73,6 +77,34 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testAboutWindowRendersWithDarkAppearance() throws {
+        _ = NSApplication.shared
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        defer { NSApp.appearance = previousAppearance }
+
+        let controller = makeAboutController()
+        controller.show(metadata: AppMetadata(
+            version: "0.1.0",
+            build: "1",
+            buildConfiguration: .debug,
+            releaseNotes: "Changed\n• Dynamic update and changelog surfaces.",
+            projectURL: testProjectURL
+        ))
+        defer { controller.close() }
+
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(
+            window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]),
+            .darkAqua
+        )
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_ABOUT_DARK_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(window.contentView)
+        )
+    }
+
+    @MainActor
     func testAboutManualCheckShowsProgressAndRecentCompletionFeedback() {
         _ = NSApplication.shared
         let phase = UpdatePhase.upToDate(version: SemanticVersion("0.1.0")!)
@@ -108,6 +140,12 @@ final class AboutControllerTests: XCTestCase {
             completedController.displayedUpdateButtonTitle,
             L10n.text("about.update_checked_recently", defaultValue: "Checked just now")
         )
+        if let contentView = completedController.window?.contentView {
+            writeSnapshotIfRequested(
+                environmentKey: "MD2PNG_ABOUT_CHECKED_SNAPSHOT_PATH",
+                contentView: contentView
+            )
+        }
         completedController.close()
 
         let cooldownController = makeAboutController(
@@ -258,7 +296,7 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testAboutUpdateCardKeepsCompactAndDetailedHeightsInHostingBoundary() {
+    func testAboutUpdateCardKeepsStableHeightAcrossStatesInHostingBoundary() {
         _ = NSApplication.shared
         let metadata = AppMetadata(
             version: "0.1.0",
@@ -285,7 +323,7 @@ final class AboutControllerTests: XCTestCase {
         let expandedCardHeight = expandedController.displayedUpdateCardHeight
         let expandedWindowSize = expandedController.window?.contentView?.bounds.size
 
-        XCTAssertEqual(compactCardHeight, AboutLayout.compactUpdateHeight, accuracy: 0.5)
+        XCTAssertEqual(compactCardHeight, AboutLayout.detailedUpdateHeight, accuracy: 0.5)
         XCTAssertEqual(expandedCardHeight, AboutLayout.detailedUpdateHeight, accuracy: 0.5)
         XCTAssertEqual(compactWindowSize, AboutLayout.windowSize)
         XCTAssertEqual(expandedWindowSize, AboutLayout.windowSize)

@@ -1,0 +1,48 @@
+import Foundation
+
+@MainActor
+protocol UpdateSession: AnyObject {
+    var status: UpdateStatus { get }
+    var isUpdating: Bool { get }
+    var onStatusChange: (@MainActor (UpdateStatus) -> Void)? { get set }
+
+    func refreshIfNeeded()
+    func checkAgain()
+    func downloadAvailableUpdate()
+    func cancelUpdate()
+    func installAndRelaunch()
+    func installLater()
+    func cancelPreparedInstallationForApplicationTermination(
+        completion: @escaping @MainActor () -> Void
+    ) -> Bool
+    func viewFullReleaseNotes()
+    func openDownloadedUpdate()
+    func revealDownloadedUpdate()
+    func viewReleasesFallback()
+    func refreshManualCheckAvailability()
+
+#if DEBUG
+    func setStatusForTesting(_ status: UpdateStatus)
+#endif
+}
+
+extension UpdateSession {
+    func refreshIfNeeded() {}
+    func downloadAvailableUpdate() {}
+    func cancelUpdate() {}
+    func installAndRelaunch() {}
+    func installLater() {}
+
+    func cancelPreparedInstallationForApplicationTermination(
+        completion: @escaping @MainActor () -> Void
+    ) -> Bool {
+        false
+    }
+
+    func viewFullReleaseNotes() {
+        viewReleasesFallback()
+    }
+
+    func openDownloadedUpdate() {}
+    func revealDownloadedUpdate() {}
+}

@@ -3,8 +3,14 @@ import SwiftUI
 
 enum AboutLayout {
     static let windowSize = NSSize(width: 560, height: 490)
-    static let compactUpdateHeight: CGFloat = 36
     static let detailedUpdateHeight: CGFloat = 66
+    static let updateRowHeight: CGFloat = 18
+    static let updateRowFontSize: CGFloat = 12
+    static let updateRowIconSize: CGFloat = 16
+    static let updateRowSpacing: CGFloat = 7
+    static let updateRowIconBaselineOffset = NSFont
+        .systemFont(ofSize: updateRowFontSize)
+        .capHeight / 2
 }
 
 @MainActor
@@ -61,7 +67,7 @@ struct AboutContentView: View {
 
             Divider()
                 .padding(.horizontal, 28)
-                .padding(.top, 22)
+                .padding(.top, 14)
 
             releaseNotes
 
@@ -186,7 +192,7 @@ struct AboutContentView: View {
             }
         }
         .padding(.horizontal, 28)
-        .padding(.top, 20)
+        .padding(.top, 12)
         .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -303,79 +309,94 @@ private struct AboutUpdateCard: View {
     let onPrimaryAction: (AboutUpdatePrimaryAction) -> Void
     let onSecondaryAction: (AboutUpdateSecondaryAction) -> Void
 
-    private var cardHeight: CGFloat {
-        presentation.detail == nil
-            ? AboutLayout.compactUpdateHeight
-            : AboutLayout.detailedUpdateHeight
-    }
-
     var body: some View {
-        HStack(alignment: .top, spacing: 7) {
-            Image(systemName: presentation.symbolName)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 18, height: 18)
-                .foregroundStyle(presentation.tint.color)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    AboutSelectableStatusLabel(
-                        text: presentation.title,
-                        accessibilityLabel: statusAccessibilityLabel,
-                        toolTip: presentation.detail ?? presentation.title
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: AboutLayout.updateRowSpacing) {
+                Image(systemName: presentation.symbolName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(
+                        width: AboutLayout.updateRowIconSize,
+                        height: AboutLayout.updateRowIconSize
                     )
-                    .frame(minWidth: 1, minHeight: 18)
-                    .layoutPriority(1)
-
-                    if let secondaryAction = presentation.secondaryAction {
-                        Button(secondaryAction.title) {
-                            onSecondaryAction(secondaryAction.action)
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.accentColor)
+                    .frame(
+                        width: AboutLayout.updateRowHeight,
+                        height: AboutLayout.updateRowHeight
+                    )
+                    .alignmentGuide(.firstTextBaseline) { dimensions in
+                        dimensions[VerticalAlignment.center]
+                            + AboutLayout.updateRowIconBaselineOffset
                     }
+                    .foregroundStyle(presentation.tint.color)
+                    .accessibilityHidden(true)
 
-                    if let primaryAction = presentation.primaryAction {
-                        Button(primaryAction.title) {
-                            onPrimaryAction(primaryAction.action)
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(
-                            size: 12,
-                            weight: primaryAction.isEmphasized ? .semibold : .regular
-                        ))
-                        .foregroundStyle(primaryAction.isEnabled
-                            ? Color.accentColor
-                            : Color(nsColor: .secondaryLabelColor))
-                        .disabled(!primaryAction.isEnabled)
-                        .help(primaryAction.toolTip ?? primaryAction.title)
+                AboutSelectableStatusLabel(
+                    text: presentation.title,
+                    accessibilityLabel: statusAccessibilityLabel,
+                    toolTip: presentation.detail ?? presentation.title
+                )
+                .frame(minWidth: 1)
+                .layoutPriority(1)
+
+                if let secondaryAction = presentation.secondaryAction {
+                    Button(secondaryAction.title) {
+                        onSecondaryAction(secondaryAction.action)
                     }
+                    .buttonStyle(.plain)
+                    .font(.system(size: AboutLayout.updateRowFontSize))
+                    .foregroundStyle(Color.accentColor)
                 }
 
-                if let detail = presentation.detail {
-                    Text(detail)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .help(detail)
+                if let primaryAction = presentation.primaryAction {
+                    Button(primaryAction.title) {
+                        onPrimaryAction(primaryAction.action)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(
+                        size: AboutLayout.updateRowFontSize,
+                        weight: primaryAction.isEmphasized ? .semibold : .regular
+                    ))
+                    .foregroundStyle(primaryAction.isEnabled
+                        ? Color.accentColor
+                        : Color(nsColor: .secondaryLabelColor))
+                    .disabled(!primaryAction.isEnabled)
+                    .help(primaryAction.toolTip ?? primaryAction.title)
                 }
+
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: AboutLayout.updateRowHeight,
+                alignment: .leading
+            )
+
+            if let detail = presentation.detail {
+                Text(detail)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, AboutLayout.updateRowHeight + AboutLayout.updateRowSpacing)
+                    .help(detail)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.top, 9)
         .padding(.bottom, 7)
-        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: AboutLayout.detailedUpdateHeight,
+            maxHeight: AboutLayout.detailedUpdateHeight,
+            alignment: presentation.detail == nil ? .leading : .topLeading
+        )
         .background(
-            Color(nsColor: .separatorColor).opacity(0.07),
+            Color.primary.opacity(0.06),
             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.2), lineWidth: 0.5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
         .help(L10n.text(
             "about.check_for_updates_help",
@@ -408,7 +429,7 @@ private struct AboutSelectableStatusLabel: NSViewRepresentable {
     func makeNSView(context: Context) -> NSTextField {
         let textField = SelectAllOnDoubleClickTextField(labelWithString: "")
         textField.identifier = Self.identifier
-        textField.font = .systemFont(ofSize: 11.5)
+        textField.font = .systemFont(ofSize: AboutLayout.updateRowFontSize)
         textField.isSelectable = true
         textField.maximumNumberOfLines = 1
         textField.lineBreakMode = .byTruncatingTail
@@ -430,7 +451,7 @@ private struct AboutSelectableStatusLabel: NSViewRepresentable {
         let intrinsicSize = textField.intrinsicContentSize
         return CGSize(
             width: min(proposal.width ?? intrinsicSize.width, intrinsicSize.width),
-            height: max(18, intrinsicSize.height)
+            height: max(AboutLayout.updateRowHeight, intrinsicSize.height)
         )
     }
 }
