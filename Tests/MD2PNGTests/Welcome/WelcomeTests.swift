@@ -55,6 +55,9 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(english.trySample, "Try an Example")
         XCTAssertTrue(english.trySampleHelp.contains("example"))
         XCTAssertEqual(english.replayDemo, "Replay workflow demo")
+        XCTAssertEqual(english.copyStepCompletionDetail, "Copy in any app")
+        XCTAssertEqual(english.renderStepCompletionDetail, "Render locally")
+        XCTAssertEqual(english.pasteStepCompletionDetail, "Review, then send")
         XCTAssertEqual(english.shortcutDetected, "Detected")
         XCTAssertEqual(english.shortcutVerified, "Works")
         XCTAssertEqual(english.launchAtLoginTitle, "Launch at Login")
@@ -72,6 +75,9 @@ final class WelcomeTests: XCTestCase {
         )
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
         XCTAssertEqual(chinese.replayDemo, "重新播放操作演示")
+        XCTAssertEqual(chinese.copyStepCompletionDetail, "在任意应用中复制")
+        XCTAssertEqual(chinese.renderStepCompletionDetail, "在本机渲染")
+        XCTAssertEqual(chinese.pasteStepCompletionDetail, "检查后再发送")
         XCTAssertEqual(englishGuide.title, "Find Examples in the md2png menu")
         XCTAssertEqual(chineseGuide.title, "在 md2png 菜单中找到“示例”")
         XCTAssertEqual(englishGuide.exampleTitle(.short), "Short Sample")
@@ -381,6 +387,39 @@ final class WelcomeTests: XCTestCase {
                 replayButton.convert(replayButton.bounds, to: contentView)
             ))
         }
+    }
+
+    @MainActor
+    func testStandardWelcomeFooterKeepsNotesAndActionsOnOneRow() throws {
+        _ = NSApplication.shared
+        let (defaults, suiteName) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let controller = WelcomeController(
+            preference: WelcomePreference(defaults: defaults),
+            visibleFrameProvider: { NSRect(x: 0, y: 0, width: 900, height: 800) },
+            onTrySample: {}
+        )
+        controller.show(shortcuts: [])
+        defer { controller.close() }
+
+        let contentView = try XCTUnwrap(controller.window?.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        let notes = try XCTUnwrap(firstSubview(
+            ofType: NSView.self,
+            in: contentView,
+            where: { $0.identifier == WelcomeFooterLayoutMarker.notesIdentifier }
+        ))
+        let actions = try XCTUnwrap(firstSubview(
+            ofType: NSView.self,
+            in: contentView,
+            where: { $0.identifier == WelcomeFooterLayoutMarker.actionsIdentifier }
+        ))
+        let notesFrame = notes.convert(notes.bounds, to: contentView)
+        let actionFrame = actions.convert(actions.bounds, to: contentView)
+        let verticalOverlap = min(notesFrame.maxY, actionFrame.maxY)
+            - max(notesFrame.minY, actionFrame.minY)
+
+        XCTAssertGreaterThan(verticalOverlap, 0, "notes=\(notesFrame), action=\(actionFrame)")
     }
 
     @MainActor

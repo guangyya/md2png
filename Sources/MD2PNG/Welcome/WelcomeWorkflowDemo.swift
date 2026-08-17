@@ -357,15 +357,40 @@ private struct WelcomeWorkflowScene: View {
 
             WelcomeTransformTrack(progress: progress, copyEmphasis: copyEmphasis)
 
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: 16)
-                .contentTransition(.opacity)
-                .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
+            Group {
+                if progress.showsCompletedJourney {
+                    completedDetails
+                } else {
+                    Text(detail)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 16)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
+            .animation(.easeInOut(duration: 0.22), value: progress.showsCompletedJourney)
         }
+    }
+
+    private var completedDetails: some View {
+        ZStack {
+            completionDetail(copy.copyStepCompletionDetail)
+                .offset(x: -WelcomeWorkflowLayout.stageOffset)
+            completionDetail(copy.renderStepCompletionDetail)
+            completionDetail(copy.pasteStepCompletionDetail)
+                .offset(x: WelcomeWorkflowLayout.stageOffset)
+        }
+        .frame(maxWidth: .infinity, minHeight: 16)
+    }
+
+    private func completionDetail(_ text: String) -> some View {
+        Text(text)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .frame(width: WelcomeWorkflowLayout.stageWidth)
     }
 
     private var detail: String {

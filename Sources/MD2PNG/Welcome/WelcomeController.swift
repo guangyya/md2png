@@ -132,10 +132,13 @@ struct WelcomeCopy {
     let subtitle: String
     let copyStepTitle: String
     let copyStepDetail: String
+    let copyStepCompletionDetail: String
     let renderStepTitle: String
     let renderStepDetail: String
+    let renderStepCompletionDetail: String
     let pasteStepTitle: String
     let pasteStepDetail: String
+    let pasteStepCompletionDetail: String
     let shortcutsTitle: String
     let shortcutVerificationHelp: String
     let shortcutReady: String
@@ -184,6 +187,11 @@ struct WelcomeCopy {
             defaultValue: "Copy Markdown text in any app.",
             bundle: localizationBundle
         )
+        copyStepCompletionDetail = L10n.text(
+            "welcome.step.copy.completion_detail",
+            defaultValue: "Copy in any app",
+            bundle: localizationBundle
+        )
         renderStepTitle = L10n.text(
             "welcome.step.render.title",
             defaultValue: "Render it",
@@ -194,6 +202,11 @@ struct WelcomeCopy {
             defaultValue: "Use the global shortcut or choose Render Clipboard as Image from the menu bar.",
             bundle: localizationBundle
         )
+        renderStepCompletionDetail = L10n.text(
+            "welcome.step.render.completion_detail",
+            defaultValue: "Render locally",
+            bundle: localizationBundle
+        )
         pasteStepTitle = L10n.text(
             "welcome.step.paste.title",
             defaultValue: "Paste the PNG",
@@ -202,6 +215,11 @@ struct WelcomeCopy {
         pasteStepDetail = L10n.text(
             "welcome.step.paste.detail",
             defaultValue: "Press Command-V, review the image, and send it yourself.",
+            bundle: localizationBundle
+        )
+        pasteStepCompletionDetail = L10n.text(
+            "welcome.step.paste.completion_detail",
+            defaultValue: "Review, then send",
             bundle: localizationBundle
         )
         shortcutsTitle = L10n.text(
@@ -788,15 +806,15 @@ private struct WelcomeFooter: View {
                 .padding(.leading, 22)
 
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 14) {
+                HStack(alignment: .center, spacing: 10) {
                     footerNotes
-
-                    Spacer(minLength: 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
 
                     footerActions
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
                     footerNotes
                     HStack(spacing: 10) {
                         Spacer()
@@ -818,6 +836,9 @@ private struct WelcomeFooter: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
+        .background(WelcomeFooterLayoutMarker(
+            identifier: WelcomeFooterLayoutMarker.notesIdentifier
+        ))
     }
 
     private var footerActions: some View {
@@ -837,6 +858,27 @@ private struct WelcomeFooter: View {
                 .accessibilityIdentifier("WelcomeDoneButton")
         }
         .fixedSize(horizontal: true, vertical: false)
+        .background(WelcomeFooterLayoutMarker(
+            identifier: WelcomeFooterLayoutMarker.actionsIdentifier
+        ))
+    }
+}
+
+struct WelcomeFooterLayoutMarker: NSViewRepresentable {
+    static let notesIdentifier = NSUserInterfaceItemIdentifier("WelcomeFooterNotesMarker")
+    static let actionsIdentifier = NSUserInterfaceItemIdentifier("WelcomeFooterActionsMarker")
+
+    let identifier: NSUserInterfaceItemIdentifier
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.identifier = identifier
+        view.setAccessibilityElement(false)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        nsView.identifier = identifier
     }
 }
 
