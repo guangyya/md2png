@@ -87,16 +87,43 @@ struct WelcomeWindowPlacement {
         windowSize: NSSize,
         visibleFrame: NSRect
     ) -> NSPoint {
-        NSPoint(
-            x: visibleFrame.midX - windowSize.width / 2,
-            y: visibleFrame.midY - windowSize.height / 2
+        let centeredX = visibleFrame.midX - windowSize.width / 2
+        let centeredY = visibleFrame.midY - windowSize.height / 2
+        return NSPoint(
+            x: clampedOrigin(
+                centeredX,
+                minimum: visibleFrame.minX,
+                maximum: visibleFrame.maxX - windowSize.width
+            ),
+            y: clampedOrigin(
+                centeredY,
+                minimum: visibleFrame.minY,
+                maximum: visibleFrame.maxY - windowSize.height
+            )
         )
+    }
+
+    private static func clampedOrigin(
+        _ value: CGFloat,
+        minimum: CGFloat,
+        maximum: CGFloat
+    ) -> CGFloat {
+        guard maximum >= minimum else { return minimum }
+        return min(max(value, minimum), maximum)
     }
 }
 
-private enum WelcomeLayout {
-    static let contentSize = NSSize(width: 560, height: 570)
-    static let statusColumnWidth: CGFloat = 100
+enum WelcomeLayout {
+    static let preferredContentSize = NSSize(width: 560, height: 570)
+    static let screenInset: CGFloat = 12
+    static let statusColumnMinimumWidth: CGFloat = 88
+
+    static func contentSize(maximumContentSize: NSSize) -> NSSize {
+        NSSize(
+            width: max(1, min(preferredContentSize.width, maximumContentSize.width)),
+            height: max(1, min(preferredContentSize.height, maximumContentSize.height))
+        )
+    }
 }
 
 struct WelcomeCopy {
@@ -128,6 +155,7 @@ struct WelcomeCopy {
     let reopenHint: String
     let trySample: String
     let trySampleHelp: String
+    let replayDemo: String
     let done: String
 
     init(localizationBundle: Bundle? = nil) {
@@ -271,6 +299,11 @@ struct WelcomeCopy {
             defaultValue: "Choose a bundled example to try.",
             bundle: localizationBundle
         )
+        replayDemo = L10n.text(
+            "welcome.replay_demo",
+            defaultValue: "Replay workflow demo",
+            bundle: localizationBundle
+        )
         done = L10n.text(
             "welcome.done",
             defaultValue: "Done",
@@ -320,6 +353,8 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let onTrySample: () -> Void
     private let shortcutVerificationState = WelcomeShortcutVerificationState()
     private let launchAtLoginState: WelcomeLaunchAtLoginState
+    private let visibleFrameProvider: @MainActor () -> NSRect?
+    private let dynamicTypeSize: DynamicTypeSize?
 
 #if DEBUG
     var displayedShortcutStatuses: [WelcomeShortcutStatus] {
@@ -339,6 +374,8 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         launchAtLoginController: LaunchAtLoginController = LaunchAtLoginController(),
         onLaunchAtLoginError: @escaping (Error) -> Void = { _ in },
         onVisibilityChange: @escaping (Bool) -> Void = { _ in },
+        visibleFrameProvider: @escaping @MainActor () -> NSRect? = WelcomeController.activeVisibleFrame,
+        dynamicTypeSize: DynamicTypeSize? = nil,
         onTrySample: @escaping () -> Void
     ) {
         self.preference = preference
@@ -348,6 +385,8 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
             onError: onLaunchAtLoginError
         )
         self.onVisibilityChange = onVisibilityChange
+        self.visibleFrameProvider = visibleFrameProvider
+        self.dynamicTypeSize = dynamicTypeSize
         self.onTrySample = onTrySample
         super.init(window: nil)
     }
@@ -366,18 +405,12 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     func show(shortcuts: [WelcomeShortcutStatus]) {
         shortcutVerificationState.reset(shortcuts: shortcuts)
         launchAtLoginState.refresh()
-        let rootView = WelcomeView(
-            copy: copy,
-            shortcutVerificationState: shortcutVerificationState,
-            launchAtLoginState: launchAtLoginState,
-            onTrySample: { [weak self] in self?.trySample() },
-            onDone: { [weak self] in self?.complete() }
-        )
-        let hostingController = NSHostingController(rootView: rootView)
-
         if window == nil {
             let window = PreviewWindow(
-                contentRect: NSRect(origin: .zero, size: WelcomeLayout.contentSize),
+                contentRect: NSRect(
+                    origin: .zero,
+                    size: WelcomeLayout.preferredContentSize
+                ),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -389,13 +422,45 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
             window.delegate = self
             self.window = window
         }
-        window?.contentViewController = hostingController
-        window?.setContentSize(WelcomeLayout.contentSize)
+
+        guard let window else { return }
+        let visibleFrame = visibleFrameProvider()
+        let maximumContentSize = visibleFrame.map { visibleFrame in
+            let availableFrame = visibleFrame.insetBy(
+                dx: WelcomeLayout.screenInset,
+                dy: WelcomeLayout.screenInset
+            )
+            return window.contentRect(forFrameRect: availableFrame).size
+        } ?? WelcomeLayout.preferredContentSize
+        let contentSize = WelcomeLayout.contentSize(
+            maximumContentSize: maximumContentSize
+        )
+        let rootView = WelcomeView(
+            copy: copy,
+            contentSize: contentSize,
+            shortcutVerificationState: shortcutVerificationState,
+            launchAtLoginState: launchAtLoginState,
+            onTrySample: { [weak self] in self?.trySample() },
+            onDone: { [weak self] in self?.complete() }
+        )
+        var erasedRootView = AnyView(rootView)
+        if let dynamicTypeSize {
+            erasedRootView = AnyView(
+                erasedRootView.environment(\.dynamicTypeSize, dynamicTypeSize)
+            )
+        }
+        let hostingController = NSHostingController(rootView: erasedRootView)
+
+        window.contentViewController = hostingController
+        window.setContentSize(contentSize)
         onVisibilityChange(true)
         NSApp.activate(ignoringOtherApps: true)
-        centerOnActiveScreen()
+        if let visibleFrame {
+            center(window: window, in: visibleFrame)
+        }
         showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
+        window.makeKeyAndOrderFront(nil)
+        window.contentView?.layoutSubtreeIfNeeded()
     }
 
     func verifyShortcut(_ command: GlobalShortcutCommand) -> Bool {
@@ -456,22 +521,25 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         )
     }
 
-    private func centerOnActiveScreen() {
-        guard let window else { return }
-        let pointerLocation = NSEvent.mouseLocation
-        let targetScreen = NSScreen.screens.first {
-            $0.frame.contains(pointerLocation)
-        } ?? NSScreen.main ?? NSScreen.screens.first
-        guard let visibleFrame = targetScreen?.visibleFrame else { return }
+    private func center(window: NSWindow, in visibleFrame: NSRect) {
         window.setFrameOrigin(WelcomeWindowPlacement.centeredOrigin(
             windowSize: window.frame.size,
             visibleFrame: visibleFrame
         ))
     }
+
+    private static func activeVisibleFrame() -> NSRect? {
+        let pointerLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first {
+            $0.frame.contains(pointerLocation)
+        } ?? NSScreen.main ?? NSScreen.screens.first
+        return targetScreen?.visibleFrame
+    }
 }
 
 private struct WelcomeView: View {
     let copy: WelcomeCopy
+    let contentSize: NSSize
     @ObservedObject var shortcutVerificationState: WelcomeShortcutVerificationState
     @ObservedObject var launchAtLoginState: WelcomeLaunchAtLoginState
     let onTrySample: () -> Void
@@ -483,85 +551,89 @@ private struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .center, spacing: 13) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 44, height: 44)
-                        .padding(7)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    Color.cyan.opacity(0.2),
-                                    Color.purple.opacity(0.16)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.cyan.opacity(0.5),
-                                            Color.purple.opacity(0.4)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.8
-                                )
-                        }
-                        .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(copy.title)
-                            .font(.system(size: 23, weight: .semibold))
-                            .foregroundStyle(
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 13) {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 44, height: 44)
+                            .padding(7)
+                            .background(
                                 LinearGradient(
-                                    colors: [Color.primary, Color.purple.opacity(0.9)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                    colors: [
+                                        Color.cyan.opacity(0.2),
+                                        Color.purple.opacity(0.16)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                             )
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(copy.subtitle)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.cyan.opacity(0.5),
+                                                Color.purple.opacity(0.4)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 0.8
+                                    )
+                            }
+                            .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(copy.title)
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color.primary, Color.purple.opacity(0.9)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(copy.subtitle)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                }
 
-                WelcomeWorkflowDemo(copy: copy)
+                    WelcomeWorkflowDemo(copy: copy)
 
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(copy.shortcutsTitle)
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(copy.shortcutsTitle)
+                            .font(.headline)
 
-                    Text(copy.shortcutVerificationHelp)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    ForEach(shortcutVerificationState.shortcuts) { shortcut in
-                        WelcomeShortcutRow(shortcut: shortcut, copy: copy)
-                    }
-
-                    if hasShortcutConflict {
-                        Label(copy.shortcutConflictHelp, systemImage: "info.circle")
+                        Text(copy.shortcutVerificationHelp)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+
+                        ForEach(shortcutVerificationState.shortcuts) { shortcut in
+                            WelcomeShortcutRow(shortcut: shortcut, copy: copy)
+                        }
+
+                        if hasShortcutConflict {
+                            Label(copy.shortcutConflictHelp, systemImage: "info.circle")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
+                .padding(.horizontal, 22)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
 
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
             .frame(
                 maxWidth: .infinity,
                 maxHeight: .infinity,
@@ -578,8 +650,8 @@ private struct WelcomeView: View {
             )
         }
         .frame(
-            width: WelcomeLayout.contentSize.width,
-            height: WelcomeLayout.contentSize.height
+            width: contentSize.width,
+            height: contentSize.height
         )
         .background {
             WelcomeBackdrop()
@@ -609,9 +681,9 @@ private struct WelcomeLaunchAtLoginRow: View {
                 Label(statusText, systemImage: statusSymbol)
                     .font(.callout.weight(.medium))
                     .foregroundStyle(statusColor)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(
-                        width: WelcomeLayout.statusColumnWidth,
+                        minWidth: WelcomeLayout.statusColumnMinimumWidth,
                         alignment: .leading
                     )
             }
@@ -715,33 +787,56 @@ private struct WelcomeFooter: View {
             Divider()
                 .padding(.leading, 22)
 
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Label(copy.privacyNote, systemImage: "lock.shield")
-                    Label(copy.reopenHint, systemImage: "menubar.rectangle")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    footerNotes
+
+                    Spacer(minLength: 12)
+
+                    footerActions
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 12)
-
-                Button(action: onTrySample) {
-                    Label(copy.trySample, systemImage: "sparkles")
+                VStack(alignment: .leading, spacing: 10) {
+                    footerNotes
+                    HStack(spacing: 10) {
+                        Spacer()
+                        footerActions
+                    }
                 }
-                .help(copy.trySampleHelp)
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-
-                Button(copy.done, action: onDone)
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 11)
         }
         .background(.regularMaterial)
+    }
+
+    private var footerNotes: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Label(copy.privacyNote, systemImage: "lock.shield")
+            Label(copy.reopenHint, systemImage: "menubar.rectangle")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var footerActions: some View {
+        HStack(spacing: 10) {
+            Button(action: onTrySample) {
+                Label(copy.trySample, systemImage: "sparkles")
+            }
+            .help(copy.trySampleHelp)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .accessibilityIdentifier("WelcomeTrySampleButton")
+
+            Button(copy.done, action: onDone)
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .accessibilityIdentifier("WelcomeDoneButton")
+        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -792,7 +887,7 @@ private struct WelcomeShortcutRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Text(shortcut.title)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
 
@@ -813,9 +908,9 @@ private struct WelcomeShortcutRow: View {
             Label(statusText, systemImage: statusSymbol)
                 .font(.callout.weight(.medium))
                 .foregroundStyle(statusColor)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(
-                    width: WelcomeLayout.statusColumnWidth,
+                    minWidth: WelcomeLayout.statusColumnMinimumWidth,
                     alignment: .leading
                 )
                 .symbolEffect(.bounce, value: shortcut.verificationCount)

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import MD2PNG
 
@@ -47,10 +48,13 @@ final class WelcomeTests: XCTestCase {
         let chineseBundle = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
         let english = WelcomeCopy(localizationBundle: englishBundle)
         let chinese = WelcomeCopy(localizationBundle: chineseBundle)
+        let englishGuide = SampleGuideCopy(localizationBundle: englishBundle)
+        let chineseGuide = SampleGuideCopy(localizationBundle: chineseBundle)
 
         XCTAssertEqual(english.windowTitle, "Welcome to md2png")
         XCTAssertEqual(english.trySample, "Try an Example")
         XCTAssertTrue(english.trySampleHelp.contains("example"))
+        XCTAssertEqual(english.replayDemo, "Replay workflow demo")
         XCTAssertEqual(english.shortcutDetected, "Detected")
         XCTAssertEqual(english.shortcutVerified, "Works")
         XCTAssertEqual(english.launchAtLoginTitle, "Launch at Login")
@@ -67,6 +71,11 @@ final class WelcomeTests: XCTestCase {
             "Render Clipboard as Image shortcut works."
         )
         XCTAssertEqual(chinese.windowTitle, "欢迎使用 md2png")
+        XCTAssertEqual(chinese.replayDemo, "重新播放操作演示")
+        XCTAssertEqual(englishGuide.title, "Find Examples in the md2png menu")
+        XCTAssertEqual(chineseGuide.title, "在 md2png 菜单中找到“示例”")
+        XCTAssertEqual(englishGuide.exampleTitle(.short), "Short Sample")
+        XCTAssertEqual(chineseGuide.exampleTitle(.short), "简短示例")
         XCTAssertEqual(chinese.shortcutDetected, "已检测")
         XCTAssertEqual(chinese.shortcutVerified, "已生效")
         XCTAssertEqual(chinese.shortcutUnavailable, "已占用")
@@ -285,6 +294,143 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(origin.y, 248.5, accuracy: 0.001)
     }
 
+    func testWelcomeAndSampleGuideLayoutsStayInsideSmallVisibleFrames() {
+        XCTAssertEqual(
+            WelcomeLayout.contentSize(maximumContentSize: NSSize(width: 520, height: 430)),
+            NSSize(width: 520, height: 430)
+        )
+        XCTAssertEqual(
+            WelcomeLayout.contentSize(maximumContentSize: NSSize(width: 800, height: 900)),
+            WelcomeLayout.preferredContentSize
+        )
+        XCTAssertEqual(
+            SampleGuideLayout.contentSize(visibleFrame: NSRect(
+                x: 1_440,
+                y: 24,
+                width: 400,
+                height: 300
+            )),
+            NSSize(width: 376, height: 276)
+        )
+        XCTAssertGreaterThan(
+            GuideMenuHighlightStyle(contrast: .increased).borderWidth,
+            GuideMenuHighlightStyle(contrast: .standard).borderWidth
+        )
+        XCTAssertGreaterThan(
+            GuideMenuHighlightStyle(contrast: .increased).recommendedFillOpacity,
+            GuideMenuHighlightStyle(contrast: .standard).recommendedFillOpacity
+        )
+
+        let visibleFrame = NSRect(x: -500, y: 25, width: 500, height: 400)
+        let oversizedOrigin = WelcomeWindowPlacement.centeredOrigin(
+            windowSize: NSSize(width: 560, height: 470),
+            visibleFrame: visibleFrame
+        )
+        XCTAssertEqual(oversizedOrigin, visibleFrame.origin)
+    }
+
+    @MainActor
+    func testLargeAccessibilityWelcomeStaysVisibleAndExposesReplaySeparately() throws {
+        _ = NSApplication.shared
+        let visibleFrame = NSRect(x: 100, y: 80, width: 590, height: 540)
+        let bundles = [
+            try XCTUnwrap(L10n.localizedBundle(for: "en")),
+            try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+        ]
+
+        for bundle in bundles {
+            let (defaults, suiteName) = try makeDefaults()
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            let copy = WelcomeCopy(localizationBundle: bundle)
+            let controller = WelcomeController(
+                preference: WelcomePreference(defaults: defaults),
+                localizationBundle: bundle,
+                visibleFrameProvider: { visibleFrame },
+                dynamicTypeSize: .accessibility3,
+                onTrySample: {}
+            )
+            controller.show(shortcuts: [WelcomeShortcutStatus(
+                id: 1,
+                title: copy.renderStepTitle,
+                shortcutGlyphs: "⌃⌘X",
+                shortcutAccessibilityName: "Control-Command-X",
+                isRegistered: true
+            )])
+            defer { controller.close() }
+
+            let window = try XCTUnwrap(controller.window)
+            let contentView = try XCTUnwrap(window.contentView)
+            contentView.layoutSubtreeIfNeeded()
+
+            XCTAssertGreaterThanOrEqual(window.frame.minX, visibleFrame.minX)
+            XCTAssertGreaterThanOrEqual(window.frame.minY, visibleFrame.minY)
+            XCTAssertLessThanOrEqual(window.frame.maxX, visibleFrame.maxX)
+            XCTAssertLessThanOrEqual(window.frame.maxY, visibleFrame.maxY)
+            XCTAssertNotNil(firstSubview(ofType: NSScrollView.self, in: contentView))
+
+            let replayButton = try XCTUnwrap(firstSubview(
+                ofType: NSButton.self,
+                in: contentView,
+                where: { $0.identifier == WelcomeReplayButton.identifier }
+            ))
+            XCTAssertEqual(replayButton.accessibilityRole(), .button)
+            XCTAssertEqual(replayButton.accessibilityLabel(), copy.replayDemo)
+            XCTAssertEqual(replayButton.keyEquivalent, "r")
+            XCTAssertEqual(replayButton.keyEquivalentModifierMask, [.command])
+            XCTAssertTrue(contentView.bounds.contains(
+                replayButton.convert(replayButton.bounds, to: contentView)
+            ))
+        }
+    }
+
+    @MainActor
+    func testSampleGuideRendersScrollableLocalizedAccessibilityLayouts() throws {
+        _ = NSApplication.shared
+        let contentSize = NSSize(width: 420, height: 300)
+        let bundles = [
+            try XCTUnwrap(L10n.localizedBundle(for: "en")),
+            try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+        ]
+
+        for bundle in bundles {
+            let hostingController = NSHostingController(rootView:
+                SampleGuideView(
+                    copy: SampleGuideCopy(localizationBundle: bundle),
+                    contentSize: contentSize,
+                    menuState: SampleGuideMenuState(
+                        canRestoreLastMarkdown: true,
+                        canShowLastRender: true
+                    ),
+                    onChoose: { _ in },
+                    initialPhase: .submenu,
+                    runsRevealSequence: false
+                )
+                .environment(\.dynamicTypeSize, .accessibility3)
+            )
+            let window = makeTestWindow(
+                contentSize: contentSize,
+                contentViewController: hostingController
+            )
+            let contentView = try XCTUnwrap(window.contentView)
+            contentView.layoutSubtreeIfNeeded()
+
+            XCTAssertEqual(contentView.bounds.size, contentSize)
+            XCTAssertNotNil(firstSubview(ofType: NSScrollView.self, in: contentView))
+            let image = try XCTUnwrap(contentView.bitmapImageRepForCachingDisplay(
+                in: contentView.bounds
+            ))
+            contentView.cacheDisplay(in: contentView.bounds, to: image)
+            XCTAssertEqual(
+                image.pixelsWide,
+                Int(contentSize.width * window.backingScaleFactor)
+            )
+            XCTAssertEqual(
+                image.pixelsHigh,
+                Int(contentSize.height * window.backingScaleFactor)
+            )
+        }
+    }
+
     func testWelcomeAnimationProgressMovesThroughTheWholeWorkflow() {
         let copying = WelcomeAnimationProgress(phase: .copy)
         let rendering = WelcomeAnimationProgress(phase: .render)
@@ -313,6 +459,17 @@ final class WelcomeTests: XCTestCase {
         XCTAssertFalse(SampleGuidePhase.examplesFocused.acceptsSubmenuInput)
         XCTAssertTrue(SampleGuidePhase.submenu.showsSubmenu)
         XCTAssertTrue(SampleGuidePhase.submenu.acceptsSubmenuInput)
+
+        for hiddenPhase in [SampleGuidePhase.mainMenu, .examplesFocused] {
+            let policy = SampleGuideInteractionPolicy(phase: hiddenPhase)
+            XCTAssertFalse(policy.showsExamples)
+            XCTAssertFalse(policy.acceptsExampleInput)
+            XCTAssertTrue(policy.hidesExamplesFromAccessibility)
+        }
+        let visiblePolicy = SampleGuideInteractionPolicy(phase: .submenu)
+        XCTAssertTrue(visiblePolicy.showsExamples)
+        XCTAssertTrue(visiblePolicy.acceptsExampleInput)
+        XCTAssertFalse(visiblePolicy.hidesExamplesFromAccessibility)
     }
 
     @MainActor
@@ -497,6 +654,50 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(controller.window?.isVisible, false)
         XCTAssertEqual(visibilityChanges, [true, false])
         XCTAssertFalse(controller.showIfNeeded(shortcuts: shortcuts))
+    }
+
+    @MainActor
+    private func makeTestWindow(
+        contentSize: NSSize,
+        contentViewController: NSViewController
+    ) -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: contentSize),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = contentViewController
+        window.setContentSize(contentSize)
+        return window
+    }
+
+    @MainActor
+    private func firstSubview<ViewType: NSView>(
+        ofType type: ViewType.Type,
+        in view: NSView?,
+        where predicate: (ViewType) -> Bool = { _ in true }
+    ) -> ViewType? {
+        allSubviews(ofType: type, in: view).first(where: predicate)
+    }
+
+    @MainActor
+    private func allSubviews<ViewType: NSView>(
+        ofType type: ViewType.Type,
+        in view: NSView?
+    ) -> [ViewType] {
+        guard let view else { return [] }
+        var matches: [ViewType] = []
+        var pending = [view]
+        var visited: Set<ObjectIdentifier> = []
+        while let candidate = pending.popLast() {
+            guard visited.insert(ObjectIdentifier(candidate)).inserted else { continue }
+            if let match = candidate as? ViewType {
+                matches.append(match)
+            }
+            pending.append(contentsOf: candidate.subviews)
+        }
+        return matches
     }
 
     private func makeDefaults() throws -> (UserDefaults, String) {

@@ -66,16 +66,27 @@ struct WelcomeWorkflowDemo: View {
     let copy: WelcomeCopy
 
     var body: some View {
-        WelcomeWorkflowScene(
-            copy: copy,
-            progress: reduceMotion
-                ? .reducedMotion
-                : WelcomeAnimationProgress(phase: phase)
-        )
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
+        ZStack(alignment: .topTrailing) {
+            WelcomeWorkflowScene(
+                copy: copy,
+                progress: reduceMotion
+                    ? .reducedMotion
+                    : WelcomeAnimationProgress(phase: phase)
+            )
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(copy.copyStepTitle). \(copy.renderStepTitle). \(copy.pasteStepTitle)."
+            )
+
+            WelcomeReplayButton(label: copy.replayDemo, action: replay)
+                .frame(width: 26, height: 26)
+                .background(.thinMaterial, in: Circle())
+                .padding(9)
+        }
         .frame(maxWidth: .infinity)
-        .frame(height: 156)
+        .frame(minHeight: 156)
         .background(
             LinearGradient(
                 colors: [
@@ -102,26 +113,7 @@ struct WelcomeWorkflowDemo: View {
                     lineWidth: 0.7
                 )
         }
-        .overlay(alignment: .topTrailing) {
-            Button(action: replay) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
-                    .background(.thinMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .help(L10n.text(
-                "welcome.replay_demo",
-                defaultValue: "Replay workflow demo"
-            ))
-            .padding(9)
-        }
         .shadow(color: WelcomeDemoPalette.violet.opacity(0.07), radius: 10, y: 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "\(copy.copyStepTitle). \(copy.renderStepTitle). \(copy.pasteStepTitle)."
-        )
         .task(id: sequenceID) {
             await runSequence()
         }
@@ -169,6 +161,61 @@ struct WelcomeWorkflowDemo: View {
     }
 }
 
+struct WelcomeReplayButton: NSViewRepresentable {
+    static let identifier = NSUserInterfaceItemIdentifier("WelcomeReplayButton")
+
+    let label: String
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton()
+        button.identifier = Self.identifier
+        button.title = ""
+        button.image = NSImage(
+            systemSymbolName: "arrow.clockwise",
+            accessibilityDescription: nil
+        )
+        button.imagePosition = .imageOnly
+        button.isBordered = false
+        button.focusRingType = .default
+        button.setAccessibilityElement(true)
+        button.setAccessibilityRole(.button)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.performAction)
+        button.keyEquivalent = "r"
+        button.keyEquivalentModifierMask = [.command]
+        update(button)
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        context.coordinator.action = action
+        update(button)
+    }
+
+    private func update(_ button: NSButton) {
+        button.toolTip = label
+        button.setAccessibilityLabel(label)
+        button.setAccessibilityHelp(label)
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        @objc func performAction() {
+            action()
+        }
+    }
+}
+
 private struct WelcomeWorkflowScene: View {
     let copy: WelcomeCopy
     let progress: WelcomeAnimationProgress
@@ -201,7 +248,8 @@ private struct WelcomeWorkflowScene: View {
             Text(detail)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, minHeight: 16)
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
@@ -229,7 +277,8 @@ private struct WelcomeStageLabel: View {
     var body: some View {
         Label(title, systemImage: symbol)
             .font(.caption.weight(.semibold))
-            .lineLimit(1)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(isActive ? color : .secondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
