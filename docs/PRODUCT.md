@@ -45,8 +45,9 @@ sending it.
 - Global render and last-preview shortcuts plus equivalent menu commands.
 - A one-time first-launch guide with the three-step workflow, live shortcut
   registration status, an optional state-aware Launch at Login control, an
-  explicit menu-guided short-sample action, and a menu command to reopen it.
-  Bundled examples open their preview after rendering.
+  explicit menu-guided short-sample action, adaptive scrolling on small screens
+  and at accessibility text sizes, and a menu command to reopen it. Bundled
+  examples open their preview after rendering.
 - Compact clipboard preview, non-activating HUD, and an in-memory preview of the
   latest successful render with explicit copy, save, Preview, fit, actual-size,
   and zoom controls.
@@ -57,13 +58,16 @@ sending it.
 - English and Simplified Chinese UI selected from macOS language settings.
 - An off-by-default Launch at Login action backed by the native macOS main-app
   login service, with effective-state refresh and an explicit approval route.
-- About window with Debug/Release identification, version/build/source commit,
-  release notes, project link, update action, and copyable diagnostics.
-- Silent update discovery in About, backed by a 24-hour successful-result cache
-  and a rate-limited **Check Again** action. A newer signed DMG downloads only
-  after **Download Update** is clicked, is verified, and opens for the user to
-  finish installation. Progress stays in the About row and status item, with
-  milestone-only VoiceOver announcements rather than a modal progress window.
+- A native About presentation with Debug/Release identification,
+  version/build/source commit, concise release history, project link, update
+  state and actions, and copyable diagnostics.
+- User-initiated update discovery from About. **Check for Updates…** fetches a
+  signed appcast, previews bounded release notes, and rate-limits repeated
+  requests. **Download Update** lets Sparkle download and verify the immutable
+  Apple silicon ZIP. Installation remains paused at **Ready to Install** until
+  the separate **Install and Relaunch** choice; **Later** cancels the prepared
+  install. Progress and failures stay inline, and a notarized DMG remains the
+  manual recovery path.
 - Duplicate render entry points disabled while one render is in progress.
 - Compact, Standard, and Wide output-width presets, with the last explicit
   selection remembered locally and Standard preserving the original sizing.
@@ -91,10 +95,11 @@ reference images. Click a preview to inspect its PNG.
 ## Render themes
 
 Clean Light preserves the original renderer and remains the default. Warm Paper
-uses a low-glare cream surface and earth-toned accents. Dark uses an opaque dark
-surface with high-contrast text and syntax colors. Each palette is bundled and
-applies together to Markdown surfaces, borders, syntax highlighting, and Mermaid
-flowcharts, sequence diagrams, and Gantt charts.
+uses a subtle warm off-white surface with earth-toned accents and distinct code
+surfaces. Dark uses an opaque dark surface with high-contrast text and syntax
+colors. Each palette is bundled and applies together to Markdown surfaces,
+borders, syntax highlighting, and Mermaid flowcharts, sequence diagrams, and
+Gantt charts.
 
 Theme selection is explicit and local. The shortcut, menu command, and bundled
 examples capture the currently selected theme when rendering starts, and the
@@ -116,8 +121,8 @@ System/Auto appearance matching remain outside this phase.
 
 - Editing Markdown inside the app.
 - Monitoring or intercepting another application's messages.
-- Launch-time or scheduled update checks, silent app replacement, or an embedded
-  GitHub credential.
+- Launch-time or scheduled update checks, unattended app replacement, or an
+  embedded GitHub credential.
 - Cloud rendering, shared storage, analytics, or telemetry.
 - Intel (`x86_64`) distribution.
 

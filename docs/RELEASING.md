@@ -585,11 +585,11 @@ The ZIP also contains the existing Developer ID-signed, notarized app; the
 versioned and latest DMGs remain manual installation and recovery artifacts.
 
 Version `0.6.x` does not contain Sparkle, so upgrading from `0.6.x` to `0.7.0`
-remains a manual DMG installation. The `0.7.0` release must publish the first
-valid signed appcast and ZIP so an isolated `0.7.0` client can discover and
-install its first successor without replacing a release asset. Validate that
-path against a private test feed or isolated repository before announcing
-seamless updates.
+remains a manual DMG installation. Version `0.7.0` published the first valid
+signed appcast and immutable ZIP; `0.7.0` to `0.8.0` is the first supported
+seamless update path. Validate that path against a private test feed or isolated
+repository before announcing `0.8.0`, without replacing a published release
+asset.
 
 Never mutate a published versioned ZIP. If an update is bad but its signing key
 is still trusted, leave its evidence intact, stop marking it latest, and publish

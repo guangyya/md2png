@@ -7,11 +7,18 @@ for the complete project history and release details.
 
 ### Added
 
+- Preview release notes and install a signed update directly from About.
 - Re-render the last Markdown with the current Theme and Output Width.
 
 ### Changed
 
 - Scan a clearer menu and get more useful success and recovery messages.
+- Keep Welcome usable on smaller screens and at larger text sizes.
+- Make Warm Paper less yellow and code easier to read.
+
+### Fixed
+
+- Keep Fit compact in Last Render on newer macOS versions.
 
 ## [0.7.0] - 2026-08-17
 

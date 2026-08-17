@@ -102,8 +102,8 @@ flowchart LR
   resumes through Sparkle. The app never keeps its own duplicate archive;
   Sparkle owns cleanup and may download the immutable ZIP again after a
   prepared installation is cancelled.
-- `0.6.x` to `0.7.0` is a manual DMG migration. `0.7.0` must validate the first
-  signed seamless update to a later test version before the path is announced.
+- `0.6.x` to `0.7.0` remains a manual DMG migration. `0.7.0` and later use the
+  signed appcast and immutable ZIP when a newer compatible release is available.
 - Published versioned ZIPs are immutable. Recover a bad release by publishing a
   higher fixed version. If feed or key trust is in doubt, stop seamless updates
   and use the notarized DMG; never downgrade verification policy.

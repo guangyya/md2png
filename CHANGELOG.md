@@ -9,6 +9,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Add an explicit signed update flow to About: preview bounded release notes,
+  download and verify the versioned Apple silicon update, pause at Ready to
+  Install, and choose Install and Relaunch or Later without leaving the app.
 - Add a Re-render Last Markdown command that applies the current Theme and
   Output Width without requiring the source to be copied again.
 
@@ -19,6 +22,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   place with accurate enabled states.
 - Make English and Simplified Chinese success and error messages concise,
   recovery-oriented, and explicit about clipboard safety after render failures.
+- Modernize the About presentation while keeping build identity, release
+  history, project links, update state, and copyable diagnostics together.
+- Make Welcome scroll and adapt to smaller displays and larger accessibility
+  text sizes while keeping the full copy-render-paste journey visible.
+- Tone down Warm Paper's yellow cast and strengthen code and Mermaid contrast.
+
+### Fixed
+
+- Keep Fit a compact momentary toolbar action on newer macOS versions instead
+  of showing an oversized persistent selection state.
 
 ## [0.7.0] - 2026-08-17
 

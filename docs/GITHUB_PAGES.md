@@ -4,53 +4,33 @@ The project website is a dependency-free static site in `site/`. The workflow
 in `.github/workflows/pages.yml` publishes that directory whenever a site file
 changes on `main`, and it can also be run manually.
 
-## Enable the first deployment
+The public site is served at <https://md2png.wbxsh.com/> with HTTPS enforced.
+The English page is canonical at `/`, and Simplified Chinese is available at
+`/zh/`. Repository metadata should use the same public URL as its homepage.
 
-1. Merge the site changes into `main` and push them to GitHub.
-2. Open **Repository Settings → Pages**.
-3. Under **Build and deployment**, choose **GitHub Actions** as the source.
-4. Open **Actions → Deploy GitHub Pages** and run the workflow if the merge did
-   not start it automatically.
+## Deploy and verify changes
 
-The default project URL will be `https://guangyya.github.io/md2png/`.
+1. Review both `site/index.html` and `site/zh/index.html`, including navigation,
+   downloads, privacy claims, and update instructions.
+2. Merge the site changes into `main`. A change under `site/` automatically
+   starts **Deploy GitHub Pages**; the workflow can also be run manually.
+3. Confirm the workflow's `github-pages` deployment succeeds.
+4. Open <https://md2png.wbxsh.com/> and <https://md2png.wbxsh.com/zh/> over HTTPS
+   and check the updated content and release download link.
 
-## Add a custom domain
+## Custom-domain recovery
 
-GitHub recommends verifying the domain before attaching it to a Pages site. In
-personal **Settings → Pages**, add the domain and publish the TXT record GitHub
-provides. Keep that TXT record after verification.
+GitHub stores the active custom domain in Pages settings; this custom Actions
+deployment does not require or use a checked-in `CNAME` file. If the domain is
+detached, first confirm that `md2png.wbxsh.com` remains verified in personal
+**Settings → Pages**, then restore it under **Repository Settings → Pages**.
 
-Then open **Repository Settings → Pages**, enter the hostname under **Custom
-domain**, and save it before changing DNS.
-
-### Subdomain, recommended for a project site
-
-For a hostname such as `md2png.example.com`, add this DNS record:
+The public site uses this DNS shape:
 
 | Type | Name | Value |
 |---|---|---|
 | CNAME | `md2png` | `guangyya.github.io` |
 
-The target must not include `/md2png`.
-
-### Apex domain
-
-For a hostname such as `example.com`, use `ALIAS`/`ANAME` when the DNS provider
-supports it, or add all four GitHub Pages IPv4 records:
-
-```text
-185.199.108.153
-185.199.109.153
-185.199.110.153
-185.199.111.153
-```
-
-GitHub also recommends adding `www` as a CNAME to `guangyya.github.io` so it can
-redirect between the apex and `www` variants.
-
-Do not add wildcard DNS records. Once GitHub shows the DNS check as successful,
-turn on **Enforce HTTPS**. DNS and certificate changes can take up to 24 hours.
-
-This project deploys with a custom GitHub Actions workflow, so a checked-in
-`CNAME` file is neither required nor used; GitHub stores the custom domain in
-the Pages settings.
+The target must not include `/md2png`. Do not add wildcard DNS records. After
+GitHub reports a successful DNS check, enable **Enforce HTTPS** and verify both
+language URLs. DNS and certificate recovery can take up to 24 hours.

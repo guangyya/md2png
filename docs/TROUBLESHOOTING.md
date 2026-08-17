@@ -69,13 +69,15 @@ in Show Last Render.
 First confirm that the success HUD appeared after rendering. **Show Last Render**
 only becomes available after a successful render in the current app session.
 Close the preview with `Command-W`, render again, and reopen it. Small images are
-shown without upscaling; tall images fit the window width and begin at the top.
+centered; **Fit** scales the image to the available width, while **Actual Size**
+shows one PNG pixel per display backing pixel. Tall images begin at the top and
+remain scrollable.
 
-## Restore Last Markdown is unavailable or asks for confirmation
+## A Last Markdown action is unavailable or asks for confirmation
 
-**Restore Last Markdown** becomes available only after a successful render in
-the current app session. The source is kept
-in memory and is intentionally discarded when md2png quits.
+**Re-render Last Markdown** and **Restore Last Markdown** become available only
+after a successful render in the current app session. The source is kept in
+memory and is intentionally discarded when md2png quits.
 
 If another application or copy action changed the clipboard after md2png last
 wrote it, md2png asks before replacing that newer content. Choose **Cancel** to
@@ -90,22 +92,19 @@ The distributed app requires macOS 14 or newer and Apple silicon.
 
 ## The update check in About fails
 
-Open **About md2png** and confirm that the Mac can reach `api.github.com` and
-`github.com`, then use **Try Again**. A corporate proxy or GitHub rate limit can
-also block the request. Successful results are cached for 24 hours; manual
-checks allow at most one request per 60 seconds, and the button remains disabled
-until any GitHub-provided retry time has passed. Checking is deliberately silent,
-so no checking label or progress dialog is expected.
+Open **About md2png** and confirm that the Mac can reach `github.com`, then use
+**Try Again**. A corporate proxy, DNS filter, or temporary GitHub failure can
+block the signed appcast or update archive. Manual checks allow at most one
+request per 60 seconds. Opening About, launching md2png, and rendering never
+start an update request on their own.
 
-The app downloads only the versioned Apple silicon Developer ID DMG advertised
-by the latest stable Release. It removes incomplete downloads and rejects files
-whose size or SHA-256 digest does not match the Release metadata. Download
-percentage, verification, and opening status appear in About after **Download
-Update** is clicked. If the flow still fails, choose **View Releases** and
-download the DMG manually.
-
-After md2png opens the verified DMG, drag the app into Applications and confirm
-replacement in Finder. md2png does not silently replace or relaunch itself.
+When an update is available, About shows its version and release notes.
+**Download Update** starts download and signature verification; progress remains
+inline until About reaches **Ready to Install**. Choose **Install and Relaunch**
+to replace and restart the app, or **Later** to cancel the prepared install. If
+the signed flow still fails, choose **View Releases**, download the notarized
+DMG manually, and drag md2png into Applications. Never bypass a feed, archive,
+or code-signature failure.
 
 ## Information to include in a bug report
 
