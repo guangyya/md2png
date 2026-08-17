@@ -125,6 +125,56 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.state.selectedTheme, .dark)
         XCTAssertTrue(harness.renderRequests.isEmpty)
     }
+
+    func testDiagnosticsCorrelateRenderStagesWithoutPersistingMarkdownOrErrors() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "md2png-render-diagnostics-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let now = Date(timeIntervalSince1970: 1_787_000_000)
+        let logger = DiagnosticLogger(configuration: DiagnosticLoggerConfiguration(
+            directoryURL: directoryURL,
+            retentionPolicy: .standard,
+            includesVerboseEvents: true,
+            isEnabled: true,
+            now: { now },
+            applicationInfo: DiagnosticApplicationInfo(
+                name: "md2png",
+                version: "0.9.0",
+                build: "9",
+                sourceCommit: nil,
+                configuration: "debug"
+            ),
+            systemInfo: DiagnosticSystemInfo(
+                macOSVersion: "26.0.0",
+                architecture: "arm64"
+            )
+        ))
+        let canary = "# PRIVATE MARKDOWN /Users/private/secret.md"
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = canary
+        let coordinator = harness.makeCoordinator(diagnosticLogger: logger)
+
+        coordinator.renderClipboard()
+        let operationID = try XCTUnwrap(harness.renderRequests.first?.operationID)
+        harness.completeNextRender(with: .failure(NSError(
+            domain: "PrivateErrorDomain",
+            code: 91,
+            userInfo: [NSLocalizedDescriptionKey: canary]
+        )))
+        await logger.flush()
+
+        let export = try await logger.export(window: .lastHour, now: now)
+        let encoded = try export.encodedString()
+        XCTAssertGreaterThanOrEqual(
+            export.events.filter { $0.operationID == operationID }.count,
+            2
+        )
+        XCTAssertFalse(encoded.contains(canary))
+        XCTAssertFalse(encoded.contains("/Users/private"))
+        XCTAssertFalse(encoded.contains("PrivateErrorDomain"))
+    }
 }
 
 @MainActor
@@ -133,6 +183,7 @@ private final class RenderCoordinatorHarness {
         let markdown: String
         let widthPreset: RenderWidthPreset
         let theme: RenderTheme
+        let operationID: DiagnosticOperationID
         let completion: RenderCoordinator.RenderCompletion
     }
 
@@ -150,14 +201,17 @@ private final class RenderCoordinatorHarness {
     private(set) var previews: [LastRender] = []
     private(set) var states: [RenderCoordinatorState] = []
 
-    func makeCoordinator() -> RenderCoordinator {
+    func makeCoordinator(
+        diagnosticLogger: DiagnosticLogger = .disabled
+    ) -> RenderCoordinator {
         RenderCoordinator(
             dependencies: RenderCoordinator.Dependencies(
-                render: { [weak self] markdown, widthPreset, theme, completion in
+                render: { [weak self] markdown, widthPreset, theme, operationID, completion in
                     self?.renderRequests.append(RenderRequest(
                         markdown: markdown,
                         widthPreset: widthPreset,
                         theme: theme,
+                        operationID: operationID,
                         completion: completion
                     ))
                 },
@@ -187,6 +241,7 @@ private final class RenderCoordinatorHarness {
                     self?.selectedThemes.append(theme)
                 }
             ),
+            diagnosticLogger: diagnosticLogger,
             confirmClipboardOverwrite: { [weak self] action in
                 guard let self else { return false }
                 self.confirmedActions.append(action)

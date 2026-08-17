@@ -7,9 +7,11 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
 
     private struct Request {
         let id: UUID
+        let operationID: DiagnosticOperationID
         let markdown: String
         let widthPreset: RenderWidthPreset
         let theme: RenderTheme
+        let startedAt: UInt64
         let completion: Completion
     }
 
@@ -23,6 +25,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     private let hostWindow: NSWindow
     private let pageURL: URL?
     private let watchdogTimeout: TimeInterval
+    private let diagnosticLogger: DiagnosticLogger
     private var requests: [UUID: Request] = [:]
     private var recoveryState: RendererRecoveryState
     private var currentNavigation: NavigationAttempt?
@@ -31,10 +34,12 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
 
     init(
         pageURL: URL? = RendererResources.pageURL,
-        watchdogTimeout: TimeInterval = 15
+        watchdogTimeout: TimeInterval = 15,
+        diagnosticLogger: DiagnosticLogger = .disabled
     ) {
         self.pageURL = pageURL
         self.watchdogTimeout = max(watchdogTimeout, 0)
+        self.diagnosticLogger = diagnosticLogger
         let recoveryState = RendererRecoveryState(hasRendererPage: pageURL != nil)
         self.recoveryState = recoveryState
         webViewGenerationID = recoveryState.currentRendererGenerationID
@@ -46,6 +51,12 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             defer: false
         )
         super.init()
+        diagnosticLogger.record(
+            category: .resource,
+            stage: .rendererPageLookup,
+            result: pageURL == nil ? .unavailable : .available,
+            level: pageURL == nil ? .error : .info
+        )
         hostWindow.contentView = webView
         hostWindow.orderBack(nil)
         webView.navigationDelegate = self
@@ -69,16 +80,26 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         _ markdown: String,
         widthPreset: RenderWidthPreset = .standard,
         theme: RenderTheme = .cleanLight,
+        operationID: DiagnosticOperationID = DiagnosticOperationID(),
         completion: @escaping Completion
     ) {
         let request = Request(
             id: UUID(),
+            operationID: operationID,
             markdown: markdown,
             widthPreset: widthPreset,
             theme: theme,
+            startedAt: DispatchTime.now().uptimeNanoseconds,
             completion: completion
         )
         requests[request.id] = request
+        diagnosticLogger.record(
+            category: .renderer,
+            stage: .renderRequest,
+            result: .queued,
+            level: .verbose,
+            operationID: operationID
+        )
         perform(recoveryState.enqueue(request.id))
     }
 
@@ -87,17 +108,31 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         guard let loadAttempt = loadAttempt(for: navigation) else { return }
         currentNavigation = nil
         cancelWatchdog(for: .load(loadAttempt))
+        diagnosticLogger.record(
+            category: .renderer,
+            stage: .rendererLoad,
+            result: .succeeded,
+            operationID: activeOperationID
+        )
+        if loadAttempt.kind == .recovery {
+            diagnosticLogger.record(
+                category: .webKitRecovery,
+                stage: .rendererRecovery,
+                result: .succeeded,
+                operationID: activeOperationID
+            )
+        }
         perform(recoveryState.rendererDidLoad(loadAttempt))
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         guard webView === self.webView else { return }
-        rendererLoadFailed(navigation)
+        rendererLoadFailed(navigation, error: error)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         guard webView === self.webView else { return }
-        rendererLoadFailed(navigation)
+        rendererLoadFailed(navigation, error: error)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -133,6 +168,14 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             finish(execution, with: .failure(AppError.rendererUnavailable))
             return
         }
+        let javaScriptStartedAt = DispatchTime.now().uptimeNanoseconds
+        diagnosticLogger.record(
+            category: .renderer,
+            stage: .renderJavaScript,
+            result: .started,
+            level: .verbose,
+            operationID: request.operationID
+        )
         armWatchdog(for: .render(execution))
 
         Task { [weak self] in
@@ -169,6 +212,18 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     return
                 }
 
+                self.diagnosticLogger.record(
+                    category: .renderer,
+                    stage: .renderJavaScript,
+                    result: .succeeded,
+                    level: .verbose,
+                    operationID: request.operationID,
+                    durationMilliseconds: DiagnosticDuration.milliseconds(
+                        since: javaScriptStartedAt
+                    ),
+                    dimensions: DiagnosticDimensions(width: width, height: height)
+                )
+
                 self.webView.setFrameSize(NSSize(width: width, height: height))
                 self.hostWindow.setContentSize(NSSize(width: width, height: height))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
@@ -186,6 +241,14 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         height: Int
     ) {
         guard recoveryState.renderDidStartSnapshot(execution) else { return }
+        diagnosticLogger.record(
+            category: .renderer,
+            stage: .renderSnapshot,
+            result: .started,
+            level: .verbose,
+            operationID: requests[execution.requestID]?.operationID,
+            dimensions: DiagnosticDimensions(width: width, height: height)
+        )
         let configuration = WKSnapshotConfiguration()
         configuration.rect = NSRect(x: 0, y: 0, width: width, height: height)
 
@@ -213,7 +276,34 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         let transition = recoveryState.finish(execution)
         guard let requestID = transition.completedRequestID else { return }
         cancelWatchdog(for: .render(execution))
-        requests.removeValue(forKey: requestID)?.completion(result)
+        if let request = requests.removeValue(forKey: requestID) {
+            switch result {
+            case let .success(image):
+                diagnosticLogger.record(
+                    category: .renderer,
+                    stage: .rendererExecution,
+                    result: .succeeded,
+                    operationID: request.operationID,
+                    durationMilliseconds: DiagnosticDuration.milliseconds(
+                        since: request.startedAt
+                    ),
+                    dimensions: Self.pixelDimensions(for: image)
+                )
+            case let .failure(error):
+                diagnosticLogger.record(
+                    category: .renderer,
+                    stage: .rendererExecution,
+                    result: .failed,
+                    level: .error,
+                    operationID: request.operationID,
+                    durationMilliseconds: DiagnosticDuration.milliseconds(
+                        since: request.startedAt
+                    ),
+                    error: error
+                )
+            }
+            request.completion(result)
+        }
         perform(transition.actions)
     }
 
@@ -236,10 +326,40 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     private func handleContentProcessTermination(
         from signal: RendererRecoveryState.TerminationSignal
     ) {
+        let operationID: DiagnosticOperationID? = switch signal {
+        case let .executionError(execution):
+            requests[execution.requestID]?.operationID
+        case .delegate:
+            activeOperationID
+        }
         switch recoveryState.contentProcessTerminated(from: signal) {
         case .ignored:
+            diagnosticLogger.record(
+                category: .webKitRecovery,
+                stage: .contentProcessTermination,
+                result: .ignored,
+                level: .verbose,
+                operationID: operationID
+            )
             return
         case let .handled(actions):
+            diagnosticLogger.record(
+                category: .webKitRecovery,
+                stage: .contentProcessTermination,
+                result: .accepted,
+                operationID: operationID
+            )
+            if actions.contains(where: { action in
+                if case .loadRenderer = action { return true }
+                return false
+            }) {
+                diagnosticLogger.record(
+                    category: .webKitRecovery,
+                    stage: .rendererRecovery,
+                    result: .started,
+                    operationID: operationID
+                )
+            }
             cancelWatchdog()
             currentNavigation = nil
             perform(actions)
@@ -248,7 +368,22 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
 
     private func loadRendererPage(_ attempt: RendererRecoveryState.LoadAttempt) {
         guard recoveryState.isCurrent(.load(attempt)) else { return }
+        diagnosticLogger.record(
+            category: .renderer,
+            stage: .rendererLoad,
+            result: .started,
+            level: attempt.kind == .initial ? .verbose : .info,
+            operationID: activeOperationID
+        )
         guard let pageURL else {
+            diagnosticLogger.record(
+                category: .renderer,
+                stage: .rendererLoad,
+                result: .failed,
+                level: .error,
+                operationID: activeOperationID,
+                error: AppError.rendererUnavailable
+            )
             perform(recoveryState.rendererLoadFailed(attempt))
             return
         }
@@ -259,6 +394,14 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             allowingReadAccessTo: pageURL.deletingLastPathComponent()
         ) else {
             cancelWatchdog(for: .load(attempt))
+            diagnosticLogger.record(
+                category: .renderer,
+                stage: .rendererLoad,
+                result: .failed,
+                level: .error,
+                operationID: activeOperationID,
+                error: AppError.rendererUnavailable
+            )
             perform(recoveryState.rendererLoadFailed(attempt))
             return
         }
@@ -277,10 +420,21 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         webViewGenerationID = attempt.id
     }
 
-    private func rendererLoadFailed(_ navigation: WKNavigation?) {
+    private func rendererLoadFailed(
+        _ navigation: WKNavigation?,
+        error: (any Error)? = nil
+    ) {
         guard let loadAttempt = loadAttempt(for: navigation) else { return }
         currentNavigation = nil
         cancelWatchdog(for: .load(loadAttempt))
+        diagnosticLogger.record(
+            category: .renderer,
+            stage: .rendererLoad,
+            result: .failed,
+            level: .error,
+            operationID: activeOperationID,
+            error: error ?? AppError.rendererUnavailable
+        )
         perform(recoveryState.rendererLoadFailed(loadAttempt))
     }
 
@@ -316,6 +470,20 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
 
     private func watchdogDidFire(for attempt: RendererRecoveryState.Attempt) {
         guard watchdogAttempt == attempt else { return }
+        let operationID: DiagnosticOperationID? = switch attempt {
+        case let .render(execution):
+            requests[execution.requestID]?.operationID
+        case .load:
+            activeOperationID
+        }
+        diagnosticLogger.record(
+            category: .webKitRecovery,
+            stage: .watchdogTimeout,
+            result: .failed,
+            level: .error,
+            operationID: operationID,
+            error: AppError.rendererTimedOut
+        )
         watchdogWorkItem = nil
         watchdogAttempt = nil
 
@@ -343,9 +511,44 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     .rendererTimedOut
                 }
                 for requestID in requestIDs {
-                    requests.removeValue(forKey: requestID)?.completion(.failure(error))
+                    if let request = requests.removeValue(forKey: requestID) {
+                        diagnosticLogger.record(
+                            category: failure == .recoveryFailed
+                                ? .webKitRecovery
+                                : .renderer,
+                            stage: failure == .recoveryFailed
+                                ? .rendererRecovery
+                                : .rendererExecution,
+                            result: .failed,
+                            level: .error,
+                            operationID: request.operationID,
+                            durationMilliseconds: DiagnosticDuration.milliseconds(
+                                since: request.startedAt
+                            ),
+                            error: error
+                        )
+                        request.completion(.failure(error))
+                    }
                 }
             }
         }
+    }
+
+    private var activeOperationID: DiagnosticOperationID? {
+        recoveryState.activeRequestID.flatMap { requests[$0]?.operationID }
+    }
+
+    private static func pixelDimensions(for image: NSImage) -> DiagnosticDimensions {
+        if let bitmap = image.representations
+            .compactMap({ $0 as? NSBitmapImageRep })
+            .max(by: { lhs, rhs in
+                lhs.pixelsWide * lhs.pixelsHigh < rhs.pixelsWide * rhs.pixelsHigh
+            }) {
+            return DiagnosticDimensions(width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
+        }
+        return DiagnosticDimensions(
+            width: Int(image.size.width.rounded()),
+            height: Int(image.size.height.rounded())
+        )
     }
 }

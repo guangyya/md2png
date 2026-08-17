@@ -129,30 +129,73 @@ final class PackagedRenderSelfTest {
     private var renderer: MarkdownRenderer?
     private var timeoutWorkItem: DispatchWorkItem?
     private var didFinish = false
+    private let diagnosticLogger: DiagnosticLogger
+    private var operationID: DiagnosticOperationID?
+    private var startedAt: UInt64?
+
+    init(diagnosticLogger: DiagnosticLogger = .disabled) {
+        self.diagnosticLogger = diagnosticLogger
+    }
 
     func run(
         bundle: Bundle = .main,
         timeout: TimeInterval = 20,
         completion: @escaping Completion
     ) {
+        didFinish = false
+        let operationID = DiagnosticOperationID()
+        self.operationID = operationID
+        startedAt = DispatchTime.now().uptimeNanoseconds
+        diagnosticLogger.record(
+            category: .selfTest,
+            stage: .selfTestRun,
+            result: .started,
+            operationID: operationID
+        )
         guard bundle.bundleURL.pathExtension == "app" else {
-            completion(.failure(.notPackagedApplication))
+            finish(.failure(.notPackagedApplication), completion: completion)
             return
         }
         guard let pageURL = RendererResources.packagedPageURL(
             resourcesURL: bundle.resourceURL
         ) else {
-            completion(.failure(.rendererResourcesUnavailable))
+            diagnosticLogger.record(
+                category: .resource,
+                stage: .rendererPageLookup,
+                result: .unavailable,
+                level: .error,
+                operationID: operationID
+            )
+            finish(.failure(.rendererResourcesUnavailable), completion: completion)
             return
         }
+        diagnosticLogger.record(
+            category: .resource,
+            stage: .rendererPageLookup,
+            result: .available,
+            operationID: operationID
+        )
         guard let markdownURL = PackagedRenderSelfTestResources.markdownURL(
             resourcesURL: bundle.resourceURL
         ), let markdown = try? String(contentsOf: markdownURL, encoding: .utf8) else {
-            completion(.failure(.markdownResourceUnavailable))
+            diagnosticLogger.record(
+                category: .resource,
+                stage: .selfTestMarkdownLookup,
+                result: .unavailable,
+                level: .error,
+                operationID: operationID
+            )
+            finish(.failure(.markdownResourceUnavailable), completion: completion)
             return
         }
+        diagnosticLogger.record(
+            category: .resource,
+            stage: .selfTestMarkdownLookup,
+            result: .available,
+            operationID: operationID
+        )
         guard PackagedRenderSelfTestResources.validate(markdown: markdown) else {
-            completion(.failure(.invalidMarkdownResource))
+            finish(.failure(.invalidMarkdownResource), completion: completion)
             return
         }
 
@@ -162,9 +205,12 @@ final class PackagedRenderSelfTest {
         self.timeoutWorkItem = timeoutWorkItem
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: timeoutWorkItem)
 
-        let renderer = MarkdownRenderer(pageURL: pageURL)
+        let renderer = MarkdownRenderer(
+            pageURL: pageURL,
+            diagnosticLogger: diagnosticLogger
+        )
         self.renderer = renderer
-        renderer.render(markdown) { [weak self] result in
+        renderer.render(markdown, operationID: operationID) { [weak self] result in
             guard let self else { return }
             switch result {
             case let .success(image):
@@ -188,13 +234,48 @@ final class PackagedRenderSelfTest {
         timeoutWorkItem?.cancel()
         timeoutWorkItem = nil
         renderer = nil
+        if let operationID {
+            switch result {
+            case let .success(report):
+                diagnosticLogger.record(
+                    category: .selfTest,
+                    stage: .selfTestRun,
+                    result: .succeeded,
+                    operationID: operationID,
+                    durationMilliseconds: startedAt.map(
+                        DiagnosticDuration.milliseconds(since:)
+                    ),
+                    dimensions: DiagnosticDimensions(
+                        width: report.width,
+                        height: report.height
+                    )
+                )
+            case let .failure(failure):
+                diagnosticLogger.record(
+                    category: .selfTest,
+                    stage: .selfTestRun,
+                    result: .failed,
+                    level: .error,
+                    operationID: operationID,
+                    durationMilliseconds: startedAt.map(
+                        DiagnosticDuration.milliseconds(since:)
+                    ),
+                    error: failure
+                )
+            }
+        }
+        operationID = nil
+        startedAt = nil
         completion(result)
     }
 }
 
 @MainActor
 final class PackagedRenderSelfTestApplicationDelegate: NSObject, NSApplicationDelegate {
-    private let selfTest = PackagedRenderSelfTest()
+    private let diagnosticLogger = DiagnosticLogger.shared
+    private lazy var selfTest = PackagedRenderSelfTest(
+        diagnosticLogger: diagnosticLogger
+    )
     private(set) var exitCode: Int32 = 70
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -213,19 +294,22 @@ final class PackagedRenderSelfTestApplicationDelegate: NSObject, NSApplicationDe
                 )
                 self.exitCode = failure.exitCode
             }
-            NSApp.stop(nil)
-            if let event = NSEvent.otherEvent(
-                with: .applicationDefined,
-                location: .zero,
-                modifierFlags: [],
-                timestamp: 0,
-                windowNumber: 0,
-                context: nil,
-                subtype: 0,
-                data1: 0,
-                data2: 0
-            ) {
-                NSApp.postEvent(event, atStart: false)
+            Task { @MainActor in
+                await self.diagnosticLogger.flush()
+                NSApp.stop(nil)
+                if let event = NSEvent.otherEvent(
+                    with: .applicationDefined,
+                    location: .zero,
+                    modifierFlags: [],
+                    timestamp: 0,
+                    windowNumber: 0,
+                    context: nil,
+                    subtype: 0,
+                    data1: 0,
+                    data2: 0
+                ) {
+                    NSApp.postEvent(event, atStart: false)
+                }
             }
         }
     }

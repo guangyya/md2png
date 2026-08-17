@@ -111,4 +111,12 @@ or code-signature failure.
 Open **About md2png** and use the copy icon beside the version. Include that
 diagnostic line, the smallest Markdown input that reproduces the issue, and a
 screenshot when appropriate. Remove confidential message content before filing
-a report.
+a report. md2png does not upload its local operational logs automatically.
+
+## Delete local diagnostic logs
+
+md2png stores bounded, privacy-safe operational logs in
+`~/Library/Logs/md2png/Diagnostics`. To remove them, quit md2png, choose
+**Go > Go to Folder…** in Finder, enter `~/Library/Logs/md2png`, and delete the
+`Diagnostics` folder. This does not affect clipboard contents, preferences, or
+the installed application.

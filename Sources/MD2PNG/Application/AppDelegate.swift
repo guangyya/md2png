@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let diagnosticLogger: DiagnosticLogger
     private let hud = HUDController()
     private lazy var previewController = PreviewController(
         onCopied: { [weak self] changeCount in
@@ -23,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     )
     private lazy var updateController = UpdateController(
+        diagnosticLogger: diagnosticLogger,
         updateDriver: SparkleUpdateDriver {
             UpdateChannel.current().repository?.appcastURL
         },
@@ -76,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     )
     private lazy var renderCoordinator = RenderCoordinator(
+        diagnosticLogger: diagnosticLogger,
         confirmClipboardOverwrite: { [weak self] action in
             self?.confirmClipboardOverwrite(action) ?? false
         },
@@ -132,15 +135,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 #endif
 
     override convenience init() {
-        self.init(sampleGuidePresenter: nil)
+        self.init(sampleGuidePresenter: nil, diagnosticLogger: .shared)
     }
 
-    init(sampleGuidePresenter: (any SampleGuidePresenting)?) {
+    init(
+        sampleGuidePresenter: (any SampleGuidePresenting)?,
+        diagnosticLogger: DiagnosticLogger = .disabled
+    ) {
         injectedSampleGuidePresenter = sampleGuidePresenter
+        self.diagnosticLogger = diagnosticLogger
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        diagnosticLogger.record(
+            category: .appLifecycle,
+            stage: .applicationLaunch,
+            result: .started
+        )
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
         updateStatusPresenter.presentRelaunchResultIfNeeded()
@@ -160,6 +172,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 failedRegistrationIDs: failedRegistrationIDs
             )
         }
+        diagnosticLogger.record(
+            category: .shortcut,
+            stage: .shortcutRegistration,
+            result: failedRegistrationIDs.isEmpty ? .succeeded : .failed,
+            level: failedRegistrationIDs.isEmpty ? .info : .error,
+            itemCount: registrations.count,
+            failureCount: failedRegistrationIDs.count
+        )
 
         if welcomePreference.shouldShowOnLaunch {
             DispatchQueue.main.async { [weak self] in
@@ -180,9 +200,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         }
+        diagnosticLogger.record(
+            category: .appLifecycle,
+            stage: .applicationLaunch,
+            result: .succeeded
+        )
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        diagnosticLogger.record(
+            category: .appLifecycle,
+            stage: .applicationActive,
+            result: .succeeded,
+            level: .verbose
+        )
         guard statusMenuController != nil else { return }
         updateLaunchAtLoginMenu()
     }
@@ -191,9 +222,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication
     ) -> NSApplication.TerminateReply {
         if renderCoordinator.isUpdateInstallPending {
+            diagnosticLogger.record(
+                category: .appLifecycle,
+                stage: .applicationTermination,
+                result: .accepted
+            )
             return .terminateNow
         }
         if isWaitingForUpdateDeferralBeforeTermination {
+            diagnosticLogger.record(
+                category: .appLifecycle,
+                stage: .applicationTermination,
+                result: .deferred,
+                level: .verbose
+            )
             return .terminateLater
         }
 
@@ -206,13 +248,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         return
                     }
                     self.isWaitingForUpdateDeferralBeforeTermination = false
+                    self.diagnosticLogger.record(
+                        category: .appLifecycle,
+                        stage: .applicationTermination,
+                        result: .accepted
+                    )
                     sender.reply(toApplicationShouldTerminate: true)
                 }
             }
         if waitsForDeferral {
+            diagnosticLogger.record(
+                category: .appLifecycle,
+                stage: .applicationTermination,
+                result: .deferred
+            )
             return .terminateLater
         }
         isWaitingForUpdateDeferralBeforeTermination = false
+        diagnosticLogger.record(
+            category: .appLifecycle,
+            stage: .applicationTermination,
+            result: .accepted
+        )
         return .terminateNow
     }
 
