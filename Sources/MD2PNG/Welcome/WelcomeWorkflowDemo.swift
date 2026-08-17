@@ -18,12 +18,17 @@ struct WelcomeAnimationProgress: Equatable {
     let cardTravel: CGFloat
     let keyPress: CGFloat
     let imageReveal: CGFloat
-    let pastePrompt: CGFloat
-    let activityOpacity: CGFloat
     let detailIndex: Int
     let showsCompletedJourney: Bool
 
     static let reducedMotion = WelcomeAnimationProgress(phase: .complete)
+
+    func shortcutOpacity(for phase: WelcomeWorkflowPhase) -> CGFloat {
+        if showsCompletedJourney {
+            return phase == .complete ? 0 : 1
+        }
+        return phase.rawValue == detailIndex ? 1 : 0
+    }
 
     init(phase: WelcomeWorkflowPhase) {
         switch phase {
@@ -31,32 +36,24 @@ struct WelcomeAnimationProgress: Equatable {
             cardTravel = -1
             keyPress = 0
             imageReveal = 0
-            pastePrompt = 0
-            activityOpacity = 1
             detailIndex = 0
             showsCompletedJourney = false
         case .render:
             cardTravel = 0
             keyPress = 1
             imageReveal = 0.56
-            pastePrompt = 0
-            activityOpacity = 1
             detailIndex = 1
             showsCompletedJourney = false
         case .paste:
             cardTravel = 1
             keyPress = 0
             imageReveal = 1
-            pastePrompt = 1
-            activityOpacity = 1
             detailIndex = 2
             showsCompletedJourney = false
         case .complete:
             cardTravel = 1
             keyPress = 0
             imageReveal = 1
-            pastePrompt = 0.72
-            activityOpacity = 0.82
             detailIndex = 2
             showsCompletedJourney = true
         }
@@ -66,14 +63,27 @@ struct WelcomeAnimationProgress: Equatable {
 struct WelcomeCompletedJourneyStage: Equatable, Identifiable {
     let phase: WelcomeWorkflowPhase
     let cardOffset: CGFloat
+    let shortcutKeys: [String]
 
     var id: Int { phase.rawValue }
     var progress: WelcomeAnimationProgress { WelcomeAnimationProgress(phase: phase) }
 
     static let all = [
-        WelcomeCompletedJourneyStage(phase: .copy, cardOffset: -154),
-        WelcomeCompletedJourneyStage(phase: .render, cardOffset: 0),
-        WelcomeCompletedJourneyStage(phase: .paste, cardOffset: 154)
+        WelcomeCompletedJourneyStage(
+            phase: .copy,
+            cardOffset: -154,
+            shortcutKeys: ["⌘", "C"]
+        ),
+        WelcomeCompletedJourneyStage(
+            phase: .render,
+            cardOffset: 0,
+            shortcutKeys: ["⌃", "⌘", "X"]
+        ),
+        WelcomeCompletedJourneyStage(
+            phase: .paste,
+            cardOffset: 154,
+            shortcutKeys: ["⌘", "V"]
+        )
     ]
 }
 
@@ -332,7 +342,7 @@ private struct WelcomeTransformTrack: View {
             .frame(width: 358)
 
             ForEach(WelcomeCompletedJourneyStage.all) { stage in
-                WelcomeTransformCard(progress: stage.progress)
+                WelcomeTransformCard(progress: stage.progress, isSettled: true)
                     .offset(x: stage.cardOffset)
                     .opacity(progress.showsCompletedJourney ? 1 : 0)
                     .scaleEffect(progress.showsCompletedJourney ? 1 : 0.92)
@@ -342,23 +352,29 @@ private struct WelcomeTransformTrack: View {
                 .offset(x: 154 * progress.cardTravel)
                 .opacity(progress.showsCompletedJourney ? 0 : 1)
 
-            WelcomeShortcutBadge()
-                .offset(y: 28)
-                .opacity(progress.keyPress)
-                .scaleEffect(0.78 + 0.22 * progress.keyPress)
-
-            Text("⌘V")
-                .font(.system(.caption, design: .rounded).weight(.bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(WelcomeDemoPalette.pink, in: Capsule())
-                .shadow(color: WelcomeDemoPalette.pink.opacity(0.28), radius: 6, y: 2)
-                .offset(x: 204, y: -25 - 5 * progress.pastePrompt)
-                .opacity(progress.pastePrompt * progress.activityOpacity)
-                .scaleEffect(0.78 + 0.22 * progress.pastePrompt)
+            ForEach(WelcomeCompletedJourneyStage.all) { stage in
+                let shortcutOpacity = progress.shortcutOpacity(for: stage.phase)
+                WelcomeShortcutBadge(
+                    keys: stage.shortcutKeys,
+                    color: shortcutColor(for: stage.phase)
+                )
+                .offset(x: stage.cardOffset, y: 28)
+                .opacity(shortcutOpacity)
+                .scaleEffect(0.78 + 0.22 * shortcutOpacity)
+            }
         }
         .frame(height: 70)
+    }
+
+    private func shortcutColor(for phase: WelcomeWorkflowPhase) -> Color {
+        switch phase {
+        case .copy:
+            WelcomeDemoPalette.cyan
+        case .render:
+            WelcomeDemoPalette.violet
+        case .paste, .complete:
+            WelcomeDemoPalette.pink
+        }
     }
 }
 
@@ -377,9 +393,11 @@ private struct WelcomeTrackNode: View {
 
 private struct WelcomeTransformCard: View {
     let progress: WelcomeAnimationProgress
+    var isSettled = false
 
     private var flipAngle: Double {
-        sin(Double(progress.imageReveal) * .pi) * 9
+        guard !isSettled else { return 0 }
+        return sin(Double(progress.imageReveal) * .pi) * 9
     }
 
     var body: some View {
@@ -409,7 +427,7 @@ private struct WelcomeTransformCard: View {
         }
         .frame(width: 128, height: 62)
         .rotation3DEffect(.degrees(flipAngle), axis: (x: 0, y: 1, z: 0))
-        .scaleEffect(1 + 0.045 * progress.keyPress)
+        .scaleEffect(isSettled ? 1 : 1 + 0.045 * progress.keyPress)
         .shadow(
             color: WelcomeDemoPalette.violet.opacity(0.12 + 0.18 * progress.keyPress),
             radius: 9,
@@ -463,9 +481,12 @@ private struct WelcomePNGFace: View {
 }
 
 private struct WelcomeShortcutBadge: View {
+    let keys: [String]
+    let color: Color
+
     var body: some View {
         HStack(spacing: 3) {
-            ForEach(["⌃", "⌘", "X"], id: \.self) { key in
+            ForEach(keys, id: \.self) { key in
                 Text(key)
                     .font(.system(.caption2, design: .rounded).weight(.bold))
                     .frame(width: 18, height: 18)
@@ -473,11 +494,11 @@ private struct WelcomeShortcutBadge: View {
             }
         }
         .padding(4)
-        .background(WelcomeDemoPalette.violet.opacity(0.2), in: Capsule())
+        .background(color.opacity(0.2), in: Capsule())
         .overlay {
-            Capsule().stroke(WelcomeDemoPalette.violet.opacity(0.45), lineWidth: 0.7)
+            Capsule().stroke(color.opacity(0.45), lineWidth: 0.7)
         }
-        .shadow(color: WelcomeDemoPalette.violet.opacity(0.25), radius: 6, y: 2)
+        .shadow(color: color.opacity(0.25), radius: 6, y: 2)
     }
 }
 

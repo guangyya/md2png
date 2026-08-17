@@ -440,17 +440,25 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(copying.imageReveal, 0)
         XCTAssertEqual(copying.detailIndex, 0)
         XCTAssertFalse(copying.showsCompletedJourney)
+        XCTAssertEqual(copying.shortcutOpacity(for: .copy), 1)
+        XCTAssertEqual(copying.shortcutOpacity(for: .render), 0)
         XCTAssertEqual(rendering.cardTravel, 0)
         XCTAssertEqual(rendering.keyPress, 1)
         XCTAssertGreaterThan(rendering.imageReveal, 0.5)
         XCTAssertEqual(rendering.detailIndex, 1)
+        XCTAssertEqual(rendering.shortcutOpacity(for: .render), 1)
         XCTAssertEqual(pasting.cardTravel, 1)
         XCTAssertEqual(pasting.imageReveal, 1)
-        XCTAssertEqual(pasting.pastePrompt, 1)
         XCTAssertEqual(pasting.detailIndex, 2)
         XCTAssertFalse(pasting.showsCompletedJourney)
+        XCTAssertEqual(pasting.shortcutOpacity(for: .paste), 1)
         XCTAssertEqual(WelcomeAnimationProgress.reducedMotion.imageReveal, 1)
         XCTAssertTrue(WelcomeAnimationProgress.reducedMotion.showsCompletedJourney)
+        XCTAssertTrue(
+            WelcomeCompletedJourneyStage.all.allSatisfy {
+                WelcomeAnimationProgress.reducedMotion.shortcutOpacity(for: $0.phase) == 1
+            }
+        )
         XCTAssertEqual(
             WelcomeCompletedJourneyStage.all.map(\.phase),
             [.copy, .render, .paste]
@@ -458,6 +466,10 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(
             WelcomeCompletedJourneyStage.all.map(\.cardOffset),
             [-154, 0, 154]
+        )
+        XCTAssertEqual(
+            WelcomeCompletedJourneyStage.all.map(\.shortcutKeys),
+            [["⌘", "C"], ["⌃", "⌘", "X"], ["⌘", "V"]]
         )
     }
 
