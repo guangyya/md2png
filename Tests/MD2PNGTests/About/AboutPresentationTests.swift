@@ -15,14 +15,37 @@ final class AboutPresentationTests: XCTestCase {
         XCTAssertNil(presentation.secondaryAction)
     }
 
-    func testSparkleUpdatePresentationReopensTheStandardWindow() {
+    func testSparkleUpdatePresentationShowsNotesBeforeDownload() {
+        let update = UpdateTestFixtures.seamlessUpdate()
         let presentation = makePresentation(status: UpdateStatus(
-            phase: .sparkleUpdateAvailable(displayVersion: "0.7.0")
+            phase: .sparkleUpdateAvailable(update)
         ))
 
-        XCTAssertEqual(presentation.title, "Update available · 0.7.0")
-        XCTAssertEqual(presentation.primaryAction?.title, "Show Update")
-        XCTAssertEqual(presentation.primaryAction?.action, .showUpdate)
+        XCTAssertEqual(presentation.title, "Update available · 0.7.0 → 0.8.0")
+        XCTAssertEqual(presentation.primaryAction?.title, "Download Update")
+        XCTAssertEqual(presentation.primaryAction?.action, .download)
+        XCTAssertEqual(presentation.releaseNotes?.title, "What’s new in 0.8.0")
+        XCTAssertTrue(presentation.releaseNotes?.text.contains("Seamless updates") == true)
+        XCTAssertEqual(presentation.releaseNotes?.showsFullReleaseNotesAction, true)
+    }
+
+    func testSparkleReadyStateRequiresExplicitInstallAndOffersLater() {
+        let update = UpdateTestFixtures.seamlessUpdate()
+        let downloading = makePresentation(status: UpdateStatus(
+            phase: .sparkleDownloading(update, progressPercent: 42)
+        ))
+        XCTAssertEqual(downloading.title, "Downloading md2png 0.8.0 — 42%")
+        XCTAssertEqual(downloading.primaryAction?.action, .cancel)
+
+        let ready = makePresentation(status: UpdateStatus(
+            phase: .sparkleReadyToInstall(update)
+        ))
+        XCTAssertEqual(ready.title, "Ready to install · 0.8.0")
+        XCTAssertEqual(ready.primaryAction?.title, "Install and Relaunch")
+        XCTAssertEqual(ready.primaryAction?.action, .installAndRelaunch)
+        XCTAssertEqual(ready.secondaryAction?.title, "Later")
+        XCTAssertEqual(ready.secondaryAction?.action, .installLater)
+        XCTAssertTrue(ready.detail?.contains("clipboard is unchanged") == true)
     }
 
     func testUpToDatePresentationMapsFeedbackAndCooldown() {

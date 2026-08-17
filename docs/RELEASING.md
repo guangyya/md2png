@@ -556,10 +556,12 @@ Opening About never starts a request. **Check for Updates…** starts a Sparkle
 information-only probe after a 60-second local cooldown. An on-latest result is
 shown inline as **Up to Date**; newer-than-published and incompatible-system
 results are distinguished from that success state. A valid newer item ends the
-probe first and then opens Sparkle's standard UI. Download, validation,
-installation, authorization when necessary, replacement, and relaunch are owned
-by Sparkle only after the user accepts that UI. Automatic checks, automatic
-downloads, and system-profile submission are disabled.
+probe and About shows the signed feed's target metadata and bounded plain-text
+release notes. **Download Update** starts Sparkle's user-initiated download,
+validation, and preparation. Completion remains paused at **Ready to Install**
+until the separate **Install and Relaunch** action. **Later** cancels the
+prepared installer rather than creating an install-on-quit path. Automatic
+checks, automatic downloads, and system-profile submission are disabled.
 
 `Info.plist` is the version and trust-pin source. `CFBundleShortVersionString`
 and `CFBundleVersion` must match the generated appcast's short version and
@@ -570,14 +572,17 @@ archive URL:
 https://github.com/OWNER/REPOSITORY/releases/download/v${version}/md2png-${version}-macOS-arm64-developer-id.zip
 ```
 
-The protected sign job uses Sparkle's pinned `generate_appcast` tool with
-embedded release notes, no deltas, and at most three retained entries (the
-current release pipeline provides one archive). The handoff, publisher, and
-published-release verifier independently require one item, the exact release
-identity and immutable ZIP URL, HTTPS-only links, a valid feed signature, and a
-valid ZIP signature. The ZIP also contains the existing Developer ID-signed,
-notarized app; the versioned and latest DMGs remain manual installation and
-recovery artifacts.
+The protected sign job authenticates the previously published appcast before
+giving it to Sparkle's pinned `generate_appcast` tool. The newly signed feed
+embeds non-empty notes, disables deltas, and retains at most three immutable
+version entries plus a full-history link. Refusing to load or validate the
+previous feed fails the release instead of silently truncating history (the
+one-time `0.7.0` bridge is the only no-prior-feed exception). The handoff,
+publisher, and published-release verifier require one to three uniquely
+versioned items, exact current-release identity and immutable ZIP URL,
+HTTPS-only links, a valid feed signature, and a valid current ZIP signature.
+The ZIP also contains the existing Developer ID-signed, notarized app; the
+versioned and latest DMGs remain manual installation and recovery artifacts.
 
 Version `0.6.x` does not contain Sparkle, so upgrading from `0.6.x` to `0.7.0`
 remains a manual DMG installation. The `0.7.0` release must publish the first
@@ -601,8 +606,12 @@ make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/guangyya/md2png \
   UPDATE_CHANNEL=disabled \
   TEST_UPDATE_VERSION=0.0.0 \
-  TEST_UPDATE_STATE=up-to-date
+  TEST_UPDATE_STATE=seamless-update-available
 ```
+
+Use `TEST_UPDATE_STATE=seamless-ready-to-install` to inspect the separate
+install decision and its in-memory-state disclosure. Fixture actions are
+disabled so these offline layouts cannot start an update or relaunch the app.
 
 Both the Make target and release publisher reject test version/state overrides
 for publication. Full install/relaunch validation must use a separately signed

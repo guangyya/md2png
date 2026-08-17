@@ -45,6 +45,29 @@ enum UpdateTestFixtures {
         )
     }
 
+    static func seamlessUpdate(
+        installedVersion: String = "0.7.0",
+        version: String = "0.8.0",
+        build: String = "8"
+    ) -> SeamlessUpdate {
+        SeamlessUpdate(
+            installedVersion: installedVersion,
+            displayVersion: version,
+            buildVersion: build,
+            publishedAt: Date(timeIntervalSince1970: 1_787_000_000),
+            contentLength: 4_200_000,
+            releaseNotes: [SeamlessUpdateReleaseNotes(
+                version: version,
+                publishedAt: Date(timeIntervalSince1970: 1_787_000_000),
+                text: "Added\n- Seamless updates."
+            )],
+            historyIsTruncated: false,
+            fullReleaseNotesURL: URL(
+                string: "https://github.com/guangyya/md2png/releases"
+            )
+        )
+    }
+
     static func releaseJSON(
         version: String,
         draft: Bool = false,

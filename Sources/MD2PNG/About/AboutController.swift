@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class AboutController: NSWindowController {
+final class AboutController: NSWindowController, NSWindowDelegate {
     private let updateController: UpdateController
     private let contentModel = AboutContentModel()
     private var updateStatusObserverID: UUID?
@@ -63,6 +63,15 @@ final class AboutController: NSWindowController {
             : AboutLayout.detailedUpdateHeight
     }
     var displayedReleaseNotesRevision: Int { contentModel.releaseNotesRevision }
+    var displayedReleaseNotesTitle: String {
+        contentModel.updatePresentation?.releaseNotes?.title ?? ""
+    }
+    var displayedReleaseNotesText: String {
+        contentModel.updatePresentation?.releaseNotes?.text ?? contentModel.metadata.releaseNotes
+    }
+    var displaysFullReleaseNotesAction: Bool {
+        contentModel.updatePresentation?.releaseNotes?.showsFullReleaseNotesAction == true
+    }
     var displayedUpdateStatusIsSelectable: Bool {
         updateStatusTextField?.isSelectable == true
     }
@@ -87,6 +96,7 @@ final class AboutController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
+        window.delegate = self
         window.contentViewController = NSHostingController(
             rootView: AboutContentView(
                 model: contentModel,
@@ -140,12 +150,12 @@ final class AboutController: NSWindowController {
         switch action {
         case .checkAgain:
             updateController.checkAgain()
-        case .showUpdate:
-            updateController.showStandardUpdateUI()
         case .download:
             updateController.downloadAvailableUpdate()
         case .cancel:
             updateController.cancelUpdate()
+        case .installAndRelaunch:
+            updateController.installAndRelaunch()
         case .openDownloadedUpdate:
             updateController.openDownloadedUpdate()
         }
@@ -155,6 +165,10 @@ final class AboutController: NSWindowController {
         switch action {
         case .viewReleases:
             updateController.viewReleasesFallback()
+        case .viewFullReleaseNotes:
+            updateController.viewFullReleaseNotes()
+        case .installLater:
+            closeAbout()
         case .revealDownloadedUpdate:
             updateController.revealDownloadedUpdate()
         }
@@ -195,6 +209,10 @@ final class AboutController: NSWindowController {
     private func closeAbout() {
         copyResetWorkItem?.cancel()
         close()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        updateController.installLater()
     }
 
 #if DEBUG
