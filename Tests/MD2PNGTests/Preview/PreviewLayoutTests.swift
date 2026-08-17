@@ -187,9 +187,11 @@ final class PreviewLayoutTests: XCTestCase {
             controller.previewZoomStatusContainerSize,
             NSSize(width: 64, height: 22)
         )
-        XCTAssertEqual(
-            controller.previewSelectedToolbarIdentifier,
-            NSToolbarItem.Identifier("preview.fit")
+        XCTAssertNil(controller.previewSelectedToolbarIdentifier)
+        XCTAssertTrue(
+            controller.toolbarSelectableItemIdentifiers(
+                NSToolbar(identifier: "preview-layout-selection-test")
+            ).isEmpty
         )
         XCTAssertEqual(
             Set(controller.previewToolbarLabels),
