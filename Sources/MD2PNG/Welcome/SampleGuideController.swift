@@ -46,6 +46,18 @@ struct SampleGuideMenuState: Equatable {
         self.launchAtLoginAction = launchAtLoginAction
         self.canUseLaunchAtLogin = canUseLaunchAtLogin
     }
+
+    init(
+        statusMenuPresentation: StatusMenuPresentation,
+        launchAtLoginPresentation: LaunchAtLoginPresentation
+    ) {
+        canRestoreLastMarkdown = statusMenuPresentation[.restoreLastMarkdown].isEnabled
+        canShowLastRender = statusMenuPresentation[.showLastRender].isEnabled
+        canRenderClipboard = statusMenuPresentation[.renderClipboard].isEnabled
+        canRerenderLastMarkdown = statusMenuPresentation[.rerenderLastMarkdown].isEnabled
+        launchAtLoginAction = launchAtLoginPresentation.menuAction
+        canUseLaunchAtLogin = launchAtLoginPresentation.canPerformAction
+    }
 }
 
 enum SampleGuideLayout {

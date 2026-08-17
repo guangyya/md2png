@@ -841,6 +841,29 @@ final class WelcomeTests: XCTestCase {
         XCTAssertFalse(controller.showIfNeeded(shortcuts: shortcuts))
     }
 
+    func testSampleGuideMenuStateUsesPresentationSnapshot() {
+        let statusPresentation = StatusMenuPresentation(state: StatusMenuState(
+            clipboardContainsMarkdown: false,
+            hasLastSource: true,
+            hasLastRender: true,
+            isRendering: false,
+            isUpdateInstallPending: false
+        ))
+        let launchPresentation = LaunchAtLoginPresentation(status: .requiresApproval)
+
+        let state = SampleGuideMenuState(
+            statusMenuPresentation: statusPresentation,
+            launchAtLoginPresentation: launchPresentation
+        )
+
+        XCTAssertFalse(state.canRenderClipboard)
+        XCTAssertTrue(state.canRerenderLastMarkdown)
+        XCTAssertTrue(state.canRestoreLastMarkdown)
+        XCTAssertTrue(state.canShowLastRender)
+        XCTAssertEqual(state.launchAtLoginAction, .allowInSystemSettings)
+        XCTAssertTrue(state.canUseLaunchAtLogin)
+    }
+
     @MainActor
     private func makeTestWindow(
         contentSize: NSSize,

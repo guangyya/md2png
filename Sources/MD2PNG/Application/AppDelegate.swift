@@ -686,17 +686,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               !isUpdateInstallPending,
               !isPresentingClipboardConfirmation,
               let button = statusItem.button else { return }
-        refreshClipboardMenuState()
-        updateLaunchAtLoginMenu()
+        let clipboardState = Clipboard.menuState(includeLabel: false)
+        let statusMenuPresentation = StatusMenuPresentation(state: StatusMenuState(
+            clipboardContainsMarkdown: clipboardState.containsMarkdown,
+            hasLastSource: lastSource.isAvailable,
+            hasLastRender: lastImage != nil,
+            isRendering: false,
+            isUpdateInstallPending: false
+        ))
         sampleGuideController.show(
             relativeTo: button,
             menuState: SampleGuideMenuState(
-                canRestoreLastMarkdown: restoreLastMarkdownMenuItem.isEnabled,
-                canShowLastRender: previewMenuItem.isEnabled,
-                canRenderClipboard: renderMenuItem.isEnabled,
-                canRerenderLastMarkdown: rerenderLastMarkdownMenuItem.isEnabled,
-                launchAtLoginAction: launchAtLoginController.presentation.menuAction,
-                canUseLaunchAtLogin: launchAtLoginMenuItem.isEnabled
+                statusMenuPresentation: statusMenuPresentation,
+                launchAtLoginPresentation: launchAtLoginController.presentation
             )
         )
     }
