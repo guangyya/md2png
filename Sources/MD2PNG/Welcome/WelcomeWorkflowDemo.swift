@@ -12,8 +12,8 @@ enum WelcomeWorkflowLayout {
     static let replayButtonInset: CGFloat = 9
     static let stageWidth: CGFloat = 128
     static let stageOffset: CGFloat = 154
-    static let trackHeight: CGFloat = 82
-    static let detailTopPadding: CGFloat = 5
+    static let trackHeight: CGFloat = 70
+    static let shortcutVerticalOffset: CGFloat = 20
 }
 
 enum WelcomeWorkflowPhase: Int, CaseIterable, Equatable {
@@ -363,7 +363,6 @@ private struct WelcomeWorkflowScene: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, minHeight: 16)
-                .padding(.top, WelcomeWorkflowLayout.detailTopPadding)
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.22), value: progress.detailIndex)
         }
@@ -443,7 +442,10 @@ private struct WelcomeTransformTrack: View {
                     keys: stage.shortcutKeys,
                     color: shortcutColor(for: stage.phase)
                 )
-                .offset(x: stage.cardOffset, y: 28)
+                .offset(
+                    x: stage.cardOffset,
+                    y: WelcomeWorkflowLayout.shortcutVerticalOffset
+                )
                 .opacity(shortcutOpacity)
                 .scaleEffect(0.78 + 0.22 * shortcutOpacity)
             }

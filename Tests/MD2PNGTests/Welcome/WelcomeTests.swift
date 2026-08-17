@@ -495,8 +495,11 @@ final class WelcomeTests: XCTestCase {
     func testWelcomeReplayAndShortcutContrastStylesKeepControlsDistinct() {
         XCTAssertEqual(WelcomeWorkflowLayout.stageWidth, 128)
         XCTAssertEqual(WelcomeWorkflowLayout.stageOffset, 154)
-        XCTAssertGreaterThan(WelcomeWorkflowLayout.trackHeight / 2, 40)
-        XCTAssertGreaterThan(WelcomeWorkflowLayout.detailTopPadding, 0)
+        XCTAssertEqual(WelcomeWorkflowLayout.trackHeight, 70)
+        XCTAssertLessThan(
+            WelcomeWorkflowLayout.shortcutVerticalOffset + 13,
+            WelcomeWorkflowLayout.trackHeight / 2
+        )
 
         let standard = WelcomeShortcutContrastStyle(contrast: .standard)
         let increased = WelcomeShortcutContrastStyle(contrast: .increased)
