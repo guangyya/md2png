@@ -483,12 +483,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
             defaultValue: "%ld%%",
             Int((currentZoomFactor * 100).rounded())
         )
-        switch zoomMode {
-        case .fit:
-            window?.toolbar?.selectedItemIdentifier = ToolbarIdentifier.fit
-        case .actualSize, .custom:
-            window?.toolbar?.selectedItemIdentifier = nil
-        }
+        window?.toolbar?.selectedItemIdentifier = nil
         zoomStatusButton.setAccessibilityLabel(L10n.text(
             "preview.actual_size",
             defaultValue: "Actual Size"
@@ -615,7 +610,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     }
 
     func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ToolbarIdentifier.fit]
+        []
     }
 
     func toolbar(

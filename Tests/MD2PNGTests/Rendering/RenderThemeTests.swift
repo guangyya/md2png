@@ -42,7 +42,7 @@ final class RenderThemeTests: XCTestCase {
         let sequence: [RenderTheme] = [.cleanLight, .dark, .warmPaper, .cleanLight]
         let expectedBackgrounds: [RenderTheme: NSColor] = [
             .cleanLight: color(0xFF, 0xFF, 0xFF),
-            .warmPaper: color(0xFB, 0xF4, 0xE3),
+            .warmPaper: color(0xFA, 0xF8, 0xF3),
             .dark: color(0x0D, 0x11, 0x17)
         ]
         var renderedSizes: [NSSize] = []
