@@ -54,6 +54,113 @@ enum SampleGuideLayout {
     }
 }
 
+enum SampleGuideExamplesEdge: Equatable {
+    case leading
+    case trailing
+}
+
+struct SampleGuidePlacement: Equatable {
+    let positioningRect: NSRect
+    let examplesEdge: SampleGuideExamplesEdge
+
+    static func resolve(
+        buttonBounds: NSRect,
+        buttonFrameInScreen: NSRect?,
+        visibleFrame: NSRect?,
+        contentSize: NSSize
+    ) -> SampleGuidePlacement {
+        let mainMenuCenter = min(
+            contentSize.width / 2,
+            SampleGuideLayout.screenInset + SampleGuideLayout.menuMinimumWidth / 2
+        )
+        let centerShift = max(0, contentSize.width / 2 - mainMenuCenter)
+        let trailingShift = centerShift
+        let leadingShift = -centerShift
+
+        guard let buttonFrameInScreen, let visibleFrame else {
+            return SampleGuidePlacement(
+                positioningRect: buttonBounds.offsetBy(dx: trailingShift, dy: 0),
+                examplesEdge: .trailing
+            )
+        }
+
+        func overflow(for shift: CGFloat) -> CGFloat {
+            let proposedCenter = buttonFrameInScreen.midX + shift
+            let proposedFrame = NSRect(
+                x: proposedCenter - contentSize.width / 2,
+                y: visibleFrame.minY,
+                width: contentSize.width,
+                height: contentSize.height
+            )
+            return max(0, visibleFrame.minX - proposedFrame.minX)
+                + max(0, proposedFrame.maxX - visibleFrame.maxX)
+        }
+
+        if overflow(for: leadingShift) < overflow(for: trailingShift) {
+            return SampleGuidePlacement(
+                positioningRect: buttonBounds.offsetBy(dx: leadingShift, dy: 0),
+                examplesEdge: .leading
+            )
+        }
+        return SampleGuidePlacement(
+            positioningRect: buttonBounds.offsetBy(dx: trailingShift, dy: 0),
+            examplesEdge: .trailing
+        )
+    }
+}
+
+enum SampleGuideFocusDirection: Equatable {
+    case previous
+    case next
+}
+
+enum SampleGuideKeyboardAction: Equatable {
+    case move(SampleGuideFocusDirection)
+    case activate
+    case dismiss
+    case ignore
+}
+
+struct SampleGuideKeyboardPolicy {
+    static func action(
+        for key: KeyEquivalent,
+        modifiers: EventModifiers,
+        acceptsExampleInput: Bool
+    ) -> SampleGuideKeyboardAction {
+        if key == .escape { return .dismiss }
+        guard acceptsExampleInput else { return .ignore }
+        if key == .upArrow || (key == .tab && modifiers.contains(.shift)) {
+            return .move(.previous)
+        }
+        if key == .downArrow || key == .tab {
+            return .move(.next)
+        }
+        if key == .return || key == .space {
+            return .activate
+        }
+        return .ignore
+    }
+}
+
+struct SampleGuideFocusOrder {
+    static func movedFocus(
+        from rawValue: Int?,
+        direction: SampleGuideFocusDirection
+    ) -> Int? {
+        let values = ExampleKind.allCases.map(\.rawValue)
+        guard !values.isEmpty else { return nil }
+        guard let rawValue, let index = values.firstIndex(of: rawValue) else {
+            return direction == .next ? values.first : values.last
+        }
+        switch direction {
+        case .previous:
+            return values[(index - 1 + values.count) % values.count]
+        case .next:
+            return values[(index + 1) % values.count]
+        }
+    }
+}
+
 struct SampleGuideCopy {
     let title: String
     let clipboard: String
@@ -166,6 +273,7 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     private let onChoose: (ExampleKind) -> Void
     private let copy: SampleGuideCopy
     private let visibleFrameProvider: (NSStatusBarButton) -> NSRect?
+    private let buttonFrameProvider: (NSStatusBarButton) -> NSRect?
     private weak var highlightedButton: NSButton?
     private var acceptsSelection = false
     private var pendingSelection: ExampleKind?
@@ -181,12 +289,17 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         visibleFrameProvider: @escaping (NSStatusBarButton) -> NSRect? = {
             $0.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         },
+        buttonFrameProvider: @escaping (NSStatusBarButton) -> NSRect? = {
+            guard let window = $0.window else { return nil }
+            return window.convertToScreen($0.convert($0.bounds, to: nil))
+        },
         onChoose: @escaping (ExampleKind) -> Void
     ) {
         self.popover = popover
         self.onChoose = onChoose
         copy = SampleGuideCopy(localizationBundle: localizationBundle)
         self.visibleFrameProvider = visibleFrameProvider
+        self.buttonFrameProvider = buttonFrameProvider
         super.init()
         popover.behavior = .transient
         popover.animates = true
@@ -200,8 +313,13 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     ) {
         guard !popover.isShown, !isClosing else { return }
         acceptsSelection = true
-        let contentSize = SampleGuideLayout.contentSize(
-            visibleFrame: visibleFrameProvider(button)
+        let visibleFrame = visibleFrameProvider(button)
+        let contentSize = SampleGuideLayout.contentSize(visibleFrame: visibleFrame)
+        let placement = SampleGuidePlacement.resolve(
+            buttonBounds: button.bounds,
+            buttonFrameInScreen: buttonFrameProvider(button),
+            visibleFrame: visibleFrame,
+            contentSize: contentSize
         )
         popover.contentSize = contentSize
 
@@ -210,15 +328,19 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
                 copy: copy,
                 contentSize: contentSize,
                 menuState: menuState,
+                examplesEdge: placement.examplesEdge,
                 onChoose: { [weak self] kind in
                     self?.choose(kind)
+                },
+                onDismiss: { [weak self] in
+                    self?.dismiss()
                 }
             )
         )
         highlightedButton = button
         button.highlight(true)
         popover.show(
-            relativeTo: button.bounds,
+            relativeTo: placement.positioningRect,
             of: button,
             preferredEdge: .minY
         )
@@ -283,11 +405,14 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
 struct SampleGuideView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: SampleGuidePhase
+    @FocusState private var focusedExampleRawValue: Int?
 
     let copy: SampleGuideCopy
     let contentSize: NSSize
     let menuState: SampleGuideMenuState
+    let examplesEdge: SampleGuideExamplesEdge
     let onChoose: (ExampleKind) -> Void
+    let onDismiss: () -> Void
     let runsRevealSequence: Bool
 
     private var interactionPolicy: SampleGuideInteractionPolicy {
@@ -298,7 +423,9 @@ struct SampleGuideView: View {
         copy: SampleGuideCopy,
         contentSize: NSSize,
         menuState: SampleGuideMenuState,
+        examplesEdge: SampleGuideExamplesEdge = .trailing,
         onChoose: @escaping (ExampleKind) -> Void,
+        onDismiss: @escaping () -> Void = {},
         initialPhase: SampleGuidePhase = .mainMenu,
         runsRevealSequence: Bool = true
     ) {
@@ -306,7 +433,9 @@ struct SampleGuideView: View {
         self.copy = copy
         self.contentSize = contentSize
         self.menuState = menuState
+        self.examplesEdge = examplesEdge
         self.onChoose = onChoose
+        self.onDismiss = onDismiss
         self.runsRevealSequence = runsRevealSequence
     }
 
@@ -321,33 +450,38 @@ struct SampleGuideView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            ScrollView([.horizontal, .vertical]) {
-                HStack(alignment: .top, spacing: 10) {
-                    SampleMainMenu(
-                        copy: copy,
-                        phase: phase,
-                        menuState: menuState
-                    )
-
-                    SampleExamplesMenu(
-                        copy: copy,
-                        isInputEnabled: interactionPolicy.acceptsExampleInput,
-                        onChoose: { kind in
-                            guard interactionPolicy.acceptsExampleInput else { return }
-                            onChoose(kind)
+            ScrollViewReader { proxy in
+                ScrollView([.horizontal, .vertical]) {
+                    HStack(alignment: .top, spacing: 10) {
+                        if examplesEdge == .leading {
+                            examplesMenu
+                                .id(SampleGuidePanel.examples)
+                            mainMenu
+                                .id(SampleGuidePanel.mainMenu)
+                        } else {
+                            mainMenu
+                                .id(SampleGuidePanel.mainMenu)
+                            examplesMenu
+                                .id(SampleGuidePanel.examples)
                         }
-                    )
-                    .opacity(interactionPolicy.showsExamples ? 1 : 0)
-                    .offset(x: interactionPolicy.showsExamples ? 0 : -14)
-                    .scaleEffect(
-                        interactionPolicy.showsExamples ? 1 : 0.97,
-                        anchor: .topLeading
-                    )
-                    .allowsHitTesting(interactionPolicy.acceptsExampleInput)
-                    .disabled(!interactionPolicy.acceptsExampleInput)
-                    .accessibilityHidden(interactionPolicy.hidesExamplesFromAccessibility)
+                    }
+                    .fixedSize(horizontal: true, vertical: true)
                 }
-                .fixedSize(horizontal: true, vertical: true)
+                .onAppear {
+                    proxy.scrollTo(
+                        SampleGuidePanel.mainMenu,
+                        anchor: examplesEdge == .leading ? .trailing : .leading
+                    )
+                }
+                .onChange(of: phase) { _, newPhase in
+                    guard newPhase == .submenu else { return }
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                        proxy.scrollTo(
+                            SampleGuidePanel.examples,
+                            anchor: examplesEdge == .leading ? .leading : .trailing
+                        )
+                    }
+                }
             }
         }
         .padding(12)
@@ -360,6 +494,90 @@ struct SampleGuideView: View {
             if runsRevealSequence {
                 await revealMenuPath()
             }
+        }
+        .onAppear {
+            synchronizeExampleFocus()
+        }
+        .onChange(of: phase) { _, _ in
+            synchronizeExampleFocus()
+        }
+        .onKeyPress(
+            keys: [.tab, .upArrow, .downArrow, .return, .space, .escape],
+            phases: .down
+        ) { press in
+            handleKeyPress(press)
+        }
+    }
+
+    private var mainMenu: some View {
+        SampleMainMenu(
+            copy: copy,
+            phase: phase,
+            menuState: menuState
+        )
+    }
+
+    private var examplesMenu: some View {
+        SampleExamplesMenu(
+            copy: copy,
+            isInputEnabled: interactionPolicy.acceptsExampleInput,
+            focusedExampleRawValue: $focusedExampleRawValue,
+            onChoose: { kind in
+                guard interactionPolicy.acceptsExampleInput else { return }
+                onChoose(kind)
+            }
+        )
+        .opacity(interactionPolicy.showsExamples ? 1 : 0)
+        .offset(
+            x: interactionPolicy.showsExamples
+                ? 0
+                : (examplesEdge == .leading ? 14 : -14)
+        )
+        .scaleEffect(
+            interactionPolicy.showsExamples ? 1 : 0.97,
+            anchor: examplesEdge == .leading ? .topTrailing : .topLeading
+        )
+        .allowsHitTesting(interactionPolicy.acceptsExampleInput)
+        .disabled(!interactionPolicy.acceptsExampleInput)
+        .accessibilityHidden(interactionPolicy.hidesExamplesFromAccessibility)
+    }
+
+    @MainActor
+    private func synchronizeExampleFocus() {
+        if interactionPolicy.acceptsExampleInput {
+            if focusedExampleRawValue == nil {
+                focusedExampleRawValue = ExampleKind.allCases.first?.rawValue
+            }
+        } else {
+            focusedExampleRawValue = nil
+        }
+    }
+
+    @MainActor
+    private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
+        switch SampleGuideKeyboardPolicy.action(
+            for: press.key,
+            modifiers: press.modifiers,
+            acceptsExampleInput: interactionPolicy.acceptsExampleInput
+        ) {
+        case let .move(direction):
+            focusedExampleRawValue = SampleGuideFocusOrder.movedFocus(
+                from: focusedExampleRawValue,
+                direction: direction
+            )
+            return .handled
+        case .activate:
+            guard let focusedExampleRawValue,
+                  let kind = ExampleKind(rawValue: focusedExampleRawValue) else {
+                return .ignored
+            }
+            onChoose(kind)
+            return .handled
+        case .dismiss:
+            onDismiss()
+            return .handled
+        case .ignore:
+            return .ignored
         }
     }
 
@@ -389,6 +607,11 @@ struct SampleGuideView: View {
             return false
         }
     }
+}
+
+private enum SampleGuidePanel: Hashable {
+    case mainMenu
+    case examples
 }
 
 private struct SampleMainMenu: View {
@@ -456,6 +679,7 @@ private struct SampleMainMenu: View {
 private struct SampleExamplesMenu: View {
     let copy: SampleGuideCopy
     let isInputEnabled: Bool
+    let focusedExampleRawValue: FocusState<Int?>.Binding
     let onChoose: (ExampleKind) -> Void
 
     var body: some View {
@@ -471,11 +695,13 @@ private struct SampleExamplesMenu: View {
                     isInputEnabled: isInputEnabled,
                     action: { onChoose(kind) }
                 )
+                .focused(focusedExampleRawValue, equals: kind.rawValue)
             }
         }
         .padding(6)
         .frame(minWidth: SampleGuideLayout.menuMinimumWidth, alignment: .top)
         .guideMenuBackground()
+        .focusSection()
     }
 }
 

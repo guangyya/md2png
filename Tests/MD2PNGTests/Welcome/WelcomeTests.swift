@@ -570,6 +570,93 @@ final class WelcomeTests: XCTestCase {
         XCTAssertFalse(visiblePolicy.hidesExamplesFromAccessibility)
     }
 
+    func testSampleGuidePlacementKeepsTheMainMenuNearestTheStatusItem() {
+        let visibleFrame = NSRect(x: 0, y: 24, width: 1_440, height: 876)
+        let buttonBounds = NSRect(x: 0, y: 0, width: 22, height: 22)
+        let contentSize = SampleGuideLayout.preferredContentSize
+        let leftPlacement = SampleGuidePlacement.resolve(
+            buttonBounds: buttonBounds,
+            buttonFrameInScreen: NSRect(x: 8, y: 878, width: 22, height: 22),
+            visibleFrame: visibleFrame,
+            contentSize: contentSize
+        )
+        let rightPlacement = SampleGuidePlacement.resolve(
+            buttonBounds: buttonBounds,
+            buttonFrameInScreen: NSRect(x: 1_410, y: 878, width: 22, height: 22),
+            visibleFrame: visibleFrame,
+            contentSize: contentSize
+        )
+
+        XCTAssertEqual(leftPlacement.examplesEdge, .trailing)
+        XCTAssertGreaterThan(leftPlacement.positioningRect.midX, buttonBounds.midX)
+        XCTAssertEqual(rightPlacement.examplesEdge, .leading)
+        XCTAssertLessThan(rightPlacement.positioningRect.midX, buttonBounds.midX)
+
+        let fallback = SampleGuidePlacement.resolve(
+            buttonBounds: buttonBounds,
+            buttonFrameInScreen: nil,
+            visibleFrame: nil,
+            contentSize: contentSize
+        )
+        XCTAssertEqual(fallback.examplesEdge, .trailing)
+    }
+
+    func testSampleGuideKeyboardPolicyTraversesActivatesAndDismisses() {
+        let values = ExampleKind.allCases.map(\.rawValue)
+        XCTAssertEqual(
+            SampleGuideFocusOrder.movedFocus(from: nil, direction: .next),
+            values.first
+        )
+        XCTAssertEqual(
+            SampleGuideFocusOrder.movedFocus(from: values.first, direction: .previous),
+            values.last
+        )
+        XCTAssertEqual(
+            SampleGuideFocusOrder.movedFocus(from: values.last, direction: .next),
+            values.first
+        )
+        XCTAssertEqual(
+            SampleGuideKeyboardPolicy.action(
+                for: .tab,
+                modifiers: [],
+                acceptsExampleInput: true
+            ),
+            .move(.next)
+        )
+        XCTAssertEqual(
+            SampleGuideKeyboardPolicy.action(
+                for: .tab,
+                modifiers: [.shift],
+                acceptsExampleInput: true
+            ),
+            .move(.previous)
+        )
+        XCTAssertEqual(
+            SampleGuideKeyboardPolicy.action(
+                for: .space,
+                modifiers: [],
+                acceptsExampleInput: true
+            ),
+            .activate
+        )
+        XCTAssertEqual(
+            SampleGuideKeyboardPolicy.action(
+                for: .escape,
+                modifiers: [],
+                acceptsExampleInput: false
+            ),
+            .dismiss
+        )
+        XCTAssertEqual(
+            SampleGuideKeyboardPolicy.action(
+                for: .downArrow,
+                modifiers: [],
+                acceptsExampleInput: false
+            ),
+            .ignore
+        )
+    }
+
     @MainActor
     func testSampleGuideClosesBeforeDeliveringOneSelection() {
         let popover = TestSampleGuidePopover()
