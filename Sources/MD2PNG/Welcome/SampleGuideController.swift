@@ -331,6 +331,15 @@ protocol SampleGuidePopover: AnyObject {
 extension NSPopover: SampleGuidePopover {}
 
 @MainActor
+protocol SampleGuidePresenting: AnyObject {
+    func show(
+        relativeTo button: NSStatusBarButton,
+        menuState: SampleGuideMenuState
+    )
+    func dismiss()
+}
+
+@MainActor
 final class SampleGuideController: NSObject, NSPopoverDelegate {
     private let popover: any SampleGuidePopover
     private let onChoose: (ExampleKind) -> Void
@@ -464,6 +473,8 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         onChoose(selection)
     }
 }
+
+extension SampleGuideController: SampleGuidePresenting {}
 
 struct SampleGuideView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

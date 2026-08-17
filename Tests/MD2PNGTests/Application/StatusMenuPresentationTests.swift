@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 @testable import MD2PNG
@@ -53,6 +54,36 @@ final class StatusMenuPresentationTests: XCTestCase {
         XCTAssertEqual(presentation[.rerenderLastMarkdown].title, "重新渲染上次的 Markdown")
         XCTAssertEqual(presentation[.theme].title, "主题")
         XCTAssertEqual(presentation[.outputWidth].title, "输出宽度")
+    }
+
+    @MainActor
+    func testWelcomeTrySamplePresentsLatestSnapshotWithoutRefreshingVisibleUI() throws {
+        _ = NSApplication.shared
+        let presenter = RecordingSampleGuidePresenter()
+        let delegate = AppDelegate(sampleGuidePresenter: presenter)
+        delegate.prepareWelcomeSampleGuidePathForTesting()
+        defer { delegate.cleanUpWelcomeSampleGuidePathForTesting() }
+        let clipboardRefreshCount = delegate.clipboardMenuRefreshCountForTesting
+        let welcomeRefreshCount = delegate.welcomeLaunchAtLoginRefreshCountForTesting
+        let expectedClipboardState = Clipboard.menuState(includeLabel: false)
+
+        delegate.triggerWelcomeSampleGuideForTesting()
+
+        XCTAssertEqual(presenter.presentedStates.count, 1)
+        let state = try XCTUnwrap(presenter.presentedStates.first)
+        XCTAssertEqual(state.canRenderClipboard, expectedClipboardState.containsMarkdown)
+        XCTAssertFalse(state.canRerenderLastMarkdown)
+        XCTAssertFalse(state.canRestoreLastMarkdown)
+        XCTAssertFalse(state.canShowLastRender)
+        XCTAssertEqual(
+            state.canUseLaunchAtLogin,
+            state.launchAtLoginAction != .unavailable
+        )
+        XCTAssertEqual(delegate.clipboardMenuRefreshCountForTesting, clipboardRefreshCount)
+        XCTAssertEqual(
+            delegate.welcomeLaunchAtLoginRefreshCountForTesting,
+            welcomeRefreshCount
+        )
     }
 
     func testRenderingAndUpdateInstallationKeepPreviewAndAppCommandsAvailable() {
@@ -151,4 +182,18 @@ final class StatusMenuPresentationTests: XCTestCase {
             localizationBundle: localizationBundle
         )
     }
+}
+
+@MainActor
+private final class RecordingSampleGuidePresenter: SampleGuidePresenting {
+    private(set) var presentedStates: [SampleGuideMenuState] = []
+
+    func show(
+        relativeTo button: NSStatusBarButton,
+        menuState: SampleGuideMenuState
+    ) {
+        presentedStates.append(menuState)
+    }
+
+    func dismiss() {}
 }

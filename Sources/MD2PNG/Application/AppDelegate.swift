@@ -58,11 +58,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         },
         onTrySample: { [weak self] in self?.showSampleGuide() }
     )
-    private lazy var sampleGuideController = SampleGuideController(
-        onChoose: { [weak self] kind in
-            self?.renderBundledExample(kind)
+    private let injectedSampleGuidePresenter: (any SampleGuidePresenting)?
+    private lazy var sampleGuidePresenter: any SampleGuidePresenting = {
+        if let injectedSampleGuidePresenter {
+            return injectedSampleGuidePresenter
         }
-    )
+        return SampleGuideController(
+            onChoose: { [weak self] kind in
+                self?.renderBundledExample(kind)
+            }
+        )
+    }()
     private lazy var globalShortcutRouter = GlobalShortcutRouter(
         verify: { [weak self] command in
             self?.welcomeController.verifyShortcut(command) ?? false
@@ -107,8 +113,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isPreviewWindowVisible = false
     private var isWelcomeWindowVisible = false
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
+#if DEBUG
+    private(set) var clipboardMenuRefreshCountForTesting = 0
+#endif
 
-    override init() {
+    override convenience init() {
+        self.init(sampleGuidePresenter: nil)
+    }
+
+    init(sampleGuidePresenter: (any SampleGuidePresenting)?) {
+        injectedSampleGuidePresenter = sampleGuidePresenter
         let renderWidthPreference = RenderWidthPreference()
         self.renderWidthPreference = renderWidthPreference
         renderWidthPreset = renderWidthPreference.selectedPreset
@@ -368,7 +382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        sampleGuideController.dismiss()
+        sampleGuidePresenter.dismiss()
         refreshClipboardMenuState()
         updateLaunchAtLoginMenu()
     }
@@ -540,6 +554,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func refreshClipboardMenuState() {
+#if DEBUG
+        clipboardMenuRefreshCountForTesting += 1
+#endif
         let state = Clipboard.menuState(includeLabel: false)
         clipboardContainsMarkdown = state.containsMarkdown
         clipboardPreviewView.update(state.preview)
@@ -694,7 +711,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isRendering: false,
             isUpdateInstallPending: false
         ))
-        sampleGuideController.show(
+        sampleGuidePresenter.show(
             relativeTo: button,
             menuState: SampleGuideMenuState(
                 statusMenuPresentation: statusMenuPresentation,
@@ -702,6 +719,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         )
     }
+
+#if DEBUG
+    func prepareWelcomeSampleGuidePathForTesting() {
+        configureStatusItem()
+        isWelcomeWindowVisible = true
+    }
+
+    func triggerWelcomeSampleGuideForTesting() {
+        welcomeController.trySampleForTesting()
+    }
+
+    var welcomeLaunchAtLoginRefreshCountForTesting: Int {
+        welcomeController.launchAtLoginRefreshCountForTesting
+    }
+
+    func cleanUpWelcomeSampleGuidePathForTesting() {
+        isWelcomeWindowVisible = false
+        if let updateStatusObserverID {
+            updateController.removeStatusObserver(updateStatusObserverID)
+            self.updateStatusObserverID = nil
+        }
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
+    }
+#endif
 
     @objc private func terminateFromStatusMenu() {
         NSApp.terminate(nil)
