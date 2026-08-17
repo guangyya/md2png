@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-17
+
 ### Added
 
 - Show actionable renderer error details with Mermaid diagram and Markdown line
