@@ -63,6 +63,16 @@ final class RenderThemeTests: XCTestCase {
             XCTAssertTrue(containsVisibleForeground(in: image), theme.rawValue)
             if theme == .warmPaper {
                 try assertWarmPaperPalette(in: image)
+                let plainCodeImage = try await render(
+                    """
+                    ```
+                    plain code text
+                    ```
+                    """,
+                    with: renderer,
+                    theme: .warmPaper
+                )
+                try assertWarmPaperPlainCodeText(in: plainCodeImage)
             }
         }
 
@@ -188,14 +198,19 @@ final class RenderThemeTests: XCTestCase {
         let background = color(0xFA, 0xF8, 0xF3)
         let codeSurface = color(0xEC, 0xE7, 0xDE)
         let codeText = color(0x34, 0x2F, 0x29)
-        let renderedColors: [(name: String, color: NSColor, minimumPixels: Int)] = [
-            ("code surface", codeSurface, 100),
-            ("syntax keyword", color(0x96, 0x37, 0x43), 3),
-            ("syntax string", color(0x6C, 0x4D, 0x13), 3),
-            ("syntax title", color(0x68, 0x4A, 0x92), 3),
-            ("syntax variable", color(0x24, 0x5B, 0x73), 3),
-            ("Mermaid secondary surface", color(0xE7, 0xE5, 0xC7), 100),
-            ("Mermaid tertiary surface", color(0xF4, 0xD8, 0xBC), 50)
+        let renderedColors: [(
+            name: String,
+            color: NSColor,
+            minimumPixels: Int,
+            tolerance: CGFloat
+        )] = [
+            ("code surface", codeSurface, 100, 0.08),
+            ("syntax keyword", color(0x96, 0x37, 0x43), 3, 0.26),
+            ("syntax string", color(0x6C, 0x4D, 0x13), 3, 0.26),
+            ("syntax title", color(0x68, 0x4A, 0x92), 3, 0.26),
+            ("syntax variable", color(0x24, 0x5B, 0x73), 3, 0.26),
+            ("Mermaid secondary surface", color(0xE7, 0xE5, 0xC7), 100, 0.08),
+            ("Mermaid tertiary surface", color(0xF4, 0xD8, 0xBC), 50, 0.08)
         ]
 
         XCTAssertGreaterThan(
@@ -213,7 +228,7 @@ final class RenderThemeTests: XCTestCase {
             file: file,
             line: line
         )
-        for expected in renderedColors.dropFirst() where expected.name.hasPrefix("syntax") {
+        for expected in renderedColors where expected.name.hasPrefix("syntax") {
             assertContrast(
                 expected.color,
                 against: codeSurface,
@@ -242,8 +257,6 @@ final class RenderThemeTests: XCTestCase {
 
         let tiff = try XCTUnwrap(image.tiffRepresentation, file: file, line: line)
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff), file: file, line: line)
-        // Small syntax glyphs are antialiased into their code-block background.
-        let renderedColorTolerance: CGFloat = 0.26
         var hitCounts = Array(repeating: 0, count: renderedColors.count)
         var nearestDistances = Array(
             repeating: CGFloat.greatestFiniteMagnitude,
@@ -259,7 +272,7 @@ final class RenderThemeTests: XCTestCase {
                     let distance = colorDistance(sample, renderedColors[index].color)
                     nearestDistances[index] = min(nearestDistances[index], distance)
                     if hitCounts[index] < renderedColors[index].minimumPixels
-                        && distance < renderedColorTolerance {
+                        && distance < renderedColors[index].tolerance {
                         hitCounts[index] += 1
                     }
                 }
@@ -281,6 +294,43 @@ final class RenderThemeTests: XCTestCase {
                 line: line
             )
         }
+    }
+
+    private func assertWarmPaperPlainCodeText(
+        in image: NSImage,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let codeText = color(0x34, 0x2F, 0x29)
+        let tiff = try XCTUnwrap(image.tiffRepresentation, file: file, line: line)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff), file: file, line: line)
+        var textPixels = 0
+        var nearestDistance = CGFloat.greatestFiniteMagnitude
+
+        scan: for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+                guard let sample = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    continue
+                }
+                let distance = colorDistance(sample, codeText)
+                nearestDistance = min(nearestDistance, distance)
+                if distance < 0.26 {
+                    textPixels += 1
+                    if textPixels >= 3 {
+                        break scan
+                    }
+                }
+            }
+        }
+
+        XCTAssertGreaterThanOrEqual(
+            textPixels,
+            3,
+            "Warm Paper plain code is missing its expected text color; "
+                + "nearest distance: \(nearestDistance)",
+            file: file,
+            line: line
+        )
     }
 
     private func assertContrast(
