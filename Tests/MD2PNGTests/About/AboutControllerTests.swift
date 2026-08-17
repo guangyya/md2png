@@ -108,6 +108,12 @@ final class AboutControllerTests: XCTestCase {
             completedController.displayedUpdateButtonTitle,
             L10n.text("about.update_checked_recently", defaultValue: "Checked just now")
         )
+        if let contentView = completedController.window?.contentView {
+            writeSnapshotIfRequested(
+                environmentKey: "MD2PNG_ABOUT_CHECKED_SNAPSHOT_PATH",
+                contentView: contentView
+            )
+        }
         completedController.close()
 
         let cooldownController = makeAboutController(

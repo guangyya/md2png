@@ -5,6 +5,10 @@ enum AboutLayout {
     static let windowSize = NSSize(width: 560, height: 490)
     static let compactUpdateHeight: CGFloat = 36
     static let detailedUpdateHeight: CGFloat = 66
+    static let updateRowHeight: CGFloat = 18
+    static let updateRowFontSize: CGFloat = 12
+    static let updateRowIconSize: CGFloat = 16
+    static let updateRowSpacing: CGFloat = 7
 }
 
 @MainActor
@@ -310,60 +314,77 @@ private struct AboutUpdateCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 7) {
-            Image(systemName: presentation.symbolName)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 18, height: 18)
-                .foregroundStyle(presentation.tint.color)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    AboutSelectableStatusLabel(
-                        text: presentation.title,
-                        accessibilityLabel: statusAccessibilityLabel,
-                        toolTip: presentation.detail ?? presentation.title
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .center, spacing: AboutLayout.updateRowSpacing) {
+                Image(systemName: presentation.symbolName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(
+                        width: AboutLayout.updateRowIconSize,
+                        height: AboutLayout.updateRowIconSize
                     )
-                    .frame(minWidth: 1, minHeight: 18)
-                    .layoutPriority(1)
+                    .frame(
+                        width: AboutLayout.updateRowHeight,
+                        height: AboutLayout.updateRowHeight
+                    )
+                    .foregroundStyle(presentation.tint.color)
+                    .accessibilityHidden(true)
 
-                    if let secondaryAction = presentation.secondaryAction {
-                        Button(secondaryAction.title) {
-                            onSecondaryAction(secondaryAction.action)
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.accentColor)
-                    }
+                AboutSelectableStatusLabel(
+                    text: presentation.title,
+                    accessibilityLabel: statusAccessibilityLabel,
+                    toolTip: presentation.detail ?? presentation.title
+                )
+                .frame(
+                    minWidth: 1,
+                    minHeight: AboutLayout.updateRowHeight,
+                    maxHeight: AboutLayout.updateRowHeight
+                )
+                .layoutPriority(1)
 
-                    if let primaryAction = presentation.primaryAction {
-                        Button(primaryAction.title) {
-                            onPrimaryAction(primaryAction.action)
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(
-                            size: 12,
-                            weight: primaryAction.isEmphasized ? .semibold : .regular
-                        ))
-                        .foregroundStyle(primaryAction.isEnabled
-                            ? Color.accentColor
-                            : Color(nsColor: .secondaryLabelColor))
-                        .disabled(!primaryAction.isEnabled)
-                        .help(primaryAction.toolTip ?? primaryAction.title)
+                if let secondaryAction = presentation.secondaryAction {
+                    Button(secondaryAction.title) {
+                        onSecondaryAction(secondaryAction.action)
                     }
+                    .buttonStyle(.plain)
+                    .font(.system(size: AboutLayout.updateRowFontSize))
+                    .frame(height: AboutLayout.updateRowHeight, alignment: .center)
+                    .foregroundStyle(Color.accentColor)
                 }
 
-                if let detail = presentation.detail {
-                    Text(detail)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .help(detail)
+                if let primaryAction = presentation.primaryAction {
+                    Button(primaryAction.title) {
+                        onPrimaryAction(primaryAction.action)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(
+                        size: AboutLayout.updateRowFontSize,
+                        weight: primaryAction.isEmphasized ? .semibold : .regular
+                    ))
+                    .frame(height: AboutLayout.updateRowHeight, alignment: .center)
+                    .foregroundStyle(primaryAction.isEnabled
+                        ? Color.accentColor
+                        : Color(nsColor: .secondaryLabelColor))
+                    .disabled(!primaryAction.isEnabled)
+                    .help(primaryAction.toolTip ?? primaryAction.title)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: AboutLayout.updateRowHeight,
+                maxHeight: AboutLayout.updateRowHeight,
+                alignment: .center
+            )
+
+            if let detail = presentation.detail {
+                Text(detail)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, AboutLayout.updateRowHeight + AboutLayout.updateRowSpacing)
+                    .help(detail)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.top, 9)
@@ -408,7 +429,7 @@ private struct AboutSelectableStatusLabel: NSViewRepresentable {
     func makeNSView(context: Context) -> NSTextField {
         let textField = SelectAllOnDoubleClickTextField(labelWithString: "")
         textField.identifier = Self.identifier
-        textField.font = .systemFont(ofSize: 11.5)
+        textField.font = .systemFont(ofSize: AboutLayout.updateRowFontSize)
         textField.isSelectable = true
         textField.maximumNumberOfLines = 1
         textField.lineBreakMode = .byTruncatingTail
@@ -430,7 +451,7 @@ private struct AboutSelectableStatusLabel: NSViewRepresentable {
         let intrinsicSize = textField.intrinsicContentSize
         return CGSize(
             width: min(proposal.width ?? intrinsicSize.width, intrinsicSize.width),
-            height: max(18, intrinsicSize.height)
+            height: max(AboutLayout.updateRowHeight, intrinsicSize.height)
         )
     }
 }
