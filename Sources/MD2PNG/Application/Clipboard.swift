@@ -1,15 +1,24 @@
 import AppKit
 
+struct ClipboardMenuState: Equatable {
+    let preview: String
+    let containsMarkdown: Bool
+}
+
 enum Clipboard {
     static var changeCount: Int {
         NSPasteboard.general.changeCount
     }
 
     static func menuPreview(includeLabel: Bool = true) -> String {
+        menuState(includeLabel: includeLabel).preview
+    }
+
+    static func menuState(includeLabel: Bool = true) -> ClipboardMenuState {
         let pasteboard = NSPasteboard.general
         let text = pasteboard.string(forType: .string)
         let hasImage = pasteboard.availableType(from: [.png, .tiff]) != nil
-        return menuPreview(text: text, hasImage: hasImage, includeLabel: includeLabel)
+        return menuState(text: text, hasImage: hasImage, includeLabel: includeLabel)
     }
 
     static func menuPreview(
@@ -19,6 +28,22 @@ enum Clipboard {
         includeLabel: Bool = true,
         localizationBundle: Bundle? = nil
     ) -> String {
+        menuState(
+            text: text,
+            hasImage: hasImage,
+            maxCharacters: maxCharacters,
+            includeLabel: includeLabel,
+            localizationBundle: localizationBundle
+        ).preview
+    }
+
+    static func menuState(
+        text: String?,
+        hasImage: Bool,
+        maxCharacters: Int = 44,
+        includeLabel: Bool = true,
+        localizationBundle: Bundle? = nil
+    ) -> ClipboardMenuState {
         let normalizedText = text?
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
@@ -31,14 +56,17 @@ enum Clipboard {
             } else {
                 preview = normalizedText
             }
-            return includeLabel
+            return ClipboardMenuState(
+                preview: includeLabel
                 ? L10n.format(
                     "clipboard.labeled",
                     defaultValue: "Clipboard: %@",
                     bundle: localizationBundle,
                     preview
                 )
-                : preview
+                : preview,
+                containsMarkdown: true
+            )
         }
 
         if hasImage {
@@ -47,14 +75,17 @@ enum Clipboard {
                 defaultValue: "PNG image",
                 bundle: localizationBundle
             )
-            return includeLabel
+            return ClipboardMenuState(
+                preview: includeLabel
                 ? L10n.format(
                     "clipboard.labeled",
                     defaultValue: "Clipboard: %@",
                     bundle: localizationBundle,
                     imageDescription
                 )
-                : imageDescription
+                : imageDescription,
+                containsMarkdown: false
+            )
         }
 
         let emptyDescription = L10n.text(
@@ -62,14 +93,17 @@ enum Clipboard {
             defaultValue: "No text",
             bundle: localizationBundle
         )
-        return includeLabel
+        return ClipboardMenuState(
+            preview: includeLabel
             ? L10n.format(
                 "clipboard.labeled",
                 defaultValue: "Clipboard: %@",
                 bundle: localizationBundle,
                 emptyDescription
             )
-            : emptyDescription
+            : emptyDescription,
+            containsMarkdown: false
+        )
     }
 
     static func markdownText() throws -> String {

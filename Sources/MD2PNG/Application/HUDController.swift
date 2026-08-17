@@ -27,6 +27,7 @@ enum HUDLayout {
     static let maximumWidth: CGFloat = 480
     static let horizontalContentWidth: CGFloat = 80
     static let minimumHeight: CGFloat = 64
+    static let maximumLines = 3
 
     static func panelSize(for message: String) -> NSSize {
         let font = NSFont.systemFont(ofSize: 14, weight: .medium)
@@ -43,7 +44,7 @@ enum HUDLayout {
             attributes: attributes
         )
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
-        let textHeight = min(ceil(measuredText.height), lineHeight * 2)
+        let textHeight = min(ceil(measuredText.height), lineHeight * CGFloat(maximumLines))
         return NSSize(width: width, height: max(minimumHeight, textHeight + 32))
     }
 
@@ -99,7 +100,7 @@ final class HUDController {
         label.textColor = .labelColor
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.lineBreakMode = .byTruncatingTail
-        label.maximumNumberOfLines = 2
+        label.maximumNumberOfLines = HUDLayout.maximumLines
         label.cell?.usesSingleLineMode = false
         label.cell?.wraps = true
         label.translatesAutoresizingMaskIntoConstraints = false

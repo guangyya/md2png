@@ -389,7 +389,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         if let widthPreset {
             window?.title = L10n.format(
                 "preview.window_title_with_width",
-                defaultValue: "Last Render — %@ · %ld × %ld px",
+                defaultValue: "Last Render — %1$@ · %2$ld × %3$ld px",
                 widthPreset.menuTitle,
                 Int(pixelSize.width.rounded()),
                 Int(pixelSize.height.rounded())
@@ -397,7 +397,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         } else {
             window?.title = L10n.format(
                 "preview.window_title_with_dimensions",
-                defaultValue: "Last Render — %ld × %ld px",
+                defaultValue: "Last Render — %1$ld × %2$ld px",
                 Int(pixelSize.width.rounded()),
                 Int(pixelSize.height.rounded())
             )

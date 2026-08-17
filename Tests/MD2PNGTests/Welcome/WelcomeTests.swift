@@ -80,7 +80,7 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(chinese.pasteStepCompletionDetail, "检查后再发送")
         XCTAssertEqual(englishGuide.title, "Find Examples in the md2png menu")
         XCTAssertEqual(chineseGuide.title, "在 md2png 菜单中找到“示例”")
-        XCTAssertEqual(englishGuide.exampleTitle(.short), "Short Sample")
+        XCTAssertEqual(englishGuide.exampleTitle(.short), "Short Example")
         XCTAssertEqual(chineseGuide.exampleTitle(.short), "简短示例")
         XCTAssertEqual(chinese.shortcutDetected, "已检测")
         XCTAssertEqual(chinese.shortcutVerified, "已生效")

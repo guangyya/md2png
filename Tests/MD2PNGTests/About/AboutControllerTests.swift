@@ -412,7 +412,7 @@ final class AboutControllerTests: XCTestCase {
             readyController.displayedUpdateDetail,
             L10n.text(
                 "about.update_relaunch_memory_detail",
-                defaultValue: "Relaunch clears Last Render and Last Source. The clipboard is unchanged."
+                defaultValue: "Relaunch clears Last Render and Last Markdown. The clipboard is unchanged."
             )
         )
 

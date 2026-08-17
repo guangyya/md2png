@@ -82,6 +82,22 @@ final class LaunchAtLoginTests: XCTestCase {
         XCTAssertTrue(service.operations.isEmpty)
     }
 
+    func testPrimaryActionHidesRawSystemRegistrationFailures() {
+        let service = LaunchAtLoginServiceStub(status: .notRegistered)
+        service.operationError = CocoaError(.fileWriteNoPermission)
+        let controller = LaunchAtLoginController(service: service)
+
+        XCTAssertThrowsError(try controller.performPrimaryAction()) { error in
+            guard let launchError = error as? LaunchAtLoginError,
+                  case .changeFailed = launchError else {
+                XCTFail("Expected a privacy-safe Launch at Login error, got \(error)")
+                return
+            }
+            XCTAssertFalse(error.localizedDescription.contains("permission"))
+        }
+        XCTAssertEqual(service.operations, [.register])
+    }
+
     func testPresentationReadsAnExternallyChangedStatus() {
         let service = LaunchAtLoginServiceStub(status: .notRegistered)
         let controller = LaunchAtLoginController(service: service)
@@ -130,6 +146,7 @@ private final class LaunchAtLoginServiceStub: LaunchAtLoginServicing {
     var status: LaunchAtLoginStatus
     var statusAfterRegister: LaunchAtLoginStatus?
     var statusAfterUnregister: LaunchAtLoginStatus?
+    var operationError: Error?
     private(set) var operations: [Operation] = []
 
     init(status: LaunchAtLoginStatus) {
@@ -138,6 +155,7 @@ private final class LaunchAtLoginServiceStub: LaunchAtLoginServicing {
 
     func register() throws {
         operations.append(.register)
+        if let operationError { throw operationError }
         if let statusAfterRegister {
             status = statusAfterRegister
         }
@@ -145,6 +163,7 @@ private final class LaunchAtLoginServiceStub: LaunchAtLoginServicing {
 
     func unregister() throws {
         operations.append(.unregister)
+        if let operationError { throw operationError }
         if let statusAfterUnregister {
             status = statusAfterUnregister
         }

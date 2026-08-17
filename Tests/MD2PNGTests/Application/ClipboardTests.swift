@@ -204,6 +204,33 @@ final class ClipboardTests: XCTestCase {
         )
     }
 
+    func testMenuStateEnablesRenderingOnlyForNonemptyText() throws {
+        let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
+
+        let text = Clipboard.menuState(
+            text: "  # Markdown  ",
+            hasImage: false,
+            includeLabel: false,
+            localizationBundle: english
+        )
+        let image = Clipboard.menuState(
+            text: nil,
+            hasImage: true,
+            includeLabel: false,
+            localizationBundle: english
+        )
+        let empty = Clipboard.menuState(
+            text: " \n\t ",
+            hasImage: false,
+            includeLabel: false,
+            localizationBundle: english
+        )
+
+        XCTAssertEqual(text, ClipboardMenuState(preview: "# Markdown", containsMarkdown: true))
+        XCTAssertEqual(image, ClipboardMenuState(preview: "PNG image", containsMarkdown: false))
+        XCTAssertEqual(empty, ClipboardMenuState(preview: "No text", containsMarkdown: false))
+    }
+
     func testMarkdownValidationPreservesTheExactSource() throws {
         let markdown = "\n  # Keep surrounding whitespace  \n"
 
@@ -226,13 +253,31 @@ final class ClipboardTests: XCTestCase {
         XCTAssertNotNil(AppError.rendererUnavailable.errorDescription)
         XCTAssertNotNil(AppError.rendererRecoveryFailed.errorDescription)
         XCTAssertNotNil(AppError.rendererTimedOut.errorDescription)
+        XCTAssertNotNil(AppError.rendererFailed.errorDescription)
         XCTAssertNotNil(AppError.invalidRendererResponse.errorDescription)
         XCTAssertNotNil(AppError.contentTooLarge(width: 1, height: 2).errorDescription)
+        XCTAssertNotNil(AppError.rendererPNGEncodingFailed.errorDescription)
         XCTAssertNotNil(AppError.pngEncodingFailed.errorDescription)
         XCTAssertNotNil(AppError.pngWriteFailed.errorDescription)
         XCTAssertNotNil(AppError.previewOpenFailed.errorDescription)
         XCTAssertNotNil(AppError.clipboardWriteFailed.errorDescription)
-        XCTAssertNotNil(AppError.exampleUnavailable("Short Sample").errorDescription)
+        XCTAssertNotNil(AppError.exampleUnavailable("Short Example").errorDescription)
+    }
+
+    func testRenderErrorsConfirmClipboardSafetyAndOfferRecovery() throws {
+        let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
+        let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+
+        let englishMessage = AppError.rendererTimedOut.message(localizationBundle: english)
+        XCTAssertTrue(englishMessage.contains("clipboard is unchanged"))
+        XCTAssertTrue(englishMessage.contains("try again"))
+
+        let chineseMessage = AppError.contentTooLarge(width: 1_200, height: 3_400)
+            .message(localizationBundle: chinese)
+        XCTAssertEqual(
+            chineseMessage,
+            "无法生成 1200 × 3400 的 PNG，剪贴板内容未改变。请缩短 Markdown 后重试。"
+        )
     }
 
     @MainActor

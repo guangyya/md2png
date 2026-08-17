@@ -7,6 +7,19 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add a Re-render Last Markdown command that applies the current Theme and
+  Output Width without requiring the source to be copied again.
+
+### Changed
+
+- Reorganize the status menu around frequent shortcuts, last-source recovery,
+  rendering choices, and infrequent app commands; keep unavailable commands in
+  place with accurate enabled states.
+- Make English and Simplified Chinese success and error messages concise,
+  recovery-oriented, and explicit about clipboard safety after render failures.
+
 ## [0.7.0] - 2026-08-17
 
 ### Added

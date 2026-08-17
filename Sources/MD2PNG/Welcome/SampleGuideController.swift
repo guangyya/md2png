@@ -26,6 +26,26 @@ struct SampleGuideInteractionPolicy: Equatable {
 struct SampleGuideMenuState: Equatable {
     let canRestoreLastMarkdown: Bool
     let canShowLastRender: Bool
+    let canRenderClipboard: Bool
+    let canRerenderLastMarkdown: Bool
+    let launchAtLoginAction: LaunchAtLoginMenuAction
+    let canUseLaunchAtLogin: Bool
+
+    init(
+        canRestoreLastMarkdown: Bool,
+        canShowLastRender: Bool,
+        canRenderClipboard: Bool = true,
+        canRerenderLastMarkdown: Bool = false,
+        launchAtLoginAction: LaunchAtLoginMenuAction = .enable,
+        canUseLaunchAtLogin: Bool = true
+    ) {
+        self.canRestoreLastMarkdown = canRestoreLastMarkdown
+        self.canShowLastRender = canShowLastRender
+        self.canRenderClipboard = canRenderClipboard
+        self.canRerenderLastMarkdown = canRerenderLastMarkdown
+        self.launchAtLoginAction = launchAtLoginAction
+        self.canUseLaunchAtLogin = canUseLaunchAtLogin
+    }
 }
 
 enum SampleGuideLayout {
@@ -165,8 +185,10 @@ struct SampleGuideCopy {
     let title: String
     let clipboard: String
     let render: String
+    let rerenderLastMarkdown: String
     let restoreLastMarkdown: String
     let showLastRender: String
+    let theme: String
     let outputWidth: String
     let examples: String
     let showWelcome: String
@@ -186,50 +208,79 @@ struct SampleGuideCopy {
             defaultValue: "Clipboard",
             bundle: localizationBundle
         )
-        render = L10n.text(
-            "menu.render",
-            defaultValue: "Render Clipboard as Image",
-            bundle: localizationBundle
+        render = StatusMenuPresentation.title(
+            for: .renderClipboard,
+            localizationBundle: localizationBundle
         )
-        restoreLastMarkdown = L10n.text(
-            "menu.restore_last_markdown",
-            defaultValue: "Restore Last Markdown",
-            bundle: localizationBundle
+        rerenderLastMarkdown = StatusMenuPresentation.title(
+            for: .rerenderLastMarkdown,
+            localizationBundle: localizationBundle
         )
-        showLastRender = L10n.text(
-            "menu.show_last_render",
-            defaultValue: "Show Last Render",
-            bundle: localizationBundle
+        restoreLastMarkdown = StatusMenuPresentation.title(
+            for: .restoreLastMarkdown,
+            localizationBundle: localizationBundle
         )
-        outputWidth = L10n.text(
-            "menu.render_width",
-            defaultValue: "Output Width",
-            bundle: localizationBundle
+        showLastRender = StatusMenuPresentation.title(
+            for: .showLastRender,
+            localizationBundle: localizationBundle
         )
-        examples = L10n.text(
-            "menu.examples",
-            defaultValue: "Examples",
-            bundle: localizationBundle
+        theme = StatusMenuPresentation.title(
+            for: .theme,
+            localizationBundle: localizationBundle
         )
-        showWelcome = L10n.text(
-            "menu.show_welcome",
-            defaultValue: "Show Welcome",
-            bundle: localizationBundle
+        outputWidth = StatusMenuPresentation.title(
+            for: .outputWidth,
+            localizationBundle: localizationBundle
         )
-        about = L10n.text(
-            "menu.about",
-            defaultValue: "About md2png",
-            bundle: localizationBundle
+        examples = StatusMenuPresentation.title(
+            for: .examples,
+            localizationBundle: localizationBundle
         )
-        quit = L10n.text(
-            "menu.quit",
-            defaultValue: "Quit md2png",
-            bundle: localizationBundle
+        showWelcome = StatusMenuPresentation.title(
+            for: .showWelcome,
+            localizationBundle: localizationBundle
+        )
+        about = StatusMenuPresentation.title(
+            for: .about,
+            localizationBundle: localizationBundle
+        )
+        quit = StatusMenuPresentation.title(
+            for: .quit,
+            localizationBundle: localizationBundle
         )
     }
 
     func exampleTitle(_ kind: ExampleKind) -> String {
         kind.menuTitle(localizationBundle: localizationBundle)
+    }
+
+    func launchAtLoginTitle(for action: LaunchAtLoginMenuAction) -> String {
+        switch action {
+        case .enable:
+            L10n.text(
+                "menu.enable_launch_at_login",
+                defaultValue: "Enable Launch at Login",
+                bundle: localizationBundle
+            )
+        case .disable:
+            L10n.text(
+                "menu.disable_launch_at_login",
+                defaultValue: "Disable Launch at Login",
+                bundle: localizationBundle
+            )
+        case .allowInSystemSettings:
+            L10n.text(
+                "menu.allow_launch_at_login",
+                defaultValue: "Allow Launch at Login…",
+                bundle: localizationBundle
+            )
+        case .unavailable:
+            L10n.text(
+                "menu.launch_at_login_unavailable",
+                defaultValue: "Launch at Login Unavailable",
+                bundle: localizationBundle
+            )
+        }
     }
 }
 
@@ -628,51 +679,65 @@ private struct SampleMainMenu: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
 
+            ForEach(StatusMenuLayout.sections.indices, id: \.self) { sectionIndex in
+                GuideDivider()
+                ForEach(StatusMenuLayout.sections[sectionIndex], id: \.self) { command in
+                    menuRow(for: command)
+                }
+            }
+        }
+        .padding(6)
+        .frame(minWidth: SampleGuideLayout.menuMinimumWidth, alignment: .top)
+        .guideMenuBackground()
+    }
+
+    @ViewBuilder
+    private func menuRow(for command: StatusMenuCommand) -> some View {
+        switch command {
+        case .renderClipboard:
             GuideMenuRow(
                 title: copy.render,
-                trailing: "⌃⌘X"
+                trailing: "⌃⌘X",
+                isDisabled: !menuState.canRenderClipboard
             )
-            GuideMenuRow(
-                title: copy.restoreLastMarkdown,
-                isDisabled: !menuState.canRestoreLastMarkdown
-            )
+        case .showLastRender:
             GuideMenuRow(
                 title: copy.showLastRender,
                 trailing: "⌃⌘Z",
                 isDisabled: !menuState.canShowLastRender
             )
-
-            GuideDivider()
-
+        case .rerenderLastMarkdown:
             GuideMenuRow(
-                title: copy.outputWidth,
-                showsChevron: true
+                title: copy.rerenderLastMarkdown,
+                isDisabled: !menuState.canRerenderLastMarkdown
             )
+        case .restoreLastMarkdown:
+            GuideMenuRow(
+                title: copy.restoreLastMarkdown,
+                isDisabled: !menuState.canRestoreLastMarkdown
+            )
+        case .theme:
+            GuideMenuRow(title: copy.theme, showsChevron: true)
+        case .outputWidth:
+            GuideMenuRow(title: copy.outputWidth, showsChevron: true)
+        case .examples:
             GuideMenuRow(
                 title: copy.examples,
                 showsChevron: true,
                 isHighlighted: phase.highlightsExamples
             )
-
-            GuideDivider()
-
+        case .launchAtLogin:
             GuideMenuRow(
-                title: copy.showWelcome
+                title: copy.launchAtLoginTitle(for: menuState.launchAtLoginAction),
+                isDisabled: !menuState.canUseLaunchAtLogin
             )
-            GuideMenuRow(
-                title: copy.about
-            )
-
-            GuideDivider()
-
-            GuideMenuRow(
-                title: copy.quit,
-                trailing: "⌘Q"
-            )
+        case .showWelcome:
+            GuideMenuRow(title: copy.showWelcome)
+        case .about:
+            GuideMenuRow(title: copy.about)
+        case .quit:
+            GuideMenuRow(title: copy.quit, trailing: "⌘Q")
         }
-        .padding(6)
-        .frame(minWidth: SampleGuideLayout.menuMinimumWidth, alignment: .top)
-        .guideMenuBackground()
     }
 }
 

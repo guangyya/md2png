@@ -83,10 +83,11 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
-| Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Show Last Render | `Control-Command-Z` (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
-| Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
+| Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
+| Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Theme | — | Selects Clean Light, Warm Paper, or Dark for subsequent renders and remembers the selection locally |
+| Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
@@ -99,8 +100,9 @@ default theme; Warm Paper and Dark apply coordinated Markdown, code-highlighting
 and Mermaid colors without changing typography, spacing, or output width. The
 chosen theme is fixed into an opaque PNG. While a render is running, additional
 render commands, width or theme changes, and examples are temporarily disabled.
-Restore Last Markdown becomes available only after a successful render
-and asks before replacing clipboard content changed by another application. The
+Re-render Last Markdown and Restore Last Markdown become available only after a
+successful render and ask before replacing clipboard content changed by another
+application. The
 Last Render window opens at a width that reflects the output, within the current
 screen, and identifies the preset and PNG pixel dimensions in its title. Its
 toolbar can copy the image again, save it explicitly, open it in Preview, fit it
@@ -121,7 +123,7 @@ See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
 dimensions and same-source reference renders, and the
 [theme notes](docs/PRODUCT.md#render-themes) for the bundled palette boundaries.
 
-## Samples
+## Examples
 
 Choose an item under **Examples** to render it immediately:
 

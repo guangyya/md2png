@@ -197,7 +197,10 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                 } else if let image {
                     self.finish(execution, with: .success(image))
                 } else {
-                    self.finish(execution, with: .failure(AppError.pngEncodingFailed))
+                    self.finish(
+                        execution,
+                        with: .failure(AppError.rendererPNGEncodingFailed)
+                    )
                 }
             }
         }
@@ -222,7 +225,7 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         if Self.isContentProcessTermination(error) {
             handleContentProcessTermination(from: .executionError(execution))
         } else {
-            finish(execution, with: .failure(error))
+            finish(execution, with: .failure(AppError.rendererFailed))
         }
     }
 
