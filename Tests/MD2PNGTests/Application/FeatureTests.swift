@@ -112,17 +112,6 @@ final class FeatureTests: XCTestCase {
         }
     }
 
-    func testRenderActivityRejectsReentryUntilFinished() {
-        var activity = RenderActivityState()
-
-        XCTAssertTrue(activity.begin())
-        XCTAssertTrue(activity.isRendering)
-        XCTAssertFalse(activity.begin())
-        activity.finish()
-        XCTAssertFalse(activity.isRendering)
-        XCTAssertTrue(activity.begin())
-    }
-
     @MainActor
     func testHUDLayoutSupportsMultilineRecoveryAndVisibleFramePlacement() {
         let short = HUDLayout.panelSize(for: "PNG copied")
