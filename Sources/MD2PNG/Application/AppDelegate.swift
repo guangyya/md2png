@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
+    private let globalShortcutPreference: GlobalShortcutPreference
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
         launchAtLoginController: launchAtLoginController,
@@ -123,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     private var statusMenuController: StatusMenuController?
-    private var hotKey: GlobalHotKey?
+    private let globalHotKeyRegistrar = GlobalHotKeyRegistrar()
     private var welcomeShortcutStatuses: [WelcomeShortcutStatus] = []
     private var clipboardContainsMarkdown = false
     private var isSampleGuidePresentationScheduled = false
@@ -144,10 +145,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     init(
         sampleGuidePresenter: (any SampleGuidePresenting)?,
-        diagnosticLogger: DiagnosticLogger = .disabled
+        diagnosticLogger: DiagnosticLogger = .disabled,
+        globalShortcutPreference: GlobalShortcutPreference = GlobalShortcutPreference()
     ) {
         injectedSampleGuidePresenter = sampleGuidePresenter
         self.diagnosticLogger = diagnosticLogger
+        self.globalShortcutPreference = globalShortcutPreference
         super.init()
     }
 
@@ -161,28 +164,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureStatusItem()
         updateStatusPresenter.presentRelaunchResultIfNeeded()
 
-        let registrations: [GlobalHotKey.Registration] = [
-            .render { [weak self] in self?.globalShortcutRouter.handle(.render) },
-            .showLastRender { [weak self] in
-                self?.globalShortcutRouter.handle(.showLastRender)
-            }
-        ]
-        let hotKey = GlobalHotKey(registrations: registrations)
-        self.hotKey = hotKey
-        let failedRegistrationIDs = Set(hotKey.failedRegistrations.map(\.id))
-        welcomeShortcutStatuses = registrations.map {
-            WelcomeShortcutStatus(
-                registration: $0,
-                failedRegistrationIDs: failedRegistrationIDs
-            )
-        }
-        diagnosticLogger.record(
-            category: .shortcut,
-            stage: .shortcutRegistration,
-            result: failedRegistrationIDs.isEmpty ? .succeeded : .failed,
-            level: failedRegistrationIDs.isEmpty ? .info : .error,
-            itemCount: registrations.count,
-            failureCount: failedRegistrationIDs.count
+        let failedRegistrationIDs = registerGlobalShortcuts(
+            configuration: globalShortcutPreference.configuration
         )
 
         if welcomePreference.shouldShowOnLaunch {
@@ -192,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     shortcuts: self.welcomeShortcutStatuses
                 )
             }
-        } else if !hotKey.failedRegistrations.isEmpty {
+        } else if !failedRegistrationIDs.isEmpty {
             DispatchQueue.main.async { [weak self] in
                 self?.hud.show(
                     L10n.text(
@@ -209,6 +192,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stage: .applicationLaunch,
             result: .succeeded
         )
+    }
+
+    @discardableResult
+    private func registerGlobalShortcuts(
+        configuration: GlobalShortcutConfiguration
+    ) -> Set<UInt32> {
+        precondition(configuration.isValid)
+        let registrations: [GlobalHotKey.Registration] = [
+            .render(shortcut: configuration.render) { [weak self] in
+                self?.globalShortcutRouter.handle(.render)
+            },
+            .showLastRender(shortcut: configuration.showLastRender) { [weak self] in
+                self?.globalShortcutRouter.handle(.showLastRender)
+            }
+        ]
+        let failedRegistrationIDs = globalHotKeyRegistrar.replace(
+            registrations: registrations
+        )
+        welcomeShortcutStatuses = registrations.map {
+            WelcomeShortcutStatus(
+                registration: $0,
+                failedRegistrationIDs: failedRegistrationIDs
+            )
+        }
+        diagnosticLogger.record(
+            category: .shortcut,
+            stage: .shortcutRegistration,
+            result: failedRegistrationIDs.isEmpty ? .succeeded : .failed,
+            level: failedRegistrationIDs.isEmpty ? .info : .error,
+            itemCount: registrations.count,
+            failureCount: failedRegistrationIDs.count
+        )
+        return failedRegistrationIDs
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {

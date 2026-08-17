@@ -14,16 +14,10 @@ final class ClipboardTests: XCTestCase {
         XCTAssertEqual(render.keyCode, UInt32(kVK_ANSI_X))
         XCTAssertEqual(showLastRender.keyCode, UInt32(kVK_ANSI_Z))
         XCTAssertEqual(render.modifiers, showLastRender.modifiers)
-        XCTAssertEqual(
-            render.displayName,
-            L10n.text("hotkey.render", defaultValue: "Render (Control-Command-X)")
-        )
+        XCTAssertEqual(render.displayName, "Render (Control-Command-X)")
         XCTAssertEqual(
             showLastRender.displayName,
-            L10n.text(
-                "hotkey.show_last_render",
-                defaultValue: "Show Last Render (Control-Command-Z)"
-            )
+            "Show Last Render (Control-Command-Z)"
         )
     }
 

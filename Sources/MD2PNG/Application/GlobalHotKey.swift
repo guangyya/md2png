@@ -1,6 +1,6 @@
 import Carbon
 
-enum GlobalShortcutCommand: UInt32 {
+enum GlobalShortcutCommand: UInt32, CaseIterable, Codable, Sendable {
     case render = 1
     case showLastRender = 2
 }
@@ -25,56 +25,80 @@ struct GlobalShortcutRouter {
 }
 
 @MainActor
-final class GlobalHotKey {
+protocol GlobalHotKeySession: AnyObject {
+    var failedRegistrationIDs: Set<UInt32> { get }
+    func invalidate()
+}
+
+@MainActor
+final class GlobalHotKey: GlobalHotKeySession {
     struct Registration {
         let id: UInt32
-        let keyCode: UInt32
-        let modifiers: UInt32
+        let shortcut: GlobalShortcut
         let commandTitle: String
-        let shortcutGlyphs: String
-        let shortcutAccessibilityName: String
         let displayName: String
         let action: () -> Void
 
-        static func render(action: @escaping () -> Void) -> Registration {
-            Registration(
+        var keyCode: UInt32 { shortcut.key.keyCode }
+        var modifiers: UInt32 { shortcut.carbonModifiers }
+        var shortcutGlyphs: String { shortcut.glyphs }
+        var shortcutAccessibilityName: String { shortcut.accessibilityName }
+
+        static func render(
+            shortcut: GlobalShortcut = .defaultRender,
+            localizationBundle: Bundle? = nil,
+            action: @escaping () -> Void
+        ) -> Registration {
+            let commandTitle = L10n.text(
+                "menu.render",
+                defaultValue: "Render Clipboard as Image",
+                bundle: localizationBundle
+            )
+            let displayTitle = L10n.text(
+                "hotkey.render_title",
+                defaultValue: "Render",
+                bundle: localizationBundle
+            )
+            return Registration(
                 id: GlobalShortcutCommand.render.rawValue,
-                keyCode: UInt32(kVK_ANSI_X),
-                modifiers: UInt32(cmdKey | controlKey),
-                commandTitle: L10n.text(
-                    "menu.render",
-                    defaultValue: "Render Clipboard as Image"
-                ),
-                shortcutGlyphs: "⌃⌘X",
-                shortcutAccessibilityName: L10n.text(
-                    "shortcut.control_command_x",
-                    defaultValue: "Control-Command-X"
-                ),
-                displayName: L10n.text(
-                    "hotkey.render",
-                    defaultValue: "Render (Control-Command-X)"
+                shortcut: shortcut,
+                commandTitle: commandTitle,
+                displayName: L10n.format(
+                    "hotkey.command_format",
+                    defaultValue: "%1$@ (%2$@)",
+                    bundle: localizationBundle,
+                    displayTitle,
+                    shortcut.accessibilityName
                 ),
                 action: action
             )
         }
 
-        static func showLastRender(action: @escaping () -> Void) -> Registration {
-            Registration(
+        static func showLastRender(
+            shortcut: GlobalShortcut = .defaultShowLastRender,
+            localizationBundle: Bundle? = nil,
+            action: @escaping () -> Void
+        ) -> Registration {
+            let commandTitle = L10n.text(
+                "menu.show_last_render",
+                defaultValue: "Show Last Render",
+                bundle: localizationBundle
+            )
+            let displayTitle = L10n.text(
+                "hotkey.show_last_render_title",
+                defaultValue: "Show Last Render",
+                bundle: localizationBundle
+            )
+            return Registration(
                 id: GlobalShortcutCommand.showLastRender.rawValue,
-                keyCode: UInt32(kVK_ANSI_Z),
-                modifiers: UInt32(cmdKey | controlKey),
-                commandTitle: L10n.text(
-                    "menu.show_last_render",
-                    defaultValue: "Show Last Render"
-                ),
-                shortcutGlyphs: "⌃⌘Z",
-                shortcutAccessibilityName: L10n.text(
-                    "shortcut.control_command_z",
-                    defaultValue: "Control-Command-Z"
-                ),
-                displayName: L10n.text(
-                    "hotkey.show_last_render",
-                    defaultValue: "Show Last Render (Control-Command-Z)"
+                shortcut: shortcut,
+                commandTitle: commandTitle,
+                displayName: L10n.format(
+                    "hotkey.command_format",
+                    defaultValue: "%1$@ (%2$@)",
+                    bundle: localizationBundle,
+                    displayTitle,
+                    shortcut.accessibilityName
                 ),
                 action: action
             )
@@ -85,6 +109,11 @@ final class GlobalHotKey {
     private var eventHandler: EventHandlerRef?
     private let actions: [UInt32: () -> Void]
     private(set) var failedRegistrations: [Registration] = []
+    private(set) var isInvalidated = false
+
+    var failedRegistrationIDs: Set<UInt32> {
+        Set(failedRegistrations.map(\.id))
+    }
 
     init(registrations: [Registration]) {
         actions = Dictionary(uniqueKeysWithValues: registrations.map { ($0.id, $0.action) })
@@ -126,8 +155,59 @@ final class GlobalHotKey {
         }
     }
 
+    isolated deinit {
+        invalidate()
+    }
+
+    func invalidate() {
+        guard !isInvalidated else { return }
+        isInvalidated = true
+        for hotKey in hotKeys {
+            if let hotKey {
+                UnregisterEventHotKey(hotKey)
+            }
+        }
+        hotKeys.removeAll()
+        if let eventHandler {
+            RemoveEventHandler(eventHandler)
+            self.eventHandler = nil
+        }
+    }
+
     fileprivate func invoke(identifier: UInt32) {
+        guard !isInvalidated else { return }
         actions[identifier]?()
+    }
+}
+
+@MainActor
+final class GlobalHotKeyRegistrar {
+    typealias SessionFactory = ([GlobalHotKey.Registration]) -> any GlobalHotKeySession
+
+    private let makeSession: SessionFactory
+    private var session: (any GlobalHotKeySession)?
+
+    init(
+        makeSession: @escaping SessionFactory = { registrations in
+            GlobalHotKey(registrations: registrations)
+        }
+    ) {
+        self.makeSession = makeSession
+    }
+
+    @discardableResult
+    func replace(
+        registrations: [GlobalHotKey.Registration]
+    ) -> Set<UInt32> {
+        session?.invalidate()
+        let replacement = makeSession(registrations)
+        session = replacement
+        return replacement.failedRegistrationIDs
+    }
+
+    func invalidate() {
+        session?.invalidate()
+        session = nil
     }
 }
 

@@ -42,10 +42,9 @@
 "example.sequence" = "Sequence Diagram";
 "example.gantt" = "Gantt Timeline";
 
-"hotkey.render" = "Render (Control-Command-X)";
-"hotkey.show_last_render" = "Show Last Render (Control-Command-Z)";
-"shortcut.control_command_x" = "Control-Command-X";
-"shortcut.control_command_z" = "Control-Command-Z";
+"hotkey.render_title" = "Render";
+"hotkey.show_last_render_title" = "Show Last Render";
+"hotkey.command_format" = "%1$@ (%2$@)";
 "hud.shortcut_conflict" = "Global shortcut unavailable — use the same command from the md2png menu";
 "hud.png_copied" = "PNG copied — paste with Command-V";
 "hud.png_copied_again" = "PNG copied again — paste with Command-V";
