@@ -9,6 +9,9 @@ enum AboutLayout {
     static let updateRowFontSize: CGFloat = 12
     static let updateRowIconSize: CGFloat = 16
     static let updateRowSpacing: CGFloat = 7
+    static let updateRowIconBaselineOffset = NSFont
+        .systemFont(ofSize: updateRowFontSize)
+        .capHeight / 2
 }
 
 @MainActor
@@ -315,7 +318,7 @@ private struct AboutUpdateCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .center, spacing: AboutLayout.updateRowSpacing) {
+            HStack(alignment: .firstTextBaseline, spacing: AboutLayout.updateRowSpacing) {
                 Image(systemName: presentation.symbolName)
                     .resizable()
                     .scaledToFit()
@@ -327,6 +330,10 @@ private struct AboutUpdateCard: View {
                         width: AboutLayout.updateRowHeight,
                         height: AboutLayout.updateRowHeight
                     )
+                    .alignmentGuide(.firstTextBaseline) { dimensions in
+                        dimensions[VerticalAlignment.center]
+                            + AboutLayout.updateRowIconBaselineOffset
+                    }
                     .foregroundStyle(presentation.tint.color)
                     .accessibilityHidden(true)
 
@@ -335,11 +342,7 @@ private struct AboutUpdateCard: View {
                     accessibilityLabel: statusAccessibilityLabel,
                     toolTip: presentation.detail ?? presentation.title
                 )
-                .frame(
-                    minWidth: 1,
-                    minHeight: AboutLayout.updateRowHeight,
-                    maxHeight: AboutLayout.updateRowHeight
-                )
+                .frame(minWidth: 1)
                 .layoutPriority(1)
 
                 if let secondaryAction = presentation.secondaryAction {
@@ -348,7 +351,6 @@ private struct AboutUpdateCard: View {
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: AboutLayout.updateRowFontSize))
-                    .frame(height: AboutLayout.updateRowHeight, alignment: .center)
                     .foregroundStyle(Color.accentColor)
                 }
 
@@ -361,19 +363,19 @@ private struct AboutUpdateCard: View {
                         size: AboutLayout.updateRowFontSize,
                         weight: primaryAction.isEmphasized ? .semibold : .regular
                     ))
-                    .frame(height: AboutLayout.updateRowHeight, alignment: .center)
                     .foregroundStyle(primaryAction.isEnabled
                         ? Color.accentColor
                         : Color(nsColor: .secondaryLabelColor))
                     .disabled(!primaryAction.isEnabled)
                     .help(primaryAction.toolTip ?? primaryAction.title)
                 }
+
+                Spacer(minLength: 0)
             }
             .frame(
                 maxWidth: .infinity,
                 minHeight: AboutLayout.updateRowHeight,
-                maxHeight: AboutLayout.updateRowHeight,
-                alignment: .center
+                alignment: .leading
             )
 
             if let detail = presentation.detail {
@@ -389,7 +391,12 @@ private struct AboutUpdateCard: View {
         .padding(.horizontal, 10)
         .padding(.top, 9)
         .padding(.bottom, 7)
-        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: cardHeight,
+            maxHeight: cardHeight,
+            alignment: .topLeading
+        )
         .background(
             Color(nsColor: .separatorColor).opacity(0.07),
             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
