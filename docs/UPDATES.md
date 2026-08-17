@@ -95,10 +95,13 @@ flowchart LR
   markers. Markdown, rendered pixels, and clipboard data are never persisted.
 - Choosing **Later** sends Sparkle's cancellation response for the prepared
   installer. Closing About does the same, and a normal app termination waits
-  for that cancellation to finish, so quitting cannot turn into an implicit
-  install. A later explicit install request resumes through Sparkle. The app
-  never keeps its own duplicate archive; Sparkle owns cleanup and may download
-  the immutable ZIP again after a prepared installation is cancelled.
+  for that cancellation to finish. If termination is requested during
+  extraction, the app stays alive until Sparkle reaches its ready callback,
+  replies with cancellation, and finishes the update cycle. Quitting therefore
+  cannot turn into an implicit install. A later explicit install request
+  resumes through Sparkle. The app never keeps its own duplicate archive;
+  Sparkle owns cleanup and may download the immutable ZIP again after a
+  prepared installation is cancelled.
 - `0.6.x` to `0.7.0` is a manual DMG migration. `0.7.0` must validate the first
   signed seamless update to a later test version before the path is announced.
 - Published versioned ZIPs are immutable. Recover a bad release by publishing a

@@ -504,7 +504,12 @@ final class UpdateController {
             deferredInstallationTerminationCompletion = completion
             return true
         }
-        guard case .sparkleReadyToInstall = status.phase else { return false }
+        switch status.phase {
+        case .sparkleExtracting, .sparkleReadyToInstall:
+            break
+        default:
+            return false
+        }
         return beginDeferringPreparedInstallation(
             terminationCompletion: completion
         )

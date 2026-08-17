@@ -129,7 +129,7 @@ final class SparkleUpdateDriver: NSObject, UpdateDriving, SPUUpdaterDelegate {
     func deferInstallation(
         completion: (@MainActor () -> Void)?
     ) -> Bool {
-        guard userDriver.hasPreparedInstallation else { return false }
+        guard userDriver.canDeferPreparedInstallation else { return false }
         deferInstallationCompletion = completion
         guard userDriver.deferInstallation() else {
             deferInstallationCompletion = nil
@@ -311,7 +311,7 @@ final class SparkleUpdateDriver: NSObject, UpdateDriving, SPUUpdaterDelegate {
     }
 }
 
-private enum AboutSparkleUserDriverEvent {
+enum AboutSparkleUserDriverEvent {
     case updateChanged(SUAppcastItem)
     case downloading(received: UInt64, expected: UInt64?)
     case extracting(progress: Double)
@@ -322,7 +322,7 @@ private enum AboutSparkleUserDriverEvent {
 }
 
 @MainActor
-private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
+final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
     private let eventHandler: (AboutSparkleUserDriverEvent) -> Void
     private var expectedBuildVersion: String?
     private var checkCancellation: (() -> Void)?
@@ -331,8 +331,12 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
     private var receivedContentLength: UInt64 = 0
     private var expectedContentLength: UInt64?
     private var installsWhenReady = false
+    private var isPreparingInstallation = false
+    private var defersWhenReady = false
 
-    var hasPreparedInstallation: Bool { installReply != nil }
+    var canDeferPreparedInstallation: Bool {
+        isPreparingInstallation || installReply != nil
+    }
 
     init(eventHandler: @escaping (AboutSparkleUserDriverEvent) -> Void) {
         self.eventHandler = eventHandler
@@ -342,6 +346,8 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
     func prepareDownload(expectedBuildVersion: String) {
         self.expectedBuildVersion = expectedBuildVersion
         installsWhenReady = false
+        isPreparingInstallation = false
+        defersWhenReady = false
         receivedContentLength = 0
         expectedContentLength = nil
     }
@@ -349,6 +355,8 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
     func prepareInstall(expectedBuildVersion: String) {
         self.expectedBuildVersion = expectedBuildVersion
         installsWhenReady = true
+        isPreparingInstallation = false
+        defersWhenReady = false
     }
 
     func cancelDownload() {
@@ -361,9 +369,13 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
 
     @discardableResult
     func deferInstallation() -> Bool {
-        guard let reply = installReply else { return false }
-        installReply = nil
-        reply(.skip)
+        if let reply = installReply {
+            installReply = nil
+            reply(.skip)
+            return true
+        }
+        guard isPreparingInstallation else { return false }
+        defersWhenReady = true
         return true
     }
 
@@ -422,6 +434,8 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
     ) {
         checkCancellation = nil
         expectedBuildVersion = nil
+        isPreparingInstallation = false
+        defersWhenReady = false
         eventHandler(.failed(message: error.localizedDescription))
         acknowledgement()
     }
@@ -433,6 +447,8 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
         checkCancellation = nil
         downloadCancellation = nil
         installReply = nil
+        isPreparingInstallation = false
+        defersWhenReady = false
         eventHandler(.failed(message: error.localizedDescription))
         acknowledgement()
     }
@@ -463,6 +479,7 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
 
     func showDownloadDidStartExtractingUpdate() {
         downloadCancellation = nil
+        isPreparingInstallation = true
         eventHandler(.extracting(progress: 0))
     }
 
@@ -473,6 +490,12 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
     func showReady(
         toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void
     ) {
+        isPreparingInstallation = false
+        if defersWhenReady {
+            defersWhenReady = false
+            reply(.skip)
+            return
+        }
         if installsWhenReady {
             installsWhenReady = false
             reply(.install)
@@ -502,6 +525,8 @@ private final class AboutSparkleUserDriver: NSObject, SPUUserDriver {
         installReply = nil
         expectedBuildVersion = nil
         installsWhenReady = false
+        isPreparingInstallation = false
+        defersWhenReady = false
     }
 
     func showUpdateInFocus() {}

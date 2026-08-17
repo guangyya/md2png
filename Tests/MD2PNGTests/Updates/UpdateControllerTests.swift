@@ -614,6 +614,45 @@ final class UpdateControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testTerminationDuringExtractionWaitsForReadySkipAndCycleCompletion() {
+        let driver = FakeUpdateDriver()
+        driver.completesDeferralImmediately = false
+        let defaults = UpdateTestFixtures.makeDefaults()
+        defer { UpdateTestFixtures.removeDefaults(defaults) }
+        let update = UpdateTestFixtures.seamlessUpdate()
+        let terminationCompletionCount = LockedBox(0)
+        let controller = UpdateController(
+            channel: { .stableGitHubReleases(repository: self.repository) },
+            installedVersion: { "0.7.0" },
+            defaults: defaults,
+            updateDriver: driver
+        )
+        controller.checkAgain()
+        driver.complete(.updateAvailable(update))
+        controller.downloadAvailableUpdate()
+        driver.send(.extracting(progress: 0.5))
+
+        let waitsForCancellation = controller
+            .cancelPreparedInstallationForApplicationTermination {
+                terminationCompletionCount.set(
+                    terminationCompletionCount.value + 1
+                )
+            }
+
+        XCTAssertTrue(waitsForCancellation)
+        XCTAssertEqual(terminationCompletionCount.value, 0)
+        driver.send(.readyToInstall)
+        XCTAssertEqual(driver.readySkipCount, 1)
+        XCTAssertEqual(
+            controller.status.phase,
+            .sparkleExtracting(update, progressPercent: 50)
+        )
+        XCTAssertEqual(terminationCompletionCount.value, 0)
+        driver.completeDeferral()
+        XCTAssertEqual(terminationCompletionCount.value, 1)
+    }
+
+    @MainActor
     func testSparkleIncompatibleResultIsNotPresentedAsUpToDate() throws {
         let driver = FakeUpdateDriver()
         let defaults = UpdateTestFixtures.makeDefaults()
@@ -698,8 +737,11 @@ private final class FakeUpdateDriver: UpdateDriving {
     private(set) var cancelCount = 0
     private(set) var deferCount = 0
     private(set) var installCount = 0
+    private(set) var readySkipCount = 0
     var completesDeferralImmediately = true
     private var deferCompletion: (@MainActor () -> Void)?
+    private var isPreparingInstallation = false
+    private var defersWhenReady = false
 
     func setEventHandler(_ handler: @escaping @MainActor (UpdateDriverEvent) -> Void) {
         eventHandler = handler
@@ -726,6 +768,9 @@ private final class FakeUpdateDriver: UpdateDriving {
         completion: (@MainActor () -> Void)?
     ) -> Bool {
         deferCount += 1
+        if isPreparingInstallation {
+            defersWhenReady = true
+        }
         if completesDeferralImmediately {
             completion?()
         } else {
@@ -746,6 +791,17 @@ private final class FakeUpdateDriver: UpdateDriving {
     }
 
     func send(_ event: UpdateDriverEvent) {
+        if case .extracting = event {
+            isPreparingInstallation = true
+        }
+        if case .readyToInstall = event {
+            isPreparingInstallation = false
+            if defersWhenReady {
+                defersWhenReady = false
+                readySkipCount += 1
+                return
+            }
+        }
         eventHandler?(event)
     }
 

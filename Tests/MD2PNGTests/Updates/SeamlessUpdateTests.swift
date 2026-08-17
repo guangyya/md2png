@@ -1,4 +1,5 @@
 import Foundation
+import Sparkle
 import XCTest
 @testable import MD2PNG
 
@@ -113,6 +114,30 @@ final class SeamlessUpdateTests: XCTestCase {
                 string: "https://github.com/guangyya/md2png/releases"
             )
         )
+    }
+}
+
+@MainActor
+final class AboutSparkleUserDriverTests: XCTestCase {
+    func testTerminationDeferralDuringExtractionSkipsReadyWithoutPresentingIt() {
+        var presentedReadyState = false
+        let driver = AboutSparkleUserDriver { event in
+            if case .readyToInstall = event {
+                presentedReadyState = true
+            }
+        }
+        driver.prepareDownload(expectedBuildVersion: "8")
+        driver.showDownloadDidStartExtractingUpdate()
+
+        XCTAssertTrue(driver.canDeferPreparedInstallation)
+        XCTAssertTrue(driver.deferInstallation())
+
+        var choice: SPUUserUpdateChoice?
+        driver.showReady(toInstallAndRelaunch: { choice = $0 })
+
+        XCTAssertEqual(choice, .skip)
+        XCTAssertFalse(presentedReadyState)
+        XCTAssertFalse(driver.canDeferPreparedInstallation)
     }
 }
 
