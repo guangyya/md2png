@@ -45,6 +45,32 @@ final class DiagnosticLoggerTests: XCTestCase {
         }
     }
 
+    func testRendererFailuresUseStableSafeDomainAndCode() async throws {
+        let directoryURL = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let logger = makeLogger(directoryURL: directoryURL)
+        logger.record(
+            category: .renderer,
+            stage: .renderCompletion,
+            result: .failed,
+            level: .error,
+            error: RendererFailure(
+                kind: .mermaidSyntax,
+                diagramNumber: 2,
+                sourceLine: 17
+            )
+        )
+        await logger.flush()
+
+        let export = try await logger.export(window: .lastHour, now: fixedNow)
+
+        XCTAssertEqual(export.events.first?.error?.domain, "md2png.renderer")
+        XCTAssertEqual(export.events.first?.error?.code, 1)
+        let encoded = try export.encodedString()
+        XCTAssertFalse(encoded.contains("diagramNumber"))
+        XCTAssertFalse(encoded.contains("sourceLine"))
+    }
+
     func testConcurrentEventsAreSerializedWithoutLoss() async throws {
         let directoryURL = temporaryDirectoryURL()
         defer { try? FileManager.default.removeItem(at: directoryURL) }

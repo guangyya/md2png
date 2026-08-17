@@ -65,9 +65,14 @@ const markdown = new MarkdownIt({
 
 const defaultFence = markdown.renderer.rules.fence.bind(markdown.renderer.rules);
 markdown.renderer.rules.fence = (tokens, index, options, env, self) => {
-  const language = tokens[index].info.trim().toLowerCase().split(/\s+/, 1)[0];
+  const token = tokens[index];
+  const language = token.info.trim().toLowerCase().split(/\s+/, 1)[0];
   if (language === "mermaid") {
-    return `<div class="mermaid">${markdown.utils.escapeHtml(tokens[index].content)}</div>`;
+    env.mermaidCount = (env.mermaidCount || 0) + 1;
+    const sourceLine = Array.isArray(token.map) ? token.map[0] + 2 : null;
+    const lineAttribute = sourceLine === null ? "" : ` data-md2png-line="${sourceLine}"`;
+    const lineCount = Math.max(1, token.content.replace(/\n$/, "").split("\n").length);
+    return `<div class="mermaid" data-md2png-diagram="${env.mermaidCount}" data-md2png-lines="${lineCount}"${lineAttribute}>${markdown.utils.escapeHtml(token.content)}</div>`;
   }
   return defaultFence(tokens, index, options, env, self);
 };
@@ -217,6 +222,68 @@ function measurement() {
   };
 }
 
+function positiveLineNumber(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
+
+function mermaidErrorLine(error) {
+  const candidates = [
+    error?.hash?.loc?.first_line,
+    error?.hash?.line,
+    error?.location?.start?.line,
+    error?.line,
+    error?.lineNumber
+  ];
+  for (const candidate of candidates) {
+    const line = positiveLineNumber(candidate);
+    if (line !== null) {
+      return line;
+    }
+  }
+  const text = [error?.str, error?.message]
+    .filter((value) => typeof value === "string")
+    .join(" ");
+  const match = text.match(/(?:on|at)?\s*line\s+(\d+)/i);
+  if (match) {
+    return positiveLineNumber(match[1]);
+  }
+  return null;
+}
+
+function mermaidFailureKind(error) {
+  const name = typeof error?.name === "string" ? error.name : "";
+  const message = typeof error?.message === "string" ? error.message : "";
+  return /diagram type|unknowndiagram/i.test(`${name} ${message}`)
+    ? "mermaid_diagram_type"
+    : "mermaid_syntax";
+}
+
+function mermaidFailure(error, diagram) {
+  const kind = mermaidFailureKind(error);
+  const diagramNumber = positiveLineNumber(diagram.dataset.md2pngDiagram) || 1;
+  const diagramStartLine = positiveLineNumber(diagram.dataset.md2pngLine);
+  const diagramLineCount = positiveLineNumber(diagram.dataset.md2pngLines);
+  const reportedDiagramLine = mermaidErrorLine(error);
+  const diagramLine = reportedDiagramLine === null || diagramLineCount === null
+    ? reportedDiagramLine
+    : Math.min(reportedDiagramLine, diagramLineCount);
+  let sourceLine = null;
+  if (kind === "mermaid_diagram_type" && diagramStartLine !== null) {
+    sourceLine = diagramStartLine;
+  } else if (diagramStartLine !== null && diagramLine !== null) {
+    sourceLine = diagramStartLine + diagramLine - 1;
+  } else if (diagramStartLine !== null) {
+    sourceLine = diagramStartLine;
+  }
+  return {
+    ok: false,
+    kind,
+    diagramNumber,
+    ...(sourceLine === null ? {} : { sourceLine })
+  };
+}
+
 window.renderMarkdown = async (source, requestedTheme) => {
   const themeName = selectRenderTheme(requestedTheme);
   const theme = renderThemes[themeName];
@@ -228,18 +295,30 @@ window.renderMarkdown = async (source, requestedTheme) => {
   });
 
   const card = document.getElementById("card");
-  card.innerHTML = DOMPurify.sanitize(markdown.render(source), {
+  const renderEnvironment = { mermaidCount: 0 };
+  card.innerHTML = DOMPurify.sanitize(markdown.render(source, renderEnvironment), {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ["style", "iframe", "object", "embed"]
   });
 
   const diagrams = card.querySelectorAll(".mermaid");
+  for (const diagram of diagrams) {
+    try {
+      await mermaid.parse(diagram.textContent || "");
+    } catch (error) {
+      return mermaidFailure(error, diagram);
+    }
+  }
   if (diagrams.length > 0) {
-    await mermaid.run({ nodes: diagrams, suppressErrors: false });
+    try {
+      await mermaid.run({ nodes: diagrams, suppressErrors: false });
+    } catch (error) {
+      return mermaidFailure(error, diagrams[0]);
+    }
   }
 
   await document.fonts.ready;
-  return measurement();
+  return { ok: true, ...measurement() };
 };
 
 window.measureRenderedContent = measurement;

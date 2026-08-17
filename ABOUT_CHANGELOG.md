@@ -7,7 +7,9 @@ for the complete project history and release details.
 
 ### Added
 
-- Save privacy-safe diagnostic logs from About when troubleshooting.
+- Get actionable renderer error details, including Mermaid diagram and line
+  context when available.
+- Run Renderer Self-Test or save privacy-safe diagnostic logs from About.
 
 ## [0.8.0] - 2026-08-17
 

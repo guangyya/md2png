@@ -77,6 +77,19 @@ final class AboutControllerTests: XCTestCase {
             )
         )
         XCTAssertTrue(controller.displayedDiagnosticSaveButtonIsEnabled)
+        XCTAssertEqual(
+            controller.displayedRendererSelfTestButtonTitle,
+            L10n.text(
+                "about.run_renderer_self_test",
+                defaultValue: "Renderer Self-Test"
+            )
+        )
+        XCTAssertTrue(controller.displayedRendererSelfTestButtonIsEnabled)
+        XCTAssertEqual(
+            controller.displayedDiagnosticsButtonTitle,
+            L10n.text("about.diagnostics", defaultValue: "Diagnostics…")
+        )
+        XCTAssertTrue(controller.displayedDiagnosticsButtonIsEnabled)
 
         writeSnapshotIfRequested(
             environmentKey: "MD2PNG_ABOUT_SNAPSHOT_PATH",
@@ -247,6 +260,84 @@ final class AboutControllerTests: XCTestCase {
         XCTAssertEqual(
             DiagnosticExportFileName.make(window: .last7Days, date: date),
             "md2png-diagnostics-19700101-000000-last-7-days.json"
+        )
+    }
+
+    @MainActor
+    func testRendererSelfTestRejectsReentryAndPresentsAResult() throws {
+        _ = NSApplication.shared
+        var runCount = 0
+        var completion: PackagedRenderSelfTest.Completion?
+        var presentedResult: Result<
+            PackagedRenderSelfTestReport,
+            PackagedRenderSelfTestFailure
+        >?
+        let controller = AboutController(
+            updateController: UpdateController(),
+            diagnosticLogger: .disabled,
+            rendererSelfTestDependencies: AboutRendererSelfTestDependencies(
+                run: { capturedCompletion in
+                    runCount += 1
+                    completion = capturedCompletion
+                },
+                presentResult: { _, result in
+                    presentedResult = result
+                }
+            )
+        )
+
+        controller.runRendererSelfTestForTesting()
+        controller.runRendererSelfTestForTesting()
+
+        XCTAssertEqual(runCount, 1)
+        XCTAssertFalse(controller.displayedRendererSelfTestButtonIsEnabled)
+        XCTAssertFalse(controller.displayedDiagnosticsButtonIsEnabled)
+        XCTAssertEqual(
+            controller.displayedRendererSelfTestButtonTitle,
+            L10n.text(
+                "about.renderer_self_test_running",
+                defaultValue: "Testing…"
+            )
+        )
+
+        completion?(.success(PackagedRenderSelfTestReport(
+            width: 640,
+            height: 480,
+            pngByteCount: 4_096
+        )))
+
+        XCTAssertTrue(controller.displayedRendererSelfTestButtonIsEnabled)
+        XCTAssertTrue(controller.displayedDiagnosticsButtonIsEnabled)
+        XCTAssertEqual(
+            controller.displayedRendererSelfTestButtonTitle,
+            L10n.text(
+                "about.run_renderer_self_test",
+                defaultValue: "Renderer Self-Test"
+            )
+        )
+        guard case let .success(report) = try XCTUnwrap(presentedResult) else {
+            XCTFail("Expected a successful self-test result")
+            return
+        }
+        XCTAssertEqual(report.width, 640)
+        XCTAssertEqual(report.height, 480)
+        XCTAssertEqual(report.pngByteCount, 4_096)
+    }
+
+    func testRendererSelfTestFailureMessagesAreSafeAndLocalized() throws {
+        let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
+        let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+
+        XCTAssertEqual(
+            PackagedRenderSelfTestFailure.rendererResourcesUnavailable.userMessage(
+                localizationBundle: english
+            ),
+            "A bundled renderer resource is missing or invalid. Reinstall md2png and try again. The clipboard was not changed."
+        )
+        XCTAssertTrue(
+            PackagedRenderSelfTestFailure.renderingFailed.userMessage(
+                localizationBundle: chinese
+            ).contains("剪贴板内容未改变")
         )
     }
 

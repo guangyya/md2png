@@ -240,18 +240,72 @@ final class FeatureTests: XCTestCase {
         }
 
         guard case let .failure(error) = result,
-              let appError = error as? AppError,
-              case .rendererFailed = appError else {
+              let failure = error as? RendererFailure else {
             XCTFail("Expected a privacy-safe renderer failure, got \(result)")
             return
         }
+        XCTAssertEqual(failure.kind, .mermaidSyntax)
+        XCTAssertEqual(failure.diagramNumber, 1)
+        XCTAssertEqual(failure.sourceLine, 3)
         XCTAssertEqual(
-            appError.errorDescription,
-            L10n.text(
-                "error.renderer_failed",
-                defaultValue: "Couldn’t render the Markdown. The clipboard is unchanged. Check the Markdown and try again."
+            failure.errorDescription,
+            L10n.format(
+                "renderer_error.mermaid_diagram_line",
+                defaultValue: "Couldn’t render Mermaid diagram %1$ld near Markdown line %2$ld.",
+                1,
+                3
             )
         )
+    }
+
+    @MainActor
+    func testMermaidDiagnosticsIdentifyDiagramTypeAndSecondDiagramLocation() async throws {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        let unknownType: Result<NSImage, Error> = await withCheckedContinuation { continuation in
+            renderer.render(
+                """
+                # Diagram
+
+                ```mermaid
+                notADiagramType
+                    A --> B
+                ```
+                """
+            ) { continuation.resume(returning: $0) }
+        }
+        guard case let .failure(typeError) = unknownType,
+              let typeFailure = typeError as? RendererFailure else {
+            XCTFail("Expected a structured Mermaid type failure")
+            return
+        }
+        XCTAssertEqual(typeFailure.kind, .mermaidDiagramType)
+        XCTAssertEqual(typeFailure.diagramNumber, 1)
+        XCTAssertEqual(typeFailure.sourceLine, 4)
+
+        let secondDiagram: Result<NSImage, Error> = await withCheckedContinuation { continuation in
+            renderer.render(
+                """
+                ```mermaid
+                flowchart LR
+                    A --> B
+                ```
+
+                ```mermaid
+                flowchart LR
+                    C -->
+                ```
+                """
+            ) { continuation.resume(returning: $0) }
+        }
+        guard case let .failure(syntaxError) = secondDiagram,
+              let syntaxFailure = syntaxError as? RendererFailure else {
+            XCTFail("Expected a structured second-diagram failure")
+            return
+        }
+        XCTAssertEqual(syntaxFailure.kind, .mermaidSyntax)
+        XCTAssertEqual(syntaxFailure.diagramNumber, 2)
+        XCTAssertEqual(syntaxFailure.sourceLine, 8)
     }
 
     private func localizationStrings(in bundle: Bundle) throws -> [String: String] {

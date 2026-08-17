@@ -6,6 +6,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     private let updateController: UpdateController
     private let diagnosticLogger: DiagnosticLogger
     private let diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies
+    private let rendererSelfTestDependencies: AboutRendererSelfTestDependencies
     private let contentModel = AboutContentModel()
     private var updateStatusObserverID: UUID?
     private var projectURL: URL?
@@ -65,6 +66,24 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     var displayedDiagnosticSaveButtonIsEnabled: Bool {
         contentModel.diagnosticSaveState != .saving
     }
+    var displayedRendererSelfTestButtonTitle: String {
+        AboutRendererSelfTestPresentation.buttonTitle(
+            for: contentModel.rendererSelfTestState
+        )
+    }
+    var displayedRendererSelfTestButtonIsEnabled: Bool {
+        contentModel.rendererSelfTestState != .running
+    }
+    var displayedDiagnosticsButtonTitle: String {
+        AboutDiagnosticsPresentation.buttonTitle(
+            selfTestState: contentModel.rendererSelfTestState,
+            saveState: contentModel.diagnosticSaveState
+        )
+    }
+    var displayedDiagnosticsButtonIsEnabled: Bool {
+        contentModel.rendererSelfTestState != .running
+            && contentModel.diagnosticSaveState != .saving
+    }
     var usesSwiftUIHostingBoundary: Bool {
         window?.contentViewController is NSHostingController<AboutContentView>
     }
@@ -97,16 +116,24 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     ) async -> AboutDiagnosticSaveResult {
         await saveDiagnosticLogs(window: window)
     }
+
+    func runRendererSelfTestForTesting() {
+        runRendererSelfTest()
+    }
 #endif
 
     init(
         updateController: UpdateController = UpdateController(),
         diagnosticLogger: DiagnosticLogger = .shared,
-        diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies = .live()
+        diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies = .live(),
+        rendererSelfTestDependencies: AboutRendererSelfTestDependencies? = nil
     ) {
         self.updateController = updateController
         self.diagnosticLogger = diagnosticLogger
         self.diagnosticSaveDependencies = diagnosticSaveDependencies
+        self.rendererSelfTestDependencies = rendererSelfTestDependencies ?? .live(
+            diagnosticLogger: diagnosticLogger
+        )
         let window = PreviewWindow(
             contentRect: NSRect(origin: .zero, size: AboutLayout.windowSize),
             styleMask: [.titled, .closable],
@@ -129,6 +156,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
                     self?.performSecondaryUpdateAction(action)
                 },
                 onCopyVersion: { [weak self] in self?.copyVersionInfo() },
+                onRunRendererSelfTest: { [weak self] in self?.runRendererSelfTest() },
                 onSaveDiagnosticLogs: { [weak self] window in
                     Task { @MainActor in
                         await self?.saveDiagnosticLogs(window: window)
@@ -262,6 +290,16 @@ final class AboutController: NSWindowController, NSWindowDelegate {
             contentModel.showDiagnosticSaveReady()
             diagnosticSaveDependencies.presentFailure(self.window)
             return .failed
+        }
+    }
+
+    private func runRendererSelfTest() {
+        guard contentModel.rendererSelfTestState != .running else { return }
+        contentModel.showRendererSelfTestStarted()
+        rendererSelfTestDependencies.run { [weak self] result in
+            guard let self else { return }
+            self.contentModel.showRendererSelfTestReady()
+            self.rendererSelfTestDependencies.presentResult(self.window, result)
         }
     }
 

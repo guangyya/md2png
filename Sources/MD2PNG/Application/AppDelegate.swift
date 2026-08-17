@@ -4,6 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let diagnosticLogger: DiagnosticLogger
     private let hud = HUDController()
+    private let rendererErrorDetailsPresenter = RendererErrorDetailsPresenter()
     private lazy var previewController = PreviewController(
         onCopied: { [weak self] changeCount in
             guard let self else { return }
@@ -533,6 +534,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 #endif
 
     private func show(_ error: Error) {
+        if let report = error as? RendererErrorReport {
+            if rendererErrorDetailsPresenter.show(report) {
+                hud.show(
+                    L10n.text(
+                        "renderer_error.details_copied",
+                        defaultValue: "Error details copied"
+                    ),
+                    symbol: "doc.on.clipboard.fill",
+                    style: .informational
+                )
+            }
+            return
+        }
         hud.show(
             error.localizedDescription,
             symbol: "exclamationmark.triangle.fill",

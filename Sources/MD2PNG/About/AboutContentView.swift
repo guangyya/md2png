@@ -20,6 +20,7 @@ final class AboutContentModel: ObservableObject {
     @Published private(set) var updateFeatureAvailable = false
     @Published private(set) var didCopyVersion = false
     @Published private(set) var diagnosticSaveState = AboutDiagnosticSaveState.idle
+    @Published private(set) var rendererSelfTestState = AboutRendererSelfTestState.idle
     @Published private(set) var releaseNotesRevision = 0
 
     init(metadata: AppMetadata = .current()) {
@@ -64,6 +65,14 @@ final class AboutContentModel: ObservableObject {
     func showDiagnosticSaveReady() {
         diagnosticSaveState = .idle
     }
+
+    func showRendererSelfTestStarted() {
+        rendererSelfTestState = .running
+    }
+
+    func showRendererSelfTestReady() {
+        rendererSelfTestState = .idle
+    }
 }
 
 struct AboutContentView: View {
@@ -73,6 +82,7 @@ struct AboutContentView: View {
     let onPrimaryUpdateAction: (AboutUpdatePrimaryAction) -> Void
     let onSecondaryUpdateAction: (AboutUpdateSecondaryAction) -> Void
     let onCopyVersion: () -> Void
+    let onRunRendererSelfTest: () -> Void
     let onSaveDiagnosticLogs: (DiagnosticExportWindow) -> Void
     let onClose: () -> Void
 
@@ -234,18 +244,31 @@ struct AboutContentView: View {
             Spacer()
 
             Menu {
-                ForEach(DiagnosticExportWindow.allCases, id: \.rawValue) { window in
-                    Button(window.aboutMenuTitle) {
-                        onSaveDiagnosticLogs(window)
+                Button(
+                    AboutRendererSelfTestPresentation.buttonTitle(for: .idle),
+                    action: onRunRendererSelfTest
+                )
+
+                Divider()
+
+                Menu(
+                    AboutDiagnosticSavePresentation.buttonTitle(for: .idle)
+                ) {
+                    ForEach(DiagnosticExportWindow.allCases, id: \.rawValue) { window in
+                        Button(window.aboutMenuTitle) {
+                            onSaveDiagnosticLogs(window)
+                        }
                     }
                 }
             } label: {
                 Label(
-                    AboutDiagnosticSavePresentation.buttonTitle(
-                        for: model.diagnosticSaveState
+                    AboutDiagnosticsPresentation.buttonTitle(
+                        selfTestState: model.rendererSelfTestState,
+                        saveState: model.diagnosticSaveState
                     ),
-                    systemImage: AboutDiagnosticSavePresentation.symbolName(
-                        for: model.diagnosticSaveState
+                    systemImage: AboutDiagnosticsPresentation.symbolName(
+                        selfTestState: model.rendererSelfTestState,
+                        saveState: model.diagnosticSaveState
                     )
                 )
                 .font(.system(size: 12))
@@ -255,10 +278,13 @@ struct AboutContentView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .disabled(model.diagnosticSaveState == .saving)
+            .disabled(
+                model.rendererSelfTestState == .running
+                    || model.diagnosticSaveState == .saving
+            )
             .help(L10n.text(
-                "about.diagnostic_logs_help",
-                defaultValue: "Saves privacy-safe local operational logs. Nothing is uploaded."
+                "about.diagnostics_help",
+                defaultValue: "Runs the renderer self-test or saves privacy-safe logs. Nothing is uploaded."
             ))
 
             Button(

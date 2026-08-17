@@ -91,7 +91,7 @@ A GFM table needs a separator row:
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
-| About md2png | — | Shows version, build and source commit, release notes, project link, update status/action, and saves privacy-safe diagnostic logs |
+| About md2png | — | Shows release and update information, runs the bundled renderer self-test, and saves privacy-safe diagnostic logs |
 
 The top of the menu contains a compact, read-only preview of the current
 clipboard. Standard preserves the original output sizing; Compact wraps prose
@@ -108,6 +108,13 @@ screen, and identifies the preset and PNG pixel dimensions in its title. Its
 toolbar can copy the image again, save it explicitly, open it in Preview, fit it
 to the window, inspect one PNG pixel per display backing pixel, and zoom without
 changing the generated image or clipboard contents.
+
+When rendering fails, md2png shows a compact details dialog that distinguishes
+Mermaid syntax, bundled-resource, WebKit recovery, timeout, size-limit, invalid
+response, and PNG-generation failures. Mermaid failures identify the diagram
+number and a nearby Markdown line when available. **Copy Error Details** copies
+only safe troubleshooting metadata; it never includes the Markdown or raw
+WebKit/Mermaid error text.
 The welcome guide opens once on first launch and can be reopened from the menu.
 It scrolls within smaller displays and at larger accessibility text sizes, and
 includes an optional, state-aware Launch at Login control. Its sample button

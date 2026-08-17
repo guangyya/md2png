@@ -107,6 +107,8 @@ struct DiagnosticErrorMetadata: Codable, Equatable, Sendable {
         switch error {
         case is AppError:
             return "md2png.app"
+        case is RendererFailure:
+            return RendererFailure.errorDomain
         case is UpdateError:
             return "md2png.update"
         case is PackagedRenderSelfTestFailure:

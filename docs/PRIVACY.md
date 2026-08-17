@@ -68,12 +68,24 @@ kept. Logging failures do not interrupt rendering or change the clipboard. The
 app does not upload, copy, save elsewhere, or reveal these logs automatically;
 sharing diagnostics always requires a separate explicit user action.
 
-In **About md2png**, **Save Diagnostic Logs…** lets the user explicitly choose
-the last hour, 24 hours, or 7 days and then choose a destination with the macOS
-save panel. The saved JSON contains the same allowlisted events plus app/build,
-macOS, architecture, and the selected time interval. Saving does not read or
-change the clipboard, contact a server, or upload the resulting file. The user
-decides whether and how to share it.
+In **About md2png → Diagnostics → Save Diagnostic Logs…**, the user explicitly
+chooses the last hour, 24 hours, or 7 days and then chooses a destination with
+the macOS save panel. The saved JSON contains the same allowlisted events plus
+app/build, macOS, architecture, and the selected time interval. Saving does not
+read or change the clipboard, contact a server, or upload the resulting file.
+The user decides whether and how to share it.
+
+Renderer failures cross the JavaScript-to-Swift boundary only as allowlisted
+categories, a Mermaid diagram number, and a numeric Markdown line when
+available. The details dialog never receives the raw Mermaid/WebKit message.
+Only choosing **Copy Error Details** changes the clipboard; the copied text
+contains the safe category, diagram/line or dimensions when relevant, a random
+operation ID, and app/system versions. It contains no Markdown or raw error.
+
+**About md2png → Diagnostics → Renderer Self-Test** renders a bundled input in
+the same non-persistent local renderer and validates the resulting PNG. The
+self-test implementation has no clipboard dependency and does not read or
+change clipboard contents.
 
 To delete all local diagnostics, quit md2png, choose **Go > Go to Folder…** in
 Finder, enter `~/Library/Logs/md2png`, and delete the `Diagnostics` folder. The
