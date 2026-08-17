@@ -570,35 +570,41 @@ final class WelcomeTests: XCTestCase {
         XCTAssertFalse(visiblePolicy.hidesExamplesFromAccessibility)
     }
 
+    func testSampleGuideKeepsACompactDemoMenu() {
+        XCTAssertEqual(SampleGuideLayout.menuSections, [
+            [.renderClipboard, .showLastRender],
+            [.theme, .outputWidth, .examples],
+            [.about, .quit]
+        ])
+        XCTAssertEqual(SampleGuideLayout.menuSections.flatMap { $0 }.count, 7)
+    }
+
     func testSampleGuidePlacementKeepsTheMainMenuNearestTheStatusItem() {
         let visibleFrame = NSRect(x: 0, y: 24, width: 1_440, height: 876)
         let buttonBounds = NSRect(x: 0, y: 0, width: 22, height: 22)
-        let contentSize = SampleGuideLayout.preferredContentSize
         let leftPlacement = SampleGuidePlacement.resolve(
             buttonBounds: buttonBounds,
             buttonFrameInScreen: NSRect(x: 8, y: 878, width: 22, height: 22),
-            visibleFrame: visibleFrame,
-            contentSize: contentSize
+            visibleFrame: visibleFrame
         )
         let rightPlacement = SampleGuidePlacement.resolve(
             buttonBounds: buttonBounds,
             buttonFrameInScreen: NSRect(x: 1_410, y: 878, width: 22, height: 22),
-            visibleFrame: visibleFrame,
-            contentSize: contentSize
+            visibleFrame: visibleFrame
         )
 
         XCTAssertEqual(leftPlacement.examplesEdge, .trailing)
-        XCTAssertGreaterThan(leftPlacement.positioningRect.midX, buttonBounds.midX)
+        XCTAssertEqual(leftPlacement.positioningRect, buttonBounds)
         XCTAssertEqual(rightPlacement.examplesEdge, .leading)
-        XCTAssertLessThan(rightPlacement.positioningRect.midX, buttonBounds.midX)
+        XCTAssertEqual(rightPlacement.positioningRect, buttonBounds)
 
         let fallback = SampleGuidePlacement.resolve(
             buttonBounds: buttonBounds,
             buttonFrameInScreen: nil,
-            visibleFrame: nil,
-            contentSize: contentSize
+            visibleFrame: nil
         )
         XCTAssertEqual(fallback.examplesEdge, .trailing)
+        XCTAssertEqual(fallback.positioningRect, buttonBounds)
     }
 
     func testSampleGuideKeyboardPolicyTraversesActivatesAndDismisses() {
@@ -799,6 +805,33 @@ final class WelcomeTests: XCTestCase {
     }
 
     @MainActor
+    func testSampleGuideRestoresPopoverSizeAfterInstallingHostingController() {
+        let popover = TestSampleGuidePopover()
+        popover.resetsContentSizeWhenInstallingController = true
+        let controller = SampleGuideController(popover: popover) { _ in }
+
+        controller.show(
+            relativeTo: NSStatusBarButton(
+                frame: NSRect(x: 0, y: 0, width: 22, height: 22)
+            ),
+            menuState: SampleGuideMenuState(
+                canRestoreLastMarkdown: false,
+                canShowLastRender: false
+            )
+        )
+
+        XCTAssertEqual(popover.contentSize, SampleGuideLayout.preferredContentSize)
+        XCTAssertEqual(
+            popover.contentViewController?.preferredContentSize,
+            SampleGuideLayout.preferredContentSize
+        )
+        XCTAssertEqual(
+            popover.contentViewController?.view.frame.size,
+            SampleGuideLayout.preferredContentSize
+        )
+    }
+
+    @MainActor
     func testWelcomeWindowCanTrySampleCompleteAndStayDismissed() throws {
         _ = NSApplication.shared
         let (defaults, suiteName) = try makeDefaults()
@@ -987,10 +1020,17 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
     var animates = false
     weak var delegate: (any NSPopoverDelegate)?
     var contentSize = NSSize.zero
-    var contentViewController: NSViewController?
+    var contentViewController: NSViewController? {
+        didSet {
+            if resetsContentSizeWhenInstallingController {
+                contentSize = NSSize(width: 135, height: 19)
+            }
+        }
+    }
     var isShown = false
     var showsWhenRequested = true
     var completesCloseImmediately = true
+    var resetsContentSizeWhenInstallingController = false
     private(set) var closeCount = 0
     private var isClosing = false
 

@@ -57,9 +57,11 @@ final class StatusMenuPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testWelcomeTrySamplePresentsLatestSnapshotWithoutRefreshingVisibleUI() throws {
+    func testWelcomeTrySamplePresentsOnNextEventLoopWithoutRefreshingVisibleUI() async throws {
         _ = NSApplication.shared
         let presenter = RecordingSampleGuidePresenter()
+        let presented = expectation(description: "Sample guide presented")
+        presenter.onShow = { presented.fulfill() }
         let delegate = AppDelegate(sampleGuidePresenter: presenter)
         delegate.prepareWelcomeSampleGuidePathForTesting()
         defer { delegate.cleanUpWelcomeSampleGuidePathForTesting() }
@@ -69,6 +71,8 @@ final class StatusMenuPresentationTests: XCTestCase {
 
         delegate.triggerWelcomeSampleGuideForTesting()
 
+        XCTAssertTrue(presenter.presentedStates.isEmpty)
+        await fulfillment(of: [presented], timeout: 1)
         XCTAssertEqual(presenter.presentedStates.count, 1)
         let state = try XCTUnwrap(presenter.presentedStates.first)
         XCTAssertEqual(state.canRenderClipboard, expectedClipboardState.containsMarkdown)
@@ -187,12 +191,14 @@ final class StatusMenuPresentationTests: XCTestCase {
 @MainActor
 private final class RecordingSampleGuidePresenter: SampleGuidePresenting {
     private(set) var presentedStates: [SampleGuideMenuState] = []
+    var onShow: (() -> Void)?
 
     func show(
         relativeTo button: NSStatusBarButton,
         menuState: SampleGuideMenuState
     ) {
         presentedStates.append(menuState)
+        onShow?()
     }
 
     func dismiss() {}

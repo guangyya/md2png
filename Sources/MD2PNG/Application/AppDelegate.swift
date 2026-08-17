@@ -106,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var renderActivity = RenderActivityState()
     private var clipboardContainsMarkdown = false
     private var isPresentingClipboardConfirmation = false
+    private var isSampleGuidePresentationScheduled = false
     private var isUpdateInstallPending = false
     private var isWaitingForUpdateDeferralBeforeTermination = false
     private var currentUpdateStatus = UpdateStatus()
@@ -699,6 +700,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func showSampleGuide() {
+        guard !isSampleGuidePresentationScheduled else { return }
+        isSampleGuidePresentationScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isSampleGuidePresentationScheduled = false
+            self.presentSampleGuide()
+        }
+    }
+
+    private func presentSampleGuide() {
         guard !renderActivity.isRendering,
               !isUpdateInstallPending,
               !isPresentingClipboardConfirmation,

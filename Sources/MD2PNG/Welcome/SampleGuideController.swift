@@ -64,6 +64,11 @@ enum SampleGuideLayout {
     static let preferredContentSize = NSSize(width: 548, height: 382)
     static let screenInset: CGFloat = 12
     static let menuMinimumWidth: CGFloat = 252
+    static let menuSections: [[StatusMenuCommand]] = [
+        [.renderClipboard, .showLastRender],
+        [.theme, .outputWidth, .examples],
+        [.about, .quit]
+    ]
 
     static func contentSize(visibleFrame: NSRect?) -> NSSize {
         guard let visibleFrame else { return preferredContentSize }
@@ -98,45 +103,19 @@ struct SampleGuidePlacement: Equatable {
     static func resolve(
         buttonBounds: NSRect,
         buttonFrameInScreen: NSRect?,
-        visibleFrame: NSRect?,
-        contentSize: NSSize
+        visibleFrame: NSRect?
     ) -> SampleGuidePlacement {
-        let mainMenuCenter = min(
-            contentSize.width / 2,
-            SampleGuideLayout.screenInset + SampleGuideLayout.menuMinimumWidth / 2
-        )
-        let centerShift = max(0, contentSize.width / 2 - mainMenuCenter)
-        let trailingShift = centerShift
-        let leadingShift = -centerShift
-
         guard let buttonFrameInScreen, let visibleFrame else {
             return SampleGuidePlacement(
-                positioningRect: buttonBounds.offsetBy(dx: trailingShift, dy: 0),
+                positioningRect: buttonBounds,
                 examplesEdge: .trailing
             )
         }
-
-        func overflow(for shift: CGFloat) -> CGFloat {
-            let proposedCenter = buttonFrameInScreen.midX + shift
-            let proposedFrame = NSRect(
-                x: proposedCenter - contentSize.width / 2,
-                y: visibleFrame.minY,
-                width: contentSize.width,
-                height: contentSize.height
-            )
-            return max(0, visibleFrame.minX - proposedFrame.minX)
-                + max(0, proposedFrame.maxX - visibleFrame.maxX)
-        }
-
-        if overflow(for: leadingShift) < overflow(for: trailingShift) {
-            return SampleGuidePlacement(
-                positioningRect: buttonBounds.offsetBy(dx: leadingShift, dy: 0),
-                examplesEdge: .leading
-            )
-        }
         return SampleGuidePlacement(
-            positioningRect: buttonBounds.offsetBy(dx: trailingShift, dy: 0),
-            examplesEdge: .trailing
+            positioningRect: buttonBounds,
+            examplesEdge: buttonFrameInScreen.midX < visibleFrame.midX
+                ? .trailing
+                : .leading
         )
     }
 }
@@ -390,12 +369,11 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         let placement = SampleGuidePlacement.resolve(
             buttonBounds: button.bounds,
             buttonFrameInScreen: buttonFrameProvider(button),
-            visibleFrame: visibleFrame,
-            contentSize: contentSize
+            visibleFrame: visibleFrame
         )
         popover.contentSize = contentSize
 
-        popover.contentViewController = NSHostingController(
+        let hostingController = NSHostingController(
             rootView: SampleGuideView(
                 copy: copy,
                 contentSize: contentSize,
@@ -409,6 +387,12 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
                 }
             )
         )
+        hostingController.preferredContentSize = contentSize
+        hostingController.view.frame = NSRect(origin: .zero, size: contentSize)
+        popover.contentViewController = hostingController
+        // Installing an NSHostingController can replace NSPopover's requested
+        // size with the SwiftUI view's not-yet-laid-out intrinsic size.
+        popover.contentSize = contentSize
         highlightedButton = button
         button.highlight(true)
         popover.show(
@@ -702,9 +686,9 @@ private struct SampleMainMenu: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
 
-            ForEach(StatusMenuLayout.sections.indices, id: \.self) { sectionIndex in
+            ForEach(SampleGuideLayout.menuSections.indices, id: \.self) { sectionIndex in
                 GuideDivider()
-                ForEach(StatusMenuLayout.sections[sectionIndex], id: \.self) { command in
+                ForEach(SampleGuideLayout.menuSections[sectionIndex], id: \.self) { command in
                     menuRow(for: command)
                 }
             }
