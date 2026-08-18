@@ -182,6 +182,7 @@ struct SampleGuideCopy {
     let theme: String
     let outputWidth: String
     let examples: String
+    let settings: String
     let showWelcome: String
     let about: String
     let quit: String
@@ -225,6 +226,10 @@ struct SampleGuideCopy {
         )
         examples = StatusMenuPresentation.title(
             for: .examples,
+            localizationBundle: localizationBundle
+        )
+        settings = StatusMenuPresentation.title(
+            for: .settings,
             localizationBundle: localizationBundle
         )
         showWelcome = StatusMenuPresentation.title(
@@ -738,6 +743,8 @@ private struct SampleMainMenu: View {
                 title: copy.launchAtLoginTitle(for: menuState.launchAtLoginAction),
                 isDisabled: !menuState.canUseLaunchAtLogin
             )
+        case .settings:
+            GuideMenuRow(title: copy.settings, trailing: "⌘,")
         case .showWelcome:
             GuideMenuRow(title: copy.showWelcome)
         case .about:

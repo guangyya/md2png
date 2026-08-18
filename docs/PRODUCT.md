@@ -42,7 +42,9 @@ sending it.
   syntax-highlighted fenced code.
 - Mermaid fences including flowcharts, sequence diagrams, and Gantt charts.
 - Retina-friendly PNG/TIFF clipboard output.
-- Global render and last-preview shortcuts plus equivalent menu commands.
+- Configurable global render and last-preview shortcuts, with local persistence,
+  conflict feedback, Restore Defaults, and equivalent menu commands that remain
+  available when global registration fails.
 - A one-time first-launch guide with the three-step workflow, live shortcut
   registration status, an optional state-aware Launch at Login control, an
   explicit menu-guided short-sample action, adaptive scrolling on small screens

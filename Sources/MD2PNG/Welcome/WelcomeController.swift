@@ -499,6 +499,10 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         launchAtLoginState.refresh()
     }
 
+    func refreshShortcuts(_ shortcuts: [WelcomeShortcutStatus]) {
+        shortcutVerificationState.reset(shortcuts: shortcuts)
+    }
+
     func windowWillClose(_ notification: Notification) {
         preference.markCompleted()
         onVisibilityChange(false)

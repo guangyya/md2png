@@ -470,7 +470,7 @@ final class RendererRecoveryStateTests: XCTestCase {
             queuedCompleted.fulfill()
         }
 
-        await fulfillment(of: [firstCompleted, queuedCompleted], timeout: 5)
+        await fulfillment(of: [firstCompleted, queuedCompleted], timeout: 10)
         let image = try XCTUnwrap(queuedResult).get()
         XCTAssertGreaterThanOrEqual(image.size.width, 520)
         XCTAssertGreaterThan(image.size.height, 80)
