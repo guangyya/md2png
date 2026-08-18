@@ -12,6 +12,10 @@ for the complete project history and release details.
 - Keep shortcut controls consistent and show the configured Render shortcut in
   the Welcome workflow demo.
 
+### Fixed
+
+- Keep shortcut recording free of an extra blue focus outline.
+
 ## [0.10.0] - 2026-08-18
 
 ### Added

@@ -568,10 +568,8 @@ struct ShortcutSettingsContentView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(
-                        Color.accentColor.opacity(
-                            shortcutControlBorderOpacity(for: command)
-                        ),
-                        lineWidth: shortcutControlBorderWidth(for: command)
+                        Color.accentColor.opacity(shortcutControlStyle.borderOpacity),
+                        lineWidth: shortcutControlStyle.borderWidth
                     )
             }
             .accessibilityIdentifier("ShortcutRecorder.\(command.rawValue)")
@@ -588,18 +586,6 @@ struct ShortcutSettingsContentView: View {
         for command: GlobalShortcutCommand
     ) -> Double {
         model.recordingCommand == command ? 0.18 : shortcutControlStyle.fillOpacity
-    }
-
-    private func shortcutControlBorderOpacity(
-        for command: GlobalShortcutCommand
-    ) -> Double {
-        model.recordingCommand == command ? 0.7 : shortcutControlStyle.borderOpacity
-    }
-
-    private func shortcutControlBorderWidth(
-        for command: GlobalShortcutCommand
-    ) -> CGFloat {
-        model.recordingCommand == command ? 1.4 : shortcutControlStyle.borderWidth
     }
 
     @ViewBuilder
@@ -668,7 +654,7 @@ final class ShortcutRecorderControl: NSButton {
         isBordered = false
         controlSize = .regular
         font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
-        focusRingType = .exterior
+        focusRingType = .none
         target = self
         action = #selector(toggleRecording)
         setButtonType(.momentaryPushIn)

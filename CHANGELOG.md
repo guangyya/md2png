@@ -17,6 +17,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   Keyboard Shortcuts, and show the configured Render shortcut in the Welcome
   workflow demo.
 
+### Fixed
+
+- Avoid adding a prominent blue focus outline when recording a shortcut in
+  Settings.
+
 ## [0.10.0] - 2026-08-18
 
 ### Added
