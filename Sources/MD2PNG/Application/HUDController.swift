@@ -19,6 +19,10 @@ enum HUDStyle: Equatable {
     var displayDuration: TimeInterval {
         self == .error ? 4.0 : 2.2
     }
+
+    func displayDuration(voiceOverEnabled: Bool) -> TimeInterval {
+        voiceOverEnabled ? max(displayDuration, 8.0) : displayDuration
+    }
 }
 
 @MainActor
@@ -63,9 +67,16 @@ final class HUDController {
 
     private var panel: NSPanel?
     private var dismissWorkItem: DispatchWorkItem?
+    private let isVoiceOverEnabled: () -> Bool
     private let announce: AnnouncementHandler
 
-    init(announce: @escaping AnnouncementHandler = { _, _ in }) {
+    init(
+        isVoiceOverEnabled: @escaping () -> Bool = {
+            NSWorkspace.shared.isVoiceOverEnabled
+        },
+        announce: @escaping AnnouncementHandler = { _, _ in }
+    ) {
+        self.isVoiceOverEnabled = isVoiceOverEnabled
         self.announce = announce
     }
 
@@ -73,12 +84,27 @@ final class HUDController {
         _ message: String,
         symbol: String,
         style: HUDStyle = .success,
-        announces: Bool = true
+        announces: Bool = true,
+        accessibilityAnnouncement: String? = nil
     ) {
         dismissWorkItem?.cancel()
         panel?.orderOut(nil)
+        panel = nil
 
-        let panelSize = HUDLayout.panelSize(for: message)
+        let announcement = accessibilityAnnouncement ?? message
+        let priority: NSAccessibilityPriorityLevel = style == .error ? .high : .medium
+        let voiceOverEnabled = isVoiceOverEnabled()
+        // VoiceOver ignores explicit announcements from an inactive menu-bar
+        // app unless they are backed by visible UI. Let it read the HUD itself,
+        // using a single uninterrupted sentence and enough time to finish.
+        let displayedMessage = voiceOverEnabled ? announcement : message
+        // Callers that suppress this HUD's announcement provide their own
+        // accessible status update. Do not expose a second transient window.
+        if voiceOverEnabled && !announces {
+            return
+        }
+
+        let panelSize = HUDLayout.panelSize(for: displayedMessage)
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -91,6 +117,7 @@ final class HUDController {
         panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .transient]
+        panel.setAccessibilityHidden(!voiceOverEnabled)
 
         let effect = NSVisualEffectView(frame: panel.contentView!.bounds)
         effect.material = .hudWindow
@@ -100,6 +127,7 @@ final class HUDController {
         effect.layer?.cornerRadius = 14
         effect.layer?.cornerCurve = .continuous
         effect.layer?.masksToBounds = true
+        effect.setAccessibilityHidden(!voiceOverEnabled)
 
         let icon = NSImageView(image: NSImage(
             systemSymbolName: symbol,
@@ -107,8 +135,9 @@ final class HUDController {
         ) ?? NSImage())
         icon.contentTintColor = style.tintColor
         icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.setAccessibilityHidden(true)
 
-        let label = NSTextField(labelWithString: message)
+        let label = NSTextField(labelWithString: displayedMessage)
         label.textColor = .labelColor
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.lineBreakMode = .byTruncatingTail
@@ -116,6 +145,7 @@ final class HUDController {
         label.cell?.usesSingleLineMode = false
         label.cell?.wraps = true
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.setAccessibilityHidden(!voiceOverEnabled)
 
         effect.addSubview(icon)
         effect.addSubview(label)
@@ -142,8 +172,8 @@ final class HUDController {
         }
         panel.orderFrontRegardless()
         self.panel = panel
-        if announces {
-            announce(message, style == .error ? .high : .medium)
+        if announces && !voiceOverEnabled {
+            announce(announcement, priority)
         }
 
         let workItem = DispatchWorkItem { [weak self, weak panel] in
@@ -151,7 +181,10 @@ final class HUDController {
             if self?.panel === panel { self?.panel = nil }
         }
         dismissWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + style.displayDuration, execute: workItem)
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + style.displayDuration(voiceOverEnabled: voiceOverEnabled),
+            execute: workItem
+        )
     }
 
     func dismiss() {
@@ -160,4 +193,24 @@ final class HUDController {
         panel?.orderOut(nil)
         panel = nil
     }
+
+#if DEBUG
+    var visualPanelIsHiddenFromAccessibilityForTesting: Bool {
+        guard let panel else { return false }
+        return panel.isAccessibilityHidden()
+            && panel.contentView?.isAccessibilityHidden() == true
+    }
+
+    var hasVisualPanelForTesting: Bool {
+        panel != nil
+    }
+
+    var visualMessageForTesting: String? {
+        guard let effect = panel?.contentView else { return nil }
+        return effect.subviews
+            .compactMap { $0 as? NSTextField }
+            .first?
+            .stringValue
+    }
+#endif
 }

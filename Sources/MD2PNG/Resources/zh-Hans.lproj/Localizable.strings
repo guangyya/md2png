@@ -66,6 +66,9 @@
 "hud.png_copied" = "PNG 已复制——请按 Command-V 粘贴";
 "hud.png_copied_again" = "PNG 已再次复制——请按 Command-V 粘贴";
 "hud.markdown_restored" = "Markdown 已恢复——请按 Command-V 粘贴";
+"hud.png_copied_accessibility" = "PNG 已复制，可以按 Command-V 粘贴";
+"hud.png_copied_again_accessibility" = "PNG 已再次复制，可以按 Command-V 粘贴";
+"hud.markdown_restored_accessibility" = "Markdown 已恢复，可以按 Command-V 粘贴";
 "hud.split_png_saved" = "已保存 1 张分片 PNG";
 "hud.split_pngs_saved" = "已保存 %ld 张分片 PNG";
 "hud.launch_at_login_requires_approval" = "请在“登录项”中允许 md2png 以完成设置";

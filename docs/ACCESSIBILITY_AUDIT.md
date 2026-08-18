@@ -2,8 +2,9 @@
 
 This checklist covers the native macOS surfaces targeted for md2png 0.10. The
 basic clipboard workflow remains available without Accessibility permission.
-The HUD remains nonactivating; status changes are announced through the menu bar
-item instead of moving keyboard or VoiceOver focus.
+The HUD remains nonactivating. While VoiceOver is running, it exposes one
+uninterrupted status message long enough to finish speaking without taking
+keyboard focus from the current app.
 
 ## Automated evidence
 
@@ -32,7 +33,7 @@ Motion enabled. A release candidate passes only when every box is checked.
 | Surface | VoiceOver and focus order | Keyboard behavior | English | 简体中文 |
 |---|---|---|:---:|:---:|
 | Status menu and clipboard preview | Menu bar button announces the current render/update state; clipboard preview precedes actionable menu items; disabled commands are announced as unavailable. | Arrow keys traverse enabled items; Return activates; Escape closes; configured Render and Last Render equivalents match Settings. | [ ] | [ ] |
-| HUD | Copy, render, restore, save, conflict, and error feedback is announced once; errors have higher priority; no window or focus is activated. | The current app keeps focus and receives the next keystroke. | [ ] | [ ] |
+| HUD | Copy, render, restore, save, conflict, and error feedback is spoken once; the transient message remains available long enough to finish; the HUD does not activate the app or take keyboard focus. | The current app keeps focus and receives the next keystroke. | [ ] | [ ] |
 | Last Render | Rendered image announces its pixel dimensions; toolbar order is Copy, Save, Preview, Fit, Zoom Out, zoom value, Zoom In; zoom value explains that it resets to Actual Size. | Command-C, Command-S, Command-9, Command-0, Command-Minus, Command-Plus, Command-W, and Command-Comma work; Tab reaches toolbar controls. | [ ] | [ ] |
 | About and diagnostics | Version copy, update status/actions, release notes, Diagnostics, and Done are distinct; update progress and failures are announced without duplicate HUD speech. | Tab follows visual order; Return activates Done/default alerts; Escape activates Cancel or Later; `Command-W` closes and `Command-,` opens Settings. | [ ] | [ ] |
 | Welcome | Workflow is one concise description; replay is separate; shortcut rows announce current shortcut and Ready/Detected/Works/Unavailable; Launch at Login state and actions are explicit. | Tab visits Replay, Launch at Login, Try an Example, and Done; Return activates Done; `Command-R` replays; `Command-W` closes. | [ ] | [ ] |
