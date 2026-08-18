@@ -3,6 +3,13 @@ import AppKit
 enum RendererErrorDetailsAction: Equatable {
     case done
     case copy
+    case saveSplitPNGs
+}
+
+enum RendererErrorDetailsResult: Equatable {
+    case dismissed
+    case detailsCopied
+    case splitExportRequested
 }
 
 struct RendererErrorDetailsPresentation: Equatable {
@@ -11,6 +18,7 @@ struct RendererErrorDetailsPresentation: Equatable {
     let suggestion: String
     let clipboardNotice: String
     let copyText: String
+    let offersSplitExport: Bool
 
     static func make(
         report: RendererErrorReport,
@@ -35,7 +43,8 @@ struct RendererErrorDetailsPresentation: Equatable {
                 application: application,
                 system: system,
                 localizationBundle: localizationBundle
-            )
+            ),
+            offersSplitExport: report.failure.supportsSplitExportRecovery
         )
     }
 }
@@ -55,18 +64,48 @@ struct RendererErrorDetailsDependencies {
                 presentation.suggestion,
                 presentation.clipboardNotice
             ].joined(separator: "\n\n")
-            let doneButton = alert.addButton(withTitle: L10n.text(
-                "about.done",
-                defaultValue: "Done"
-            ))
-            doneButton.keyEquivalent = "\r"
-            let copyButton = alert.addButton(withTitle: L10n.text(
-                "renderer_error.copy_details",
-                defaultValue: "Copy Error Details"
-            ))
-            copyButton.keyEquivalent = ""
+            if presentation.offersSplitExport {
+                let splitButton = alert.addButton(withTitle: L10n.text(
+                    "renderer_error.save_split_pngs",
+                    defaultValue: "Save as Split PNGs…"
+                ))
+                let doneButton = alert.addButton(withTitle: L10n.text(
+                    "about.done",
+                    defaultValue: "Done"
+                ))
+                let copyButton = alert.addButton(withTitle: L10n.text(
+                    "renderer_error.copy_details",
+                    defaultValue: "Copy Error Details"
+                ))
+                copyButton.keyEquivalent = ""
+                AlertKeyboard.configureDefaultAndCancel(
+                    in: alert,
+                    defaultButton: splitButton,
+                    cancelButton: doneButton
+                )
+            } else {
+                let doneButton = alert.addButton(withTitle: L10n.text(
+                    "about.done",
+                    defaultValue: "Done"
+                ))
+                doneButton.keyEquivalent = "\r"
+                let copyButton = alert.addButton(withTitle: L10n.text(
+                    "renderer_error.copy_details",
+                    defaultValue: "Copy Error Details"
+                ))
+                copyButton.keyEquivalent = ""
+            }
             NSApp.activate(ignoringOtherApps: true)
-            return alert.runModal() == .alertSecondButtonReturn ? .copy : .done
+            return switch alert.runModal() {
+            case .alertFirstButtonReturn:
+                presentation.offersSplitExport ? .saveSplitPNGs : .done
+            case .alertSecondButtonReturn:
+                presentation.offersSplitExport ? .done : .copy
+            case .alertThirdButtonReturn:
+                presentation.offersSplitExport ? .copy : .done
+            default:
+                .done
+            }
         },
         copy: { text in
             let pasteboard = NSPasteboard.general
@@ -92,14 +131,19 @@ final class RendererErrorDetailsPresenter {
         self.system = system
     }
 
-    @discardableResult
-    func show(_ report: RendererErrorReport) -> Bool {
+    func show(_ report: RendererErrorReport) -> RendererErrorDetailsResult {
         let presentation = RendererErrorDetailsPresentation.make(
             report: report,
             application: application,
             system: system
         )
-        guard dependencies.present(presentation) == .copy else { return false }
-        return dependencies.copy(presentation.copyText)
+        switch dependencies.present(presentation) {
+        case .saveSplitPNGs where presentation.offersSplitExport:
+            return .splitExportRequested
+        case .copy:
+            return dependencies.copy(presentation.copyText) ? .detailsCopied : .dismissed
+        case .done, .saveSplitPNGs:
+            return .dismissed
+        }
     }
 }

@@ -69,10 +69,11 @@ use automatic or minimal highlighting.
 ## The result is too large
 
 One clipboard image is limited to a logical size of 1600 × 16000 points. For a
-tall result, keep the Markdown on the clipboard and choose **Save Clipboard as
-Split PNGs…**. Select a parent folder; md2png creates a new folder containing
-numbered PNGs and leaves the clipboard unchanged. It prefers boundaries between
-blocks and avoids cutting fitting code blocks, Mermaid diagrams, and table rows.
+tall result, keep the Markdown on the clipboard and choose **Save as Split
+PNGs…** in the size-limit error dialog. Select a parent folder; md2png creates a
+new folder containing numbered PNGs and leaves the clipboard unchanged. It
+prefers boundaries between blocks and avoids cutting fitting code blocks,
+Mermaid diagrams, and table rows.
 
 Very wide tables and diagrams can still exceed the supported width, and an
 extremely large document can exceed the bounded split-export budget. In those

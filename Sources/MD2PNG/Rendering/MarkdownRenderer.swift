@@ -6,10 +6,10 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     typealias Completion = (Result<NSImage, Error>) -> Void
     typealias SplitCompletion = (Result<SplitRenderResult, Error>) -> Void
 
-    static let maximumSnapshotWidth = 1_600
-    static let maximumSnapshotHeight = 16_000
+    nonisolated static let maximumSnapshotWidth = 1_600
+    nonisolated static let maximumSnapshotHeight = 16_000
     static let minimumSplitSnapshotHeight = 256
-    static let maximumSplitSnapshotArea = 64_000_000
+    nonisolated static let maximumSplitSnapshotArea = 64_000_000
 
     private enum RequestMode {
         case singleImage

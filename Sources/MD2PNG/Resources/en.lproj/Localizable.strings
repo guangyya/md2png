@@ -6,7 +6,6 @@
 
 "menu.clipboard" = "Clipboard";
 "menu.render" = "Render Clipboard as Image";
-"menu.save_clipboard_as_split_pngs" = "Save Clipboard as Split PNGs…";
 "menu.rerender_last_markdown" = "Re-render Last Markdown";
 "menu.restore_last_markdown" = "Restore Last Markdown";
 "menu.show_last_render" = "Show Last Render";
@@ -97,6 +96,7 @@
 "error.example_unavailable" = "Couldn’t load %@. Choose another Example and try again.";
 "renderer_error.details_title" = "Rendering Failed";
 "renderer_error.copy_details" = "Copy Error Details";
+"renderer_error.save_split_pngs" = "Save as Split PNGs…";
 "renderer_error.details_copied" = "Error details copied";
 "renderer_error.clipboard_unchanged" = "The clipboard was not changed.";
 "renderer_error.mermaid_diagram_line" = "Couldn’t render Mermaid diagram %1$ld near Markdown line %2$ld.";
@@ -114,7 +114,8 @@
 "renderer_error.hint_mermaid_syntax" = "Check arrows, brackets, and labels near the reported line, and make sure the Mermaid fence is closed.";
 "renderer_error.hint_resources" = "Reopen md2png and run Renderer Self-Test from About. Reinstall the app if the self-test still fails.";
 "renderer_error.hint_retry" = "Try rendering again. If it still fails, run Renderer Self-Test and save diagnostic logs from About.";
-"renderer_error.hint_size_limit" = "If the content is too tall, choose Save Clipboard as Split PNGs from the md2png menu. Otherwise shorten the Markdown and try again.";
+"renderer_error.hint_size_limit" = "Save the result as split PNGs, or shorten the Markdown and try again.";
+"renderer_error.hint_size_limit_shorten" = "Choose a narrower Output Width, shorten wide tables or diagrams, then try again.";
 "renderer_error.hint_webkit_recovery" = "Try again. If it repeats, reopen md2png and run Renderer Self-Test from About.";
 "renderer_error.hint_timeout" = "Shorten complex Mermaid diagrams or Markdown, then try again.";
 "renderer_error.hint_unknown" = "Check the Markdown and try again. If it repeats, run Renderer Self-Test and save diagnostic logs from About.";

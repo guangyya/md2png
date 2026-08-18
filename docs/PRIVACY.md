@@ -11,7 +11,7 @@ The app accesses the clipboard only in response to visible user actions:
 |---|---|
 | Open the menu | Reads a short plain-text preview in memory |
 | Render Clipboard as Image | Reads non-empty plain text; writes PNG and TIFF only after a successful render |
-| Save Clipboard as Split PNGs | Reads non-empty plain text; writes numbered PNG files only to the folder explicitly selected by the user and does not write to the clipboard |
+| Save as Split PNGs after a size-limit error | Uses the unchanged non-empty source from the failed render; writes numbered PNG files only to the folder explicitly selected by the user and does not write to the clipboard |
 | Re-render Last Markdown | Reads the latest successful source from app memory; writes PNG and TIFF only after a successful render and any required clipboard confirmation |
 | Restore Last Markdown | Writes the latest successful source after any required clipboard confirmation |
 | Choose an Example | Writes the selected bundled Markdown, then renders it and writes PNG/TIFF on success |
@@ -29,10 +29,11 @@ not create a render history or silently save Markdown and images to files.
 When another application changes the clipboard after md2png writes it, the Last
 Markdown action requires confirmation before replacing that newer content.
 
-Split export is an explicit Save-only action. After the user chooses a parent
-folder, md2png creates one new output folder and writes numbered PNGs locally.
-It does not add those images to the clipboard, upload them, or retain a history.
-Existing export folders are not overwritten.
+Split export is an explicit Save-only recovery action offered after a size-limit
+error. After the user chooses a parent folder, md2png creates one new output
+folder and writes numbered PNGs locally. It does not add those images to the
+clipboard, upload them, or retain a history. Existing export folders are not
+overwritten.
 
 ## Local rendering
 
