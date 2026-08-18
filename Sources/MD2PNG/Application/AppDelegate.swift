@@ -3,9 +3,9 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let diagnosticLogger: DiagnosticLogger
-    private lazy var hud = HUDController { [weak self] message, priority in
+    private lazy var hud = HUDController(announce: { [weak self] message, priority in
         self?.announce(message, priority: priority)
-    }
+    })
     private let rendererErrorDetailsPresenter = RendererErrorDetailsPresenter()
     private lazy var previewController = PreviewController(
         onCopied: { [weak self] changeCount in
@@ -16,7 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     "hud.png_copied_again",
                     defaultValue: "PNG copied again — paste with Command-V"
                 ),
-                symbol: "doc.on.clipboard.fill"
+                symbol: "doc.on.clipboard.fill",
+                accessibilityAnnouncement: L10n.text(
+                    "hud.png_copied_again_accessibility",
+                    defaultValue: "PNG copied again and ready to paste with Command-V"
+                )
             )
         },
         onError: { [weak self] error in
@@ -458,7 +462,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     "hud.png_copied",
                     defaultValue: "PNG copied — paste with Command-V"
                 ),
-                symbol: "checkmark.circle.fill"
+                symbol: "checkmark.circle.fill",
+                accessibilityAnnouncement: L10n.text(
+                    "hud.png_copied_accessibility",
+                    defaultValue: "PNG copied and ready to paste with Command-V"
+                )
             )
         case .markdownRestored:
             hud.show(
@@ -466,7 +474,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     "hud.markdown_restored",
                     defaultValue: "Markdown restored — paste with Command-V"
                 ),
-                symbol: "doc.on.clipboard.fill"
+                symbol: "doc.on.clipboard.fill",
+                accessibilityAnnouncement: L10n.text(
+                    "hud.markdown_restored_accessibility",
+                    defaultValue: "Markdown restored and ready to paste with Command-V"
+                )
             )
         case let .splitImagesSaved(count):
             let message = count == 1

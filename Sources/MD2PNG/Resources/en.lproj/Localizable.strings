@@ -66,6 +66,9 @@
 "hud.png_copied" = "PNG copied — paste with Command-V";
 "hud.png_copied_again" = "PNG copied again — paste with Command-V";
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
+"hud.png_copied_accessibility" = "PNG copied and ready to paste with Command-V";
+"hud.png_copied_again_accessibility" = "PNG copied again and ready to paste with Command-V";
+"hud.markdown_restored_accessibility" = "Markdown restored and ready to paste with Command-V";
 "hud.split_png_saved" = "Saved 1 split PNG";
 "hud.split_pngs_saved" = "Saved %ld split PNGs";
 "hud.launch_at_login_requires_approval" = "Allow md2png in Login Items to finish setup";

@@ -28,6 +28,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   preserving a valid status-item anchor.
 - Move keyboard focus into the Welcome Example guide so Full Keyboard Access
   stays inside the popover instead of returning to the Welcome window.
+- Give VoiceOver enough time to read an uninterrupted clipboard instruction
+  from the HUD instead of dismissing its focused element mid-sentence.
 - Capture assigned global shortcuts inside Settings without triggering their
   actions, report conflicts, and keep Restore Defaults available.
 

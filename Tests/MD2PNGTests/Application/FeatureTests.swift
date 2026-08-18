@@ -150,12 +150,17 @@ final class FeatureTests: XCTestCase {
     func testHUDAnnouncesFeedbackOnceWithSeverityAndCanSuppressDuplicates() {
         _ = NSApplication.shared
         var announcements: [(message: String, priority: NSAccessibilityPriorityLevel)] = []
-        let hud = HUDController { message, priority in
+        let hud = HUDController(isVoiceOverEnabled: { false }) { message, priority in
             announcements.append((message, priority))
         }
         defer { hud.dismiss() }
 
-        hud.show("PNG copied", symbol: "checkmark.circle.fill")
+        hud.show(
+            "PNG copied — paste with Command-V",
+            symbol: "checkmark.circle.fill",
+            accessibilityAnnouncement: "PNG copied and ready to paste with Command-V"
+        )
+        XCTAssertTrue(hud.visualPanelIsHiddenFromAccessibilityForTesting)
         hud.show(
             "Render failed",
             symbol: "exclamationmark.triangle.fill",
@@ -167,8 +172,46 @@ final class FeatureTests: XCTestCase {
             announces: false
         )
 
-        XCTAssertEqual(announcements.map(\.message), ["PNG copied", "Render failed"])
+        XCTAssertEqual(announcements.map(\.message), [
+            "PNG copied and ready to paste with Command-V",
+            "Render failed"
+        ])
         XCTAssertEqual(announcements.map(\.priority), [.medium, .high])
+    }
+
+    @MainActor
+    func testHUDKeepsCompleteFeedbackVisibleWhileVoiceOverIsEnabled() {
+        var announcements: [String] = []
+        let hud = HUDController(isVoiceOverEnabled: { true }) { message, _ in
+            announcements.append(message)
+        }
+
+        hud.show(
+            "PNG copied — paste with Command-V",
+            symbol: "checkmark.circle.fill",
+            accessibilityAnnouncement: "PNG copied and ready to paste with Command-V"
+        )
+
+        defer { hud.dismiss() }
+        XCTAssertTrue(hud.hasVisualPanelForTesting)
+        XCTAssertFalse(hud.visualPanelIsHiddenFromAccessibilityForTesting)
+        XCTAssertEqual(
+            hud.visualMessageForTesting,
+            "PNG copied and ready to paste with Command-V"
+        )
+        XCTAssertTrue(announcements.isEmpty)
+        XCTAssertEqual(
+            HUDStyle.success.displayDuration(voiceOverEnabled: true),
+            8.0
+        )
+
+        hud.show(
+            "Update ready",
+            symbol: "arrow.down.circle.fill",
+            announces: false
+        )
+        XCTAssertFalse(hud.hasVisualPanelForTesting)
+        XCTAssertTrue(announcements.isEmpty)
     }
 
     func testProjectAndReleaseLinksUseInjectedHTTPSRepository() throws {
