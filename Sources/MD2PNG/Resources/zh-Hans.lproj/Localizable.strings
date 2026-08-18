@@ -6,6 +6,7 @@
 
 "menu.clipboard" = "剪贴板";
 "menu.render" = "将剪贴板渲染为图片";
+"menu.save_clipboard_as_split_pngs" = "将剪贴板分片保存为 PNG…";
 "menu.rerender_last_markdown" = "重新渲染上次的 Markdown";
 "menu.restore_last_markdown" = "恢复上次的 Markdown";
 "menu.show_last_render" = "显示上次渲染";
@@ -113,7 +114,7 @@
 "renderer_error.hint_mermaid_syntax" = "请检查所示行附近的箭头、括号和标签，并确认 Mermaid 代码块已经闭合。";
 "renderer_error.hint_resources" = "请重新打开 md2png，并在“关于”中运行“渲染器自检”。如果仍然失败，请重新安装应用。";
 "renderer_error.hint_retry" = "请重新渲染。如果仍然失败，请在“关于”中运行“渲染器自检”并保存诊断日志。";
-"renderer_error.hint_size_limit" = "请缩短 Markdown，或将内容拆成较小的部分分别渲染。";
+"renderer_error.hint_size_limit" = "如果内容只是太高，请从 md2png 菜单选择“将剪贴板分片保存为 PNG”；否则请缩短 Markdown 后重试。";
 "renderer_error.hint_webkit_recovery" = "请重试。如果反复出现，请重新打开 md2png，并在“关于”中运行“渲染器自检”。";
 "renderer_error.hint_timeout" = "请缩短复杂的 Mermaid 图或 Markdown 后重试。";
 "renderer_error.hint_unknown" = "请检查 Markdown 后重试。如果反复出现，请在“关于”中运行“渲染器自检”并保存诊断日志。";

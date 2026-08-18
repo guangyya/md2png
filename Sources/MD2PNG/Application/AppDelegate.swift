@@ -324,6 +324,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 renderClipboard: { [weak self] in
                     self?.renderCoordinator.renderClipboard()
                 },
+                saveClipboardAsSplitPNGs: { [weak self] in
+                    self?.renderCoordinator.saveClipboardAsSplitPNGs()
+                },
                 showLastRender: { [weak self] in
                     self?.renderCoordinator.showLastRender()
                 },

@@ -2,6 +2,7 @@ import Foundation
 
 enum StatusMenuCommand: String, CaseIterable, Hashable {
     case renderClipboard
+    case saveClipboardAsSplitPNGs
     case showLastRender
     case rerenderLastMarkdown
     case restoreLastMarkdown
@@ -16,10 +17,10 @@ enum StatusMenuCommand: String, CaseIterable, Hashable {
 }
 
 enum StatusMenuLayout {
-    // Keep the two global-shortcut commands together, then move progressively
-    // from recovery and rendering choices to infrequent app commands.
+    // Keep the primary render and preview commands together, then move
+    // progressively from recovery and rendering choices to infrequent commands.
     static let sections: [[StatusMenuCommand]] = [
-        [.renderClipboard, .showLastRender],
+        [.renderClipboard, .saveClipboardAsSplitPNGs, .showLastRender],
         [.rerenderLastMarkdown, .restoreLastMarkdown],
         [.theme, .outputWidth, .examples],
         [.launchAtLogin, .settings, .showWelcome, .about],
@@ -52,7 +53,7 @@ struct StatusMenuPresentation: Equatable {
 
         items = Dictionary(uniqueKeysWithValues: StatusMenuCommand.allCases.map { command in
             let isEnabled = switch command {
-            case .renderClipboard:
+            case .renderClipboard, .saveClipboardAsSplitPNGs:
                 state.clipboardContainsMarkdown && !blocksRenderingChanges
             case .showLastRender:
                 state.hasLastRender
@@ -86,6 +87,12 @@ struct StatusMenuPresentation: Equatable {
             L10n.text(
                 "menu.render",
                 defaultValue: "Render Clipboard as Image",
+                bundle: localizationBundle
+            )
+        case .saveClipboardAsSplitPNGs:
+            L10n.text(
+                "menu.save_clipboard_as_split_pngs",
+                defaultValue: "Save Clipboard as Split PNGs…",
                 bundle: localizationBundle
             )
         case .showLastRender:

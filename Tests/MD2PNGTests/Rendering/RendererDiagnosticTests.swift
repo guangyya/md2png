@@ -127,6 +127,25 @@ final class RendererDiagnosticTests: XCTestCase {
         XCTAssertEqual(failure.errorCode, 2)
     }
 
+    func testSizeLimitSuggestionRoutesTallContentToExplicitSplitExport() throws {
+        let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
+        let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
+        let failure = RendererFailure(
+            kind: .sizeLimit,
+            width: 1_120,
+            height: 20_000
+        )
+
+        XCTAssertTrue(
+            failure.suggestion(localizationBundle: english)
+                .contains("Save Clipboard as Split PNGs")
+        )
+        XCTAssertTrue(
+            failure.suggestion(localizationBundle: chinese)
+                .contains("将剪贴板分片保存为 PNG")
+        )
+    }
+
     @MainActor
     func testPresenterCopiesOnlyAfterExplicitCopyAction() throws {
         let operationID = try XCTUnwrap(DiagnosticOperationID(rawValue: "012345abcdef"))

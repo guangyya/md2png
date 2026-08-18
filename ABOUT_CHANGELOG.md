@@ -8,6 +8,7 @@ for the complete project history and release details.
 ### Added
 
 - Customize global shortcuts in Settings and restore their defaults.
+- Save tall Markdown as numbered, block-aware PNGs without changing the clipboard.
 
 ## [0.9.0] - 2026-08-17
 

@@ -10,6 +10,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     struct Actions {
         let menuWillOpen: () -> Void
         let renderClipboard: () -> Void
+        let saveClipboardAsSplitPNGs: () -> Void
         let showLastRender: () -> Void
         let rerenderLastMarkdown: () -> Void
         let restoreLastMarkdown: () -> Void
@@ -43,6 +44,15 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         _ command: StatusMenuCommand
     ) -> NSEvent.ModifierFlags? {
         statusMenuItems[command]?.keyEquivalentModifierMask
+    }
+
+    func containsMenuItemForTesting(_ command: StatusMenuCommand) -> Bool {
+        statusMenuItems[command] != nil
+    }
+
+    func performCommandForTesting(_ command: StatusMenuCommand) {
+        guard let item = statusMenuItems[command], let action = item.action else { return }
+        NSApp.sendAction(action, to: item.target, from: item)
     }
 #endif
 
@@ -185,6 +195,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         )
         renderMenuItem.target = self
 
+        let saveSplitMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .saveClipboardAsSplitPNGs),
+            action: #selector(saveClipboardAsSplitPNGs),
+            keyEquivalent: ""
+        )
+        saveSplitMenuItem.target = self
+
         let previewMenuItem = NSMenuItem(
             title: StatusMenuPresentation.title(for: .showLastRender),
             action: #selector(showLastRender),
@@ -301,6 +318,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         statusMenuItems = [
             .renderClipboard: renderMenuItem,
+            .saveClipboardAsSplitPNGs: saveSplitMenuItem,
             .showLastRender: previewMenuItem,
             .rerenderLastMarkdown: rerenderLastMarkdownMenuItem,
             .restoreLastMarkdown: restoreLastMarkdownMenuItem,
@@ -340,6 +358,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func renderClipboard() {
         actions.renderClipboard()
+    }
+
+    @objc private func saveClipboardAsSplitPNGs() {
+        actions.saveClipboardAsSplitPNGs()
     }
 
     @objc private func showLastRender() {
