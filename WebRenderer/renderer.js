@@ -222,6 +222,45 @@ function measurement() {
   };
 }
 
+function verticalRange(element, cardTop, contentHeight) {
+  const bounds = element.getBoundingClientRect();
+  const start = Math.max(0, Math.ceil(bounds.top - cardTop));
+  const end = Math.min(contentHeight, Math.floor(bounds.bottom - cardTop));
+  return end > start ? [start, end] : null;
+}
+
+function splitGeometry() {
+  const card = document.getElementById("card");
+  const { height: contentHeight } = measurement();
+  const cardTop = card.getBoundingClientRect().top;
+  const preferredBreakOffsets = new Set();
+  const protectedRanges = [];
+
+  for (const element of card.querySelectorAll(":scope > *, li, tr")) {
+    const range = verticalRange(element, cardTop, contentHeight);
+    if (range) {
+      const offset = element.matches("h1, h2, h3, h4, h5, h6")
+        ? range[0]
+        : range[1];
+      if (offset > 0 && offset < contentHeight) {
+        preferredBreakOffsets.add(offset);
+      }
+    }
+  }
+  for (const element of card.querySelectorAll("pre, .mermaid, tr")) {
+    const range = verticalRange(element, cardTop, contentHeight);
+    if (range) {
+      protectedRanges.push(range);
+    }
+  }
+
+  return {
+    contentHeight,
+    preferredBreakOffsets: [...preferredBreakOffsets].sort((left, right) => left - right),
+    protectedRanges
+  };
+}
+
 function positiveLineNumber(value) {
   const number = Number(value);
   return Number.isSafeInteger(number) && number > 0 ? number : null;
@@ -322,3 +361,4 @@ window.renderMarkdown = async (source, requestedTheme) => {
 };
 
 window.measureRenderedContent = measurement;
+window.measureRenderedContentForSplitting = splitGeometry;

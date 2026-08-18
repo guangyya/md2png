@@ -4,6 +4,22 @@ import WebKit
 @MainActor
 final class MarkdownRenderer: NSObject, WKNavigationDelegate {
     typealias Completion = (Result<NSImage, Error>) -> Void
+    typealias SplitCompletion = (Result<SplitRenderResult, Error>) -> Void
+
+    static let maximumSnapshotWidth = 1_600
+    static let maximumSnapshotHeight = 16_000
+    static let minimumSplitSnapshotHeight = 256
+    static let maximumSplitSnapshotArea = 64_000_000
+
+    private enum RequestMode {
+        case singleImage
+        case splitImages(maximumSliceHeight: Int)
+    }
+
+    private enum Output {
+        case singleImage(NSImage)
+        case splitImages(SplitRenderResult)
+    }
 
     private struct Request {
         let id: UUID
@@ -11,8 +27,9 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         let markdown: String
         let widthPreset: RenderWidthPreset
         let theme: RenderTheme
+        let mode: RequestMode
         let startedAt: UInt64
-        let completion: Completion
+        let completion: (Result<Output, Error>) -> Void
     }
 
     private struct NavigationAttempt {
@@ -83,12 +100,65 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         operationID: DiagnosticOperationID = DiagnosticOperationID(),
         completion: @escaping Completion
     ) {
+        enqueue(
+            markdown,
+            widthPreset: widthPreset,
+            theme: theme,
+            operationID: operationID,
+            mode: .singleImage
+        ) { result in
+            completion(result.flatMap { output in
+                guard case let .singleImage(image) = output else {
+                    return .failure(AppError.invalidRendererResponse)
+                }
+                return .success(image)
+            })
+        }
+    }
+
+    func renderSplit(
+        _ markdown: String,
+        widthPreset: RenderWidthPreset = .standard,
+        theme: RenderTheme = .cleanLight,
+        maximumSliceHeight: Int = MarkdownRenderer.maximumSnapshotHeight,
+        operationID: DiagnosticOperationID = DiagnosticOperationID(),
+        completion: @escaping SplitCompletion
+    ) {
+        let boundedSliceHeight = min(
+            max(maximumSliceHeight, Self.minimumSplitSnapshotHeight),
+            Self.maximumSnapshotHeight
+        )
+        enqueue(
+            markdown,
+            widthPreset: widthPreset,
+            theme: theme,
+            operationID: operationID,
+            mode: .splitImages(maximumSliceHeight: boundedSliceHeight)
+        ) { result in
+            completion(result.flatMap { output in
+                guard case let .splitImages(splitResult) = output else {
+                    return .failure(AppError.invalidRendererResponse)
+                }
+                return .success(splitResult)
+            })
+        }
+    }
+
+    private func enqueue(
+        _ markdown: String,
+        widthPreset: RenderWidthPreset,
+        theme: RenderTheme,
+        operationID: DiagnosticOperationID,
+        mode: RequestMode,
+        completion: @escaping (Result<Output, Error>) -> Void
+    ) {
         let request = Request(
             id: UUID(),
             operationID: operationID,
             markdown: markdown,
             widthPreset: widthPreset,
             theme: theme,
+            mode: mode,
             startedAt: DispatchTime.now().uptimeNanoseconds,
             completion: completion
         )
@@ -207,14 +277,81 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     return
                 }
 
+                let measuredHeight = Int(ceil(rawHeight))
                 let width = max(520, Int(ceil(rawWidth)))
-                let height = max(80, Int(ceil(rawHeight)))
-                guard width <= 1600, height <= 16_000 else {
+                let height = max(80, measuredHeight)
+                guard width <= Self.maximumSnapshotWidth else {
                     self.finish(
                         execution,
                         with: .failure(AppError.contentTooLarge(width: width, height: height))
                     )
                     return
+                }
+
+                let slices: [RenderSnapshotSlice]
+                let splitGeometry: RenderSplitGeometry?
+                switch request.mode {
+                case .singleImage:
+                    guard height <= Self.maximumSnapshotHeight else {
+                        self.finish(
+                            execution,
+                            with: .failure(AppError.contentTooLarge(
+                                width: width,
+                                height: height
+                            ))
+                        )
+                        return
+                    }
+                    slices = [RenderSnapshotSlice(
+                        range: 0 ..< height,
+                        ending: .contentEnd
+                    )]
+                    splitGeometry = nil
+                case let .splitImages(maximumSliceHeight):
+                    guard height <= Self.maximumSplitSnapshotArea / width else {
+                        self.finish(
+                            execution,
+                            with: .failure(AppError.contentTooLarge(
+                                width: width,
+                                height: height
+                            ))
+                        )
+                        return
+                    }
+                    let geometryValue = try await self.webView.callAsyncJavaScript(
+                        "return window.measureRenderedContentForSplitting()",
+                        arguments: [:],
+                        in: nil,
+                        contentWorld: .page
+                    )
+                    guard self.recoveryState.isCurrent(execution) else { return }
+                    guard let geometryResponse = RendererSplitGeometryResponse(
+                        geometryValue
+                    ), geometryResponse.geometry.contentHeight == measuredHeight,
+                    let geometry = RenderSplitGeometry(
+                        contentHeight: height,
+                        preferredBreakOffsets: geometryResponse
+                            .geometry.preferredBreakOffsets,
+                        protectedRanges: geometryResponse.geometry.protectedRanges
+                    ) else {
+                        self.finish(
+                            execution,
+                            with: .failure(AppError.invalidRendererResponse)
+                        )
+                        return
+                    }
+                    slices = RenderSplitPlanner.slices(
+                        for: geometry,
+                        maximumSliceHeight: maximumSliceHeight
+                    )
+                    splitGeometry = geometry
+                    guard !slices.isEmpty else {
+                        self.finish(
+                            execution,
+                            with: .failure(AppError.invalidRendererResponse)
+                        )
+                        return
+                    }
                 }
 
                 self.diagnosticLogger.record(
@@ -226,13 +363,20 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     durationMilliseconds: DiagnosticDuration.milliseconds(
                         since: javaScriptStartedAt
                     ),
-                    dimensions: DiagnosticDimensions(width: width, height: height)
+                    dimensions: DiagnosticDimensions(width: width, height: height),
+                    itemCount: slices.count
                 )
 
                 self.webView.setFrameSize(NSSize(width: width, height: height))
                 self.hostWindow.setContentSize(NSSize(width: width, height: height))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
-                    self?.takeSnapshot(for: execution, width: width, height: height)
+                    self?.takeSnapshots(
+                        for: execution,
+                        width: width,
+                        contentHeight: height,
+                        slices: slices,
+                        splitGeometry: splitGeometry
+                    )
                 }
             } catch {
                 self.handle(error, for: execution)
@@ -240,10 +384,12 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         }
     }
 
-    private func takeSnapshot(
+    private func takeSnapshots(
         for execution: RendererRecoveryState.Execution,
         width: Int,
-        height: Int
+        contentHeight: Int,
+        slices: [RenderSnapshotSlice],
+        splitGeometry: RenderSplitGeometry?
     ) {
         guard recoveryState.renderDidStartSnapshot(execution) else { return }
         diagnosticLogger.record(
@@ -252,10 +398,41 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
             result: .started,
             level: .verbose,
             operationID: requests[execution.requestID]?.operationID,
-            dimensions: DiagnosticDimensions(width: width, height: height)
+            dimensions: DiagnosticDimensions(width: width, height: contentHeight),
+            itemCount: slices.count
         )
+        takeSnapshot(
+            for: execution,
+            width: width,
+            contentHeight: contentHeight,
+            slices: slices,
+            splitGeometry: splitGeometry,
+            index: 0,
+            parts: []
+        )
+    }
+
+    private func takeSnapshot(
+        for execution: RendererRecoveryState.Execution,
+        width: Int,
+        contentHeight: Int,
+        slices: [RenderSnapshotSlice],
+        splitGeometry: RenderSplitGeometry?,
+        index: Int,
+        parts: [SplitRenderResult.Part]
+    ) {
+        guard recoveryState.isCurrent(execution), slices.indices.contains(index) else {
+            return
+        }
+        armWatchdog(for: .render(execution))
+        let slice = slices[index]
         let configuration = WKSnapshotConfiguration()
-        configuration.rect = NSRect(x: 0, y: 0, width: width, height: height)
+        configuration.rect = NSRect(
+            x: 0,
+            y: slice.y,
+            width: width,
+            height: slice.height
+        )
 
         webView.takeSnapshot(with: configuration) { [weak self] image, error in
             guard let self else { return }
@@ -263,7 +440,39 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                 if let error {
                     self.handle(error, for: execution)
                 } else if let image {
-                    self.finish(execution, with: .success(image))
+                    guard abs(image.size.width - CGFloat(width)) <= 1,
+                          abs(image.size.height - CGFloat(slice.height)) <= 1 else {
+                        self.finish(
+                            execution,
+                            with: .failure(AppError.rendererPNGEncodingFailed)
+                        )
+                        return
+                    }
+                    var nextParts = parts
+                    nextParts.append(SplitRenderResult.Part(
+                        image: image,
+                        slice: slice
+                    ))
+                    let nextIndex = index + 1
+                    if slices.indices.contains(nextIndex) {
+                        self.takeSnapshot(
+                            for: execution,
+                            width: width,
+                            contentHeight: contentHeight,
+                            slices: slices,
+                            splitGeometry: splitGeometry,
+                            index: nextIndex,
+                            parts: nextParts
+                        )
+                    } else {
+                        self.finishSnapshots(
+                            for: execution,
+                            width: width,
+                            contentHeight: contentHeight,
+                            splitGeometry: splitGeometry,
+                            parts: nextParts
+                        )
+                    }
                 } else {
                     self.finish(
                         execution,
@@ -274,16 +483,60 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         }
     }
 
+    private func finishSnapshots(
+        for execution: RendererRecoveryState.Execution,
+        width: Int,
+        contentHeight: Int,
+        splitGeometry: RenderSplitGeometry?,
+        parts: [SplitRenderResult.Part]
+    ) {
+        guard let request = requests[execution.requestID] else {
+            finish(execution, with: .failure(AppError.rendererUnavailable))
+            return
+        }
+        switch request.mode {
+        case .singleImage:
+            guard parts.count == 1, let image = parts.first?.image else {
+                finish(execution, with: .failure(AppError.rendererPNGEncodingFailed))
+                return
+            }
+            finish(execution, with: .success(.singleImage(image)))
+        case .splitImages:
+            guard let splitGeometry else {
+                finish(execution, with: .failure(AppError.invalidRendererResponse))
+                return
+            }
+            finish(execution, with: .success(.splitImages(SplitRenderResult(
+                contentSize: NSSize(width: width, height: contentHeight),
+                geometry: splitGeometry,
+                parts: parts
+            ))))
+        }
+    }
+
     private func finish(
         _ execution: RendererRecoveryState.Execution,
-        with result: Result<NSImage, Error>
+        with result: Result<Output, Error>
     ) {
         let transition = recoveryState.finish(execution)
         guard let requestID = transition.completedRequestID else { return }
         cancelWatchdog(for: .render(execution))
         if let request = requests.removeValue(forKey: requestID) {
             switch result {
-            case let .success(image):
+            case let .success(output):
+                let dimensions: DiagnosticDimensions
+                let itemCount: Int
+                switch output {
+                case let .singleImage(image):
+                    dimensions = Self.pixelDimensions(for: image)
+                    itemCount = 1
+                case let .splitImages(splitResult):
+                    dimensions = DiagnosticDimensions(
+                        width: Int(splitResult.contentSize.width.rounded()),
+                        height: Int(splitResult.contentSize.height.rounded())
+                    )
+                    itemCount = splitResult.parts.count
+                }
                 diagnosticLogger.record(
                     category: .renderer,
                     stage: .rendererExecution,
@@ -292,7 +545,8 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
                     durationMilliseconds: DiagnosticDuration.milliseconds(
                         since: request.startedAt
                     ),
-                    dimensions: Self.pixelDimensions(for: image)
+                    dimensions: dimensions,
+                    itemCount: itemCount
                 )
             case let .failure(error):
                 diagnosticLogger.record(
