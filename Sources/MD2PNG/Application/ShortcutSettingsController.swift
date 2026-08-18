@@ -344,7 +344,6 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
 }
 
 struct ShortcutSettingsContentView: View {
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @State private var isLaunchAtLoginHovering = false
 
     @ObservedObject var model: ShortcutSettingsModel
@@ -353,21 +352,21 @@ struct ShortcutSettingsContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.contentGroups) {
                 generalSection
                 shortcutSection
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
+            .padding(.horizontal, AppTheme.Spacing.windowHorizontal)
+            .padding(.top, AppTheme.Spacing.windowTop)
+            .padding(.bottom, AppTheme.Spacing.windowBottom)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             Divider()
 
             settingsFooter
-                .padding(.horizontal, 22)
-                .padding(.vertical, 11)
-                .background(.regularMaterial)
+                .padding(.horizontal, AppTheme.Spacing.footerHorizontal)
+                .padding(.vertical, AppTheme.Spacing.footerVertical)
+                .appWindowFooterStyle()
         }
         .frame(
             width: ShortcutSettingsLayout.windowSize.width,
@@ -380,7 +379,7 @@ struct ShortcutSettingsContentView: View {
     }
 
     private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
             Text(copy.generalTitle)
                 .font(.headline)
 
@@ -417,20 +416,9 @@ struct ShortcutSettingsContentView: View {
             }
             .buttonStyle(.plain)
             .disabled(!launchAtLoginModel.canChange)
-            .background {
-                ZStack {
-                    AppWindowCardBackground()
-                    if isLaunchAtLoginHovering && launchAtLoginModel.canChange {
-                        Color.accentColor.opacity(0.06)
-                    }
-                }
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-            }
-            .overlay {
-                AppWindowCardBorder()
-            }
+            .appCardStyle(
+                isHighlighted: isLaunchAtLoginHovering && launchAtLoginModel.canChange
+            )
             .onHover { isLaunchAtLoginHovering = $0 }
             .accessibilityLabel(copy.launchAtLogin)
             .accessibilityValue(launchAtLoginStatusText)
@@ -439,29 +427,15 @@ struct ShortcutSettingsContentView: View {
     }
 
     private var shortcutSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(copy.title)
-                    .font(.headline)
-                Text(copy.subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+            AppSectionHeading(title: copy.title, subtitle: copy.subtitle)
 
             VStack(spacing: 0) {
                 shortcutRow(.render)
                 Divider().padding(.leading, 16)
                 shortcutRow(.showLastRender)
             }
-            .background {
-                AppWindowCardBackground()
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    )
-            }
-            .overlay {
-                AppWindowCardBorder()
-            }
+            .appCardStyle()
 
             HStack {
                 Spacer()
@@ -561,31 +535,13 @@ struct ShortcutSettingsContentView: View {
                 onCapture: { _ = model.capture($0, for: command) }
             )
             .frame(width: 132, height: 30)
-            .background(
-                Color.accentColor.opacity(shortcutControlFillOpacity(for: command)),
-                in: RoundedRectangle(cornerRadius: 7)
+            .appShortcutControlStyle(
+                isActive: model.recordingCommand == command
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(
-                        Color.accentColor.opacity(shortcutControlStyle.borderOpacity),
-                        lineWidth: shortcutControlStyle.borderWidth
-                    )
-            }
             .accessibilityIdentifier("ShortcutRecorder.\(command.rawValue)")
         }
         .padding(.horizontal, 16)
         .frame(height: ShortcutSettingsLayout.rowHeight)
-    }
-
-    private var shortcutControlStyle: AppShortcutControlContrastStyle {
-        AppShortcutControlContrastStyle(contrast: colorSchemeContrast)
-    }
-
-    private func shortcutControlFillOpacity(
-        for command: GlobalShortcutCommand
-    ) -> Double {
-        model.recordingCommand == command ? 0.18 : shortcutControlStyle.fillOpacity
     }
 
     @ViewBuilder

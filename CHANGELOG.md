@@ -16,6 +16,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Keep Settings controls consistent with Welcome, scope Restore Defaults to
   Keyboard Shortcuts, and show the configured Render shortcut in the Welcome
   workflow demo.
+- Centralize shared window, card, section, status, footer, and shortcut styling
+  in a project-level app theme for consistent reuse.
 
 ### Fixed
 

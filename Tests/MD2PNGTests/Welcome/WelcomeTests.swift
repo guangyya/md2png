@@ -580,14 +580,6 @@ final class WelcomeTests: XCTestCase {
         let standardContrast = WelcomeShortcutRowContrastStyle(contrast: .standard)
         let increasedContrast = WelcomeShortcutRowContrastStyle(contrast: .increased)
         XCTAssertGreaterThan(
-            increasedContrast.shortcutBorderOpacity,
-            standardContrast.shortcutBorderOpacity
-        )
-        XCTAssertGreaterThan(
-            increasedContrast.shortcutBorderWidth,
-            standardContrast.shortcutBorderWidth
-        )
-        XCTAssertGreaterThan(
             increasedContrast.idleRowBorderOpacity,
             standardContrast.idleRowBorderOpacity
         )
@@ -894,6 +886,10 @@ final class WelcomeTests: XCTestCase {
             true
         )
         XCTAssertEqual(visibilityChanges, [true])
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_WELCOME_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(controller.window?.contentView)
+        )
 
         controller.trySampleForTesting()
         XCTAssertEqual(sampleCount, 1)
@@ -963,6 +959,27 @@ final class WelcomeTests: XCTestCase {
             pending.append(contentsOf: candidate.subviews)
         }
         return matches
+    }
+
+    @MainActor
+    private func writeSnapshotIfRequested(
+        environmentKey: String,
+        contentView: NSView
+    ) {
+        guard let outputPath = ProcessInfo.processInfo.environment[environmentKey],
+              !outputPath.isEmpty else {
+            return
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        contentView.layoutSubtreeIfNeeded()
+        contentView.displayIfNeeded()
+        guard let bitmap = contentView.bitmapImageRepForCachingDisplay(
+            in: contentView.bounds
+        ) else { return }
+        contentView.cacheDisplay(in: contentView.bounds, to: bitmap)
+        if let png = bitmap.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: outputPath))
+        }
     }
 
     private func makeDefaults() throws -> (UserDefaults, String) {
