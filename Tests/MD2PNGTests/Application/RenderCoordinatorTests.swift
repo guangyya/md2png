@@ -122,11 +122,187 @@ final class RenderCoordinatorTests: XCTestCase {
         coordinator.selectWidthPreset(.compact)
         coordinator.selectTheme(.warmPaper)
         coordinator.renderClipboard()
+        coordinator.saveClipboardAsSplitPNGs()
 
         XCTAssertTrue(coordinator.state.isUpdateInstallPending)
         XCTAssertEqual(coordinator.state.selectedWidthPreset, .wide)
         XCTAssertEqual(coordinator.state.selectedTheme, .dark)
         XCTAssertTrue(harness.renderRequests.isEmpty)
+        XCTAssertTrue(harness.splitRenderRequests.isEmpty)
+        XCTAssertTrue(harness.chosenSplitExportNames.isEmpty)
+    }
+
+    func testSplitExportUsesCurrentPresentationWithoutChangingClipboardOrHistory() async throws {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Tall release notes"
+        harness.splitExportDestinationURL = URL(
+            fileURLWithPath: "/tmp/Tall-release-notes-split",
+            isDirectory: true
+        )
+        let coordinator = harness.makeCoordinator()
+        coordinator.selectWidthPreset(.wide)
+        coordinator.selectTheme(.dark)
+
+        coordinator.saveClipboardAsSplitPNGs()
+
+        XCTAssertTrue(coordinator.state.isRendering)
+        XCTAssertEqual(harness.chosenSplitExportNames, ["Tall release notes-split"])
+        let request = try XCTUnwrap(harness.splitRenderRequests.first)
+        XCTAssertEqual(request.markdown, "# Tall release notes")
+        XCTAssertEqual(request.widthPreset, .wide)
+        XCTAssertEqual(request.theme, .dark)
+        XCTAssertTrue(harness.renderRequests.isEmpty)
+
+        let result = try makeSplitResult()
+        harness.completeNextSplitRender(with: .success(result))
+        await waitForRenderActionToFinish(coordinator)
+
+        XCTAssertEqual(harness.splitExportWrites.count, 1)
+        XCTAssertEqual(
+            harness.splitExportWrites.first?.1,
+            harness.splitExportDestinationURL
+        )
+        XCTAssertEqual(harness.notices, [.splitImagesSaved(count: 2)])
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertFalse(coordinator.state.hasLastRender)
+        XCTAssertFalse(coordinator.state.hasLastSource)
+    }
+
+    func testCancellingSplitExportDoesNotRenderOrChangeClipboard() {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Keep me"
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.saveClipboardAsSplitPNGs()
+
+        XCTAssertFalse(coordinator.state.isRendering)
+        XCTAssertEqual(harness.chosenSplitExportNames, ["Keep me-split"])
+        XCTAssertTrue(harness.splitRenderRequests.isEmpty)
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertTrue(harness.notices.isEmpty)
+        XCTAssertTrue(harness.errors.isEmpty)
+    }
+
+    func testSplitRenderFailureUsesSafeRendererDetailsAndWritesNothing() throws {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Too tall"
+        harness.splitExportDestinationURL = URL(
+            fileURLWithPath: "/tmp/Too-tall-split",
+            isDirectory: true
+        )
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.saveClipboardAsSplitPNGs()
+        harness.completeNextSplitRender(with: .failure(AppError.rendererTimedOut))
+
+        XCTAssertFalse(coordinator.state.isRendering)
+        let report = try XCTUnwrap(harness.errors.first as? RendererErrorReport)
+        XCTAssertEqual(report.failure.kind, .timeout)
+        XCTAssertTrue(harness.splitExportWrites.isEmpty)
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+    }
+
+    func testSplitSizeLimitDoesNotSuggestStartingTheSameExportAgain() throws {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Extremely tall"
+        harness.splitExportDestinationURL = URL(
+            fileURLWithPath: "/tmp/Extremely-tall-split",
+            isDirectory: true
+        )
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.saveClipboardAsSplitPNGs()
+        harness.completeNextSplitRender(with: .failure(AppError.contentTooLarge(
+            width: 1_120,
+            height: 80_000
+        )))
+
+        let error = try XCTUnwrap(harness.errors.first as? AppError)
+        guard case let .splitExportContentTooLarge(width, height) = error else {
+            return XCTFail("Expected splitExportContentTooLarge")
+        }
+        XCTAssertEqual(width, 1_120)
+        XCTAssertEqual(height, 80_000)
+        XCTAssertFalse(error.localizedDescription.contains("Save Clipboard as Split PNGs"))
+        XCTAssertFalse(coordinator.state.isRendering)
+        XCTAssertTrue(harness.splitExportWrites.isEmpty)
+    }
+
+    func testSplitExportWriteFailureRestoresIdleState() async throws {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Cannot save"
+        harness.splitExportDestinationURL = URL(
+            fileURLWithPath: "/tmp/Cannot-save-split",
+            isDirectory: true
+        )
+        harness.splitExportWriteError = AppError.splitExportWriteFailed
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.saveClipboardAsSplitPNGs()
+        harness.completeNextSplitRender(with: .success(try makeSplitResult()))
+        await waitForRenderActionToFinish(coordinator)
+
+        XCTAssertEqual(harness.errors.count, 1)
+        guard case .splitExportWriteFailed = harness.errors[0] as? AppError else {
+            return XCTFail("Expected splitExportWriteFailed")
+        }
+        XCTAssertTrue(harness.notices.isEmpty)
+        XCTAssertTrue(harness.splitExportWrites.isEmpty)
+    }
+
+    func testSplitExportDiagnosticsNeverPersistMarkdownOrDestinationPath() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "md2png-split-export-diagnostics-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let now = Date(timeIntervalSince1970: 1_787_000_000)
+        let logger = DiagnosticLogger(configuration: DiagnosticLoggerConfiguration(
+            directoryURL: directoryURL,
+            retentionPolicy: .standard,
+            includesVerboseEvents: true,
+            isEnabled: true,
+            now: { now },
+            applicationInfo: DiagnosticApplicationInfo(
+                name: "md2png",
+                version: "0.10.0",
+                build: "10",
+                sourceCommit: nil,
+                configuration: "debug"
+            ),
+            systemInfo: DiagnosticSystemInfo(
+                macOSVersion: "26.0.0",
+                architecture: "arm64"
+            )
+        ))
+        let markdownCanary = "# PRIVATE SPLIT MARKDOWN"
+        let pathCanary = "/Users/private/Secret-export-split"
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = markdownCanary
+        harness.splitExportDestinationURL = URL(
+            fileURLWithPath: pathCanary,
+            isDirectory: true
+        )
+        let coordinator = harness.makeCoordinator(diagnosticLogger: logger)
+
+        coordinator.saveClipboardAsSplitPNGs()
+        harness.completeNextSplitRender(with: .success(try makeSplitResult()))
+        await waitForRenderActionToFinish(coordinator)
+        await logger.flush()
+
+        let export = try await logger.export(window: .lastHour, now: now)
+        let encoded = try export.encodedString()
+        XCTAssertTrue(export.events.contains {
+            $0.stage == .renderCompletion
+                && $0.result == .succeeded
+                && $0.itemCount == 2
+        })
+        XCTAssertFalse(encoded.contains(markdownCanary))
+        XCTAssertFalse(encoded.contains(pathCanary))
+        XCTAssertFalse(encoded.contains("/Users/private"))
     }
 
     func testDiagnosticsCorrelateRenderStagesWithoutPersistingMarkdownOrErrors() async throws {
@@ -178,6 +354,43 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertFalse(encoded.contains("/Users/private"))
         XCTAssertFalse(encoded.contains("PrivateErrorDomain"))
     }
+
+    private func makeSplitResult() throws -> SplitRenderResult {
+        let geometry = try XCTUnwrap(RenderSplitGeometry(
+            contentHeight: 200,
+            preferredBreakOffsets: [100],
+            protectedRanges: []
+        ))
+        return SplitRenderResult(
+            contentSize: NSSize(width: 100, height: 200),
+            geometry: geometry,
+            parts: [
+                SplitRenderResult.Part(
+                    image: NSImage(size: NSSize(width: 100, height: 100)),
+                    slice: RenderSnapshotSlice(
+                        range: 0 ..< 100,
+                        ending: .preferredBoundary
+                    )
+                ),
+                SplitRenderResult.Part(
+                    image: NSImage(size: NSSize(width: 100, height: 100)),
+                    slice: RenderSnapshotSlice(
+                        range: 100 ..< 200,
+                        ending: .contentEnd
+                    )
+                )
+            ]
+        )
+    }
+
+    private func waitForRenderActionToFinish(
+        _ coordinator: RenderCoordinator
+    ) async {
+        for _ in 0 ..< 100 where coordinator.state.isRendering {
+            await Task.yield()
+        }
+        XCTAssertFalse(coordinator.state.isRendering)
+    }
 }
 
 @MainActor
@@ -190,10 +403,22 @@ private final class RenderCoordinatorHarness {
         let completion: RenderCoordinator.RenderCompletion
     }
 
+    struct SplitRenderRequest {
+        let markdown: String
+        let widthPreset: RenderWidthPreset
+        let theme: RenderTheme
+        let operationID: DiagnosticOperationID
+        let completion: RenderCoordinator.SplitRenderCompletion
+    }
+
     var clipboardMarkdown = ""
     var clipboardChangeCount = 10
     var confirmationResult = true
+    var splitExportDestinationURL: URL?
+    var splitExportWriteError: Error?
     private(set) var renderRequests: [RenderRequest] = []
+    private(set) var splitRenderRequests: [SplitRenderRequest] = []
+    private(set) var chosenSplitExportNames: [String] = []
     private(set) var writtenImages: [NSImage] = []
     private(set) var writtenMarkdown: [String] = []
     private(set) var selectedWidthPresets: [RenderWidthPreset] = []
@@ -203,6 +428,7 @@ private final class RenderCoordinatorHarness {
     private(set) var errors: [Error] = []
     private(set) var previews: [LastRender] = []
     private(set) var states: [RenderCoordinatorState] = []
+    private(set) var splitExportWrites: [(SplitRenderResult, URL)] = []
 
     func makeCoordinator(
         diagnosticLogger: DiagnosticLogger = .disabled
@@ -211,6 +437,15 @@ private final class RenderCoordinatorHarness {
             dependencies: RenderCoordinator.Dependencies(
                 render: { [weak self] markdown, widthPreset, theme, operationID, completion in
                     self?.renderRequests.append(RenderRequest(
+                        markdown: markdown,
+                        widthPreset: widthPreset,
+                        theme: theme,
+                        operationID: operationID,
+                        completion: completion
+                    ))
+                },
+                renderSplit: { [weak self] markdown, widthPreset, theme, operationID, completion in
+                    self?.splitRenderRequests.append(SplitRenderRequest(
                         markdown: markdown,
                         widthPreset: widthPreset,
                         theme: theme,
@@ -242,6 +477,14 @@ private final class RenderCoordinatorHarness {
                 },
                 selectTheme: { [weak self] theme in
                     self?.selectedThemes.append(theme)
+                },
+                chooseSplitExportDestination: { [weak self] suggestedName in
+                    self?.chosenSplitExportNames.append(suggestedName)
+                    return self?.splitExportDestinationURL
+                },
+                writeSplitExport: { [weak self] result, destinationURL in
+                    if let error = self?.splitExportWriteError { throw error }
+                    self?.splitExportWrites.append((result, destinationURL))
                 }
             ),
             diagnosticLogger: diagnosticLogger,
@@ -267,6 +510,11 @@ private final class RenderCoordinatorHarness {
 
     func completeNextRender(with result: Result<NSImage, Error>) {
         let request = renderRequests.removeFirst()
+        request.completion(result)
+    }
+
+    func completeNextSplitRender(with result: Result<SplitRenderResult, Error>) {
+        let request = splitRenderRequests.removeFirst()
         request.completion(result)
     }
 }

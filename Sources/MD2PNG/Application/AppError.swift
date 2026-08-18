@@ -8,6 +8,7 @@ enum AppError: LocalizedError {
     case rendererFailed
     case invalidRendererResponse
     case contentTooLarge(width: Int, height: Int)
+    case splitExportContentTooLarge(width: Int, height: Int)
     case rendererPNGEncodingFailed
     case pngEncodingFailed
     case pngWriteFailed
@@ -62,6 +63,14 @@ enum AppError: LocalizedError {
             return L10n.format(
                 "error.content_too_large",
                 defaultValue: "Couldn’t create a %1$ld × %2$ld PNG. The clipboard is unchanged. Shorten the Markdown and try again.",
+                bundle: localizationBundle,
+                width,
+                height
+            )
+        case let .splitExportContentTooLarge(width, height):
+            return L10n.format(
+                "error.split_export_content_too_large",
+                defaultValue: "Couldn’t split a %1$ld × %2$ld render within the safe export limit. The clipboard is unchanged. Shorten the Markdown and try again.",
                 bundle: localizationBundle,
                 width,
                 height

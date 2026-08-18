@@ -8,6 +8,7 @@ enum ClipboardOverwriteAction: Equatable {
 enum RenderCoordinatorNotice: Equatable {
     case imageCopied
     case markdownRestored
+    case splitImagesSaved(count: Int)
 }
 
 struct RenderCoordinatorState: Equatable {
@@ -29,6 +30,7 @@ struct LastRender {
 @MainActor
 final class RenderCoordinator {
     typealias RenderCompletion = (Result<NSImage, Error>) -> Void
+    typealias SplitRenderCompletion = (Result<SplitRenderResult, Error>) -> Void
 
     @MainActor
     struct Dependencies {
@@ -39,6 +41,13 @@ final class RenderCoordinator {
             _ operationID: DiagnosticOperationID,
             _ completion: @escaping RenderCompletion
         ) -> Void
+        let renderSplit: (
+            _ markdown: String,
+            _ widthPreset: RenderWidthPreset,
+            _ theme: RenderTheme,
+            _ operationID: DiagnosticOperationID,
+            _ completion: @escaping SplitRenderCompletion
+        ) -> Void
         let readClipboardMarkdown: () throws -> String
         let clipboardChangeCount: () -> Int
         let writeImage: (NSImage) throws -> Int
@@ -46,6 +55,11 @@ final class RenderCoordinator {
         let loadExample: (ExampleKind) throws -> String
         let selectWidthPreset: (RenderWidthPreset) -> Void
         let selectTheme: (RenderTheme) -> Void
+        let chooseSplitExportDestination: (_ suggestedDirectoryName: String) -> URL?
+        let writeSplitExport: (
+            _ result: SplitRenderResult,
+            _ destinationDirectoryURL: URL
+        ) async throws -> Void
 
         static func live(
             renderer: MarkdownRenderer? = nil,
@@ -66,13 +80,34 @@ final class RenderCoordinator {
                         completion: completion
                     )
                 },
+                renderSplit: { markdown, widthPreset, theme, operationID, completion in
+                    renderer.renderSplit(
+                        markdown,
+                        widthPreset: widthPreset,
+                        theme: theme,
+                        maximumSliceHeight: SplitImageExportPolicy.maximumSliceHeight,
+                        operationID: operationID,
+                        completion: completion
+                    )
+                },
                 readClipboardMarkdown: Clipboard.markdownText,
                 clipboardChangeCount: { Clipboard.changeCount },
                 writeImage: Clipboard.write(image:),
                 writeMarkdown: Clipboard.write(markdown:),
                 loadExample: AppResources.exampleMarkdown(for:),
                 selectWidthPreset: widthPreference.select,
-                selectTheme: themePreference.select
+                selectTheme: themePreference.select,
+                chooseSplitExportDestination: { suggestedDirectoryName in
+                    SplitImageExportDestination.choose(
+                        suggestedDirectoryName: suggestedDirectoryName
+                    )
+                },
+                writeSplitExport: { result, destinationDirectoryURL in
+                    try await SplitImageExportWriter.write(
+                        result,
+                        to: destinationDirectoryURL
+                    )
+                }
             )
         }
     }
@@ -84,6 +119,26 @@ final class RenderCoordinator {
     private let onError: (Error) -> Void
     private let onPreviewRequested: (LastRender) -> Void
     private let diagnosticLogger: DiagnosticLogger
+    private lazy var splitImageExportController = SplitImageExportController(
+        dependencies: SplitImageExportController.Dependencies(
+            readClipboardMarkdown: dependencies.readClipboardMarkdown,
+            chooseDestination: dependencies.chooseSplitExportDestination,
+            render: dependencies.renderSplit,
+            write: dependencies.writeSplitExport
+        ),
+        diagnosticLogger: diagnosticLogger,
+        onExportingChange: { [weak self] isExporting in
+            guard let self else { return }
+            self.isRendering = isExporting
+            self.notifyStateChange()
+        },
+        onSuccess: { [weak self] count in
+            self?.onNotice(.splitImagesSaved(count: count))
+        },
+        onError: { [weak self] error in
+            self?.onError(error)
+        }
+    )
 
     private var lastSource = LastSourceState()
     private var lastImage: NSImage?
@@ -191,6 +246,14 @@ final class RenderCoordinator {
             )
             onError(error)
         }
+    }
+
+    func saveClipboardAsSplitPNGs() {
+        guard canStartRenderAction else { return }
+        splitImageExportController.start(
+            widthPreset: selectedWidthPreset,
+            theme: selectedTheme
+        )
     }
 
     func showLastRender() {

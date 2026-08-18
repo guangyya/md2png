@@ -447,6 +447,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ),
                 symbol: "doc.on.clipboard.fill"
             )
+        case let .splitImagesSaved(count):
+            let message = count == 1
+                ? L10n.text(
+                    "hud.split_png_saved",
+                    defaultValue: "Saved 1 split PNG"
+                )
+                : L10n.format(
+                    "hud.split_pngs_saved",
+                    defaultValue: "Saved %ld split PNGs",
+                    count
+                )
+            hud.show(
+                message,
+                symbol: "folder.badge.checkmark"
+            )
         }
     }
 
