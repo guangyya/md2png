@@ -7,6 +7,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     private let diagnosticLogger: DiagnosticLogger
     private let diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies
     private let rendererSelfTestDependencies: AboutRendererSelfTestDependencies
+    private let onVisibilityChange: (Bool) -> Void
     private let contentModel = AboutContentModel()
     private var updateStatusObserverID: UUID?
     private var projectURL: URL?
@@ -127,6 +128,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         diagnosticLogger: DiagnosticLogger = .shared,
         diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies = .live(),
         rendererSelfTestDependencies: AboutRendererSelfTestDependencies? = nil,
+        onVisibilityChange: @escaping (Bool) -> Void = { _ in },
         onShowSettings: @escaping () -> Void = {}
     ) {
         self.updateController = updateController
@@ -135,6 +137,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         self.rendererSelfTestDependencies = rendererSelfTestDependencies ?? .live(
             diagnosticLogger: diagnosticLogger
         )
+        self.onVisibilityChange = onVisibilityChange
         let window = AppWindow(
             contentRect: NSRect(origin: .zero, size: AboutLayout.windowSize),
             styleMask: [.titled, .closable],
@@ -178,6 +181,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
     }
 
     func show(metadata: AppMetadata = .current()) {
+        let isBecomingVisible = window?.isVisible != true
         projectURL = metadata.projectURL
         updateFeatureAvailable = metadata.projectURL.flatMap(
             GitHubRepository.init(projectURL:)
@@ -191,6 +195,9 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         resetCopyVersionButton()
         resetDiagnosticSaveButton()
 
+        if isBecomingVisible {
+            onVisibilityChange(true)
+        }
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         window?.center()
@@ -327,6 +334,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         updateController.installLater()
+        onVisibilityChange(false)
     }
 
 #if DEBUG

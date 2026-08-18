@@ -785,11 +785,27 @@ final class AboutControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testAboutReportsWindowVisibilityChanges() {
+        _ = NSApplication.shared
+        var visibility: [Bool] = []
+        let controller = makeAboutController {
+            visibility.append($0)
+        }
+
+        controller.show()
+        controller.show()
+        controller.close()
+
+        XCTAssertEqual(visibility, [true, false])
+    }
+
+    @MainActor
     private func makeAboutController(
         phase: UpdatePhase = .upToDate(version: SemanticVersion("0.1.0")!),
         isChecking: Bool = false,
         nextManualCheckAt: Date? = nil,
-        manualCheckFeedback: ManualCheckFeedback = .none
+        manualCheckFeedback: ManualCheckFeedback = .none,
+        onVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) -> AboutController {
         let repository = GitHubRepository(projectURL: testProjectURL)!
         let updateController = UpdateController(
@@ -801,7 +817,10 @@ final class AboutControllerTests: XCTestCase {
             nextManualCheckAt: nextManualCheckAt,
             manualCheckFeedback: manualCheckFeedback
         ))
-        return AboutController(updateController: updateController)
+        return AboutController(
+            updateController: updateController,
+            onVisibilityChange: onVisibilityChange
+        )
     }
 
     private func makeDiagnosticLogger(
