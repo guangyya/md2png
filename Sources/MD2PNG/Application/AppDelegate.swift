@@ -7,32 +7,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self?.announce(message, priority: priority)
     })
     private let rendererErrorDetailsPresenter = RendererErrorDetailsPresenter()
-    private lazy var previewController = PreviewController(
-        onCopied: { [weak self] changeCount in
-            guard let self else { return }
-            self.renderCoordinator.recordOwnedClipboardWrite(changeCount: changeCount)
-            self.hud.show(
-                L10n.text(
-                    "hud.png_copied_again",
-                    defaultValue: "PNG copied again — paste with Command-V"
-                ),
-                symbol: "doc.on.clipboard.fill",
-                accessibilityAnnouncement: L10n.text(
-                    "hud.png_copied_again_accessibility",
-                    defaultValue: "PNG copied again and ready to paste with Command-V"
-                )
-            )
-        },
-        onError: { [weak self] error in
-            self?.show(error)
-        },
-        onVisibilityChange: { [weak self] isVisible in
-            self?.setPreviewWindowVisible(isVisible)
-        },
-        onShowSettings: { [weak self] in
-            self?.showShortcutSettings()
-        }
-    )
     private lazy var updateController = UpdateController(
         diagnosticLogger: diagnosticLogger,
         updateDriver: SparkleUpdateDriver {
@@ -48,48 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.setUpdateInstallPending(false)
         }
     )
-    private lazy var aboutController = AboutController(
-        updateController: updateController,
-        diagnosticLogger: diagnosticLogger,
-        onShowSettings: { [weak self] in
-            self?.showShortcutSettings()
-        }
-    )
     private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
     private let globalShortcutPreference: GlobalShortcutPreference
-    private lazy var shortcutSettingsController = ShortcutSettingsController(
-        preference: globalShortcutPreference,
-        onApply: { [weak self] configuration in
-            self?.registerGlobalShortcuts(configuration: configuration) ?? []
-        },
-        onRecordingBegan: { [weak self] in
-            // Carbon hot keys consume their matching event before the focused
-            // recorder can capture it, so suspend them for the recording session.
-            self?.globalHotKeyRegistrar.invalidate()
-        },
-        onRecordingCancelled: { [weak self] in
-            guard let self else { return }
-            self.registerGlobalShortcuts(configuration: self.globalShortcutConfiguration)
-        },
-        onVisibilityChange: { [weak self] isVisible in
-            self?.setShortcutSettingsWindowVisible(isVisible)
-        }
-    )
-    private lazy var welcomeController = WelcomeController(
-        preference: welcomePreference,
-        launchAtLoginController: launchAtLoginController,
-        onLaunchAtLoginError: { [weak self] error in
-            self?.show(error)
-        },
-        onVisibilityChange: { [weak self] isVisible in
-            self?.setWelcomeWindowVisible(isVisible)
-        },
-        onShowSettings: { [weak self] in
-            self?.showShortcutSettings()
-        },
-        onTrySample: { [weak self] in self?.showSampleGuide() }
-    )
     private let injectedSampleGuidePresenter: (any SampleGuidePresenting)?
     private lazy var sampleGuidePresenter: any SampleGuidePresenting = {
         if let injectedSampleGuidePresenter {
@@ -101,19 +36,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
     }()
-    private lazy var globalShortcutRouter = GlobalShortcutRouter(
+    private lazy var globalShortcutCoordinator = GlobalShortcutCoordinator(
+        preference: globalShortcutPreference,
+        diagnosticLogger: diagnosticLogger,
         verify: { [weak self] command in
-            self?.welcomeController.verifyShortcut(command) ?? false
+            self?.verifyGlobalShortcut(command) ?? false
         },
         perform: { [weak self] command in
-            guard let self else { return }
-            switch command {
-            case .render:
-                self.renderCoordinator.renderClipboard()
-            case .showLastRender:
-                self.renderCoordinator.showLastRender()
-            }
+            self?.performGlobalShortcut(command)
+        },
+        onStateChange: { [weak self] state in
+            self?.applyGlobalShortcutState(state)
         }
+    )
+    private lazy var windowPresentationCoordinator = WindowPresentationCoordinator(
+        updateController: updateController,
+        diagnosticLogger: diagnosticLogger,
+        launchAtLoginController: launchAtLoginController,
+        welcomePreference: welcomePreference,
+        globalShortcutPreference: globalShortcutPreference,
+        shortcutState: { [weak self] in
+            self?.currentShortcutWindowState() ?? .init(
+                configuration: .default,
+                failedRegistrationIDs: []
+            )
+        },
+        actions: WindowPresentationCoordinator.Actions(
+            previewCopied: { [weak self] changeCount in
+                self?.previewDidCopy(changeCount: changeCount)
+            },
+            showError: { [weak self] error in
+                self?.show(error)
+            },
+            applyShortcuts: { [weak self] configuration in
+                self?.applyGlobalShortcuts(configuration) ?? []
+            },
+            suspendShortcuts: { [weak self] in
+                self?.suspendGlobalShortcuts()
+            },
+            restoreShortcuts: { [weak self] in
+                self?.restoreGlobalShortcuts()
+            },
+            trySample: { [weak self] in
+                self?.showSampleGuide()
+            },
+            dismissTransientPresentation: { [weak self] in
+                self?.sampleGuidePresenter.dismiss()
+            }
+        )
     )
     private lazy var renderCoordinator = RenderCoordinator(
         diagnosticLogger: diagnosticLogger,
@@ -130,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.show(error)
         },
         onPreviewRequested: { [weak self] lastRender in
-            self?.show(lastRender)
+            self?.showPreview(lastRender)
         }
     )
     private lazy var updateStatusPresenter = UpdateStatusPresenter(
@@ -146,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.statusMenuController?.applyStatusItem(presentation)
         },
         isAboutVisible: { [weak self] in
-            self?.aboutController.window?.isVisible == true
+            self?.isAboutVisible() == true
         },
         announce: { [weak self] message in
             self?.announce(message, priority: .medium)
@@ -154,17 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     private var statusMenuController: StatusMenuController?
-    private let globalHotKeyRegistrar = GlobalHotKeyRegistrar()
-    private var globalShortcutConfiguration = GlobalShortcutConfiguration.default
-    private var failedGlobalShortcutRegistrationIDs: Set<UInt32> = []
-    private var welcomeShortcutStatuses: [WelcomeShortcutStatus] = []
     private var clipboardContainsMarkdown = false
     private var isSampleGuidePresentationScheduled = false
     private var isWaitingForUpdateDeferralBeforeTermination = false
     private var updateStatusObserverID: UUID?
-    private var isPreviewWindowVisible = false
-    private var isWelcomeWindowVisible = false
-    private var isShortcutSettingsWindowVisible = false
 
 #if DEBUG
     var clipboardMenuRefreshCountForTesting: Int {
@@ -187,26 +150,87 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
     }
 
+    private func verifyGlobalShortcut(_ command: GlobalShortcutCommand) -> Bool {
+        windowPresentationCoordinator.verifyShortcut(command)
+    }
+
+    private func performGlobalShortcut(_ command: GlobalShortcutCommand) {
+        switch command {
+        case .render:
+            renderCoordinator.renderClipboard()
+        case .showLastRender:
+            renderCoordinator.showLastRender()
+        }
+    }
+
+    private func applyGlobalShortcutState(_ state: GlobalShortcutCoordinator.State) {
+        statusMenuController?.applyShortcuts(state.configuration)
+        windowPresentationCoordinator.refreshWelcomeShortcutsIfVisible(
+            state.welcomeShortcuts
+        )
+    }
+
+    private func currentShortcutWindowState() -> WindowPresentationCoordinator.ShortcutState {
+        WindowPresentationCoordinator.ShortcutState(
+            configuration: globalShortcutCoordinator.configuration,
+            failedRegistrationIDs: globalShortcutCoordinator.failedRegistrationIDs
+        )
+    }
+
+    private func applyGlobalShortcuts(
+        _ configuration: GlobalShortcutConfiguration
+    ) -> Set<UInt32> {
+        globalShortcutCoordinator.apply(configuration)
+    }
+
+    private func suspendGlobalShortcuts() {
+        globalShortcutCoordinator.suspendForRecording()
+    }
+
+    private func restoreGlobalShortcuts() {
+        globalShortcutCoordinator.restoreAfterCancelledRecording()
+    }
+
+    private func previewDidCopy(changeCount: Int) {
+        renderCoordinator.recordOwnedClipboardWrite(changeCount: changeCount)
+        hud.show(
+            L10n.text(
+                "hud.png_copied_again",
+                defaultValue: "PNG copied again — paste with Command-V"
+            ),
+            symbol: "doc.on.clipboard.fill",
+            accessibilityAnnouncement: L10n.text(
+                "hud.png_copied_again_accessibility",
+                defaultValue: "PNG copied again and ready to paste with Command-V"
+            )
+        )
+    }
+
+    private func showPreview(_ lastRender: LastRender) {
+        windowPresentationCoordinator.showPreview(lastRender)
+    }
+
+    private func isAboutVisible() -> Bool {
+        windowPresentationCoordinator.isVisible(.about)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         diagnosticLogger.record(
             category: .appLifecycle,
             stage: .applicationLaunch,
             result: .started
         )
-        NSApp.setActivationPolicy(.accessory)
-        globalShortcutConfiguration = globalShortcutPreference.configuration
+        windowPresentationCoordinator.prepareForApplicationLaunch()
         configureStatusItem()
         updateStatusPresenter.presentRelaunchResultIfNeeded()
 
-        let failedRegistrationIDs = registerGlobalShortcuts(
-            configuration: globalShortcutConfiguration
-        )
+        let failedRegistrationIDs = globalShortcutCoordinator.start()
 
         if welcomePreference.shouldShowOnLaunch {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.welcomeController.showIfNeeded(
-                    shortcuts: self.welcomeShortcutStatuses
+                self.windowPresentationCoordinator.showWelcomeIfNeeded(
+                    shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
                 )
             }
         } else if !failedRegistrationIDs.isEmpty {
@@ -226,45 +250,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stage: .applicationLaunch,
             result: .succeeded
         )
-    }
-
-    @discardableResult
-    private func registerGlobalShortcuts(
-        configuration: GlobalShortcutConfiguration
-    ) -> Set<UInt32> {
-        precondition(configuration.isValid)
-        let registrations: [GlobalHotKey.Registration] = [
-            .render(shortcut: configuration.render) { [weak self] in
-                self?.globalShortcutRouter.handle(.render)
-            },
-            .showLastRender(shortcut: configuration.showLastRender) { [weak self] in
-                self?.globalShortcutRouter.handle(.showLastRender)
-            }
-        ]
-        let failedRegistrationIDs = globalHotKeyRegistrar.replace(
-            registrations: registrations
-        )
-        globalShortcutConfiguration = configuration
-        failedGlobalShortcutRegistrationIDs = failedRegistrationIDs
-        welcomeShortcutStatuses = registrations.map {
-            WelcomeShortcutStatus(
-                registration: $0,
-                failedRegistrationIDs: failedRegistrationIDs
-            )
-        }
-        statusMenuController?.applyShortcuts(configuration)
-        if isWelcomeWindowVisible {
-            welcomeController.refreshShortcuts(welcomeShortcutStatuses)
-        }
-        diagnosticLogger.record(
-            category: .shortcut,
-            stage: .shortcutRegistration,
-            result: failedRegistrationIDs.isEmpty ? .succeeded : .failed,
-            level: failedRegistrationIDs.isEmpty ? .info : .error,
-            itemCount: registrations.count,
-            failureCount: failedRegistrationIDs.count
-        )
-        return failedRegistrationIDs
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -339,7 +324,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = StatusMenuController(
             selectedWidthPreset: renderState.selectedWidthPreset,
             selectedTheme: renderState.selectedTheme,
-            shortcutConfiguration: globalShortcutConfiguration,
+            shortcutConfiguration: globalShortcutCoordinator.configuration,
             actions: StatusMenuController.Actions(
                 menuWillOpen: { [weak self] in self?.statusMenuWillOpen() },
                 renderClipboard: { [weak self] in
@@ -366,9 +351,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 performLaunchAtLoginAction: { [weak self] in
                     self?.performLaunchAtLoginAction()
                 },
-                showSettings: { [weak self] in self?.showShortcutSettings() },
-                showWelcome: { [weak self] in self?.showWelcome() },
-                showAbout: { [weak self] in self?.showAbout() },
+                showSettings: { [weak self] in
+                    self?.windowPresentationCoordinator.showSettings()
+                },
+                showWelcome: { [weak self] in
+                    guard let self else { return }
+                    self.windowPresentationCoordinator.showWelcome(
+                        shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
+                    )
+                },
+                showAbout: { [weak self] in
+                    self?.windowPresentationCoordinator.showAbout()
+                },
                 quit: { NSApp.terminate(nil) }
             )
         )
@@ -498,30 +492,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func show(_ lastRender: LastRender) {
-        previewController.show(
-            image: lastRender.image,
-            widthPreset: lastRender.widthPreset,
-            markdown: lastRender.markdown
-        )
-    }
-
-    private func showAbout() {
-        aboutController.show()
-    }
-
-    private func showShortcutSettings() {
-        sampleGuidePresenter.dismiss()
-        shortcutSettingsController.show(
-            configuration: globalShortcutConfiguration,
-            failedRegistrationIDs: failedGlobalShortcutRegistrationIDs
-        )
-    }
-
-    private func showWelcome() {
-        welcomeController.show(shortcuts: welcomeShortcutStatuses)
-    }
-
     private func performLaunchAtLoginAction() {
         do {
             let result = try launchAtLoginController.performPrimaryAction()
@@ -545,9 +515,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateLaunchAtLoginMenu() {
         let presentation = launchAtLoginController.presentation
         statusMenuController?.applyLaunchAtLogin(presentation)
-        if isWelcomeWindowVisible {
-            welcomeController.refreshLaunchAtLogin()
-        }
+        windowPresentationCoordinator.refreshWelcomeLaunchAtLoginIfVisible()
     }
 
     private func showSampleGuide() {
@@ -585,47 +553,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    private func setPreviewWindowVisible(_ isVisible: Bool) {
-        isPreviewWindowVisible = isVisible
-        updateWindowedActivationPolicy()
-    }
-
-    private func setWelcomeWindowVisible(_ isVisible: Bool) {
-        isWelcomeWindowVisible = isVisible
-        updateWindowedActivationPolicy()
-    }
-
-    private func setShortcutSettingsWindowVisible(_ isVisible: Bool) {
-        isShortcutSettingsWindowVisible = isVisible
-        updateWindowedActivationPolicy()
-    }
-
-    private func updateWindowedActivationPolicy() {
-        NSApp.setActivationPolicy(
-            isPreviewWindowVisible
-                || isWelcomeWindowVisible
-                || isShortcutSettingsWindowVisible
-                ? .regular
-                : .accessory
-        )
-    }
-
 #if DEBUG
     func prepareWelcomeSampleGuidePathForTesting() {
         configureStatusItem()
-        isWelcomeWindowVisible = true
+        windowPresentationCoordinator.setVisibleForTesting(true, surface: .welcome)
     }
 
     func triggerWelcomeSampleGuideForTesting() {
-        welcomeController.trySampleForTesting()
+        windowPresentationCoordinator.triggerWelcomeSampleGuideForTesting()
     }
 
     var welcomeLaunchAtLoginRefreshCountForTesting: Int {
-        welcomeController.launchAtLoginRefreshCountForTesting
+        windowPresentationCoordinator.welcomeLaunchAtLoginRefreshCountForTesting
     }
 
     func cleanUpWelcomeSampleGuidePathForTesting() {
-        isWelcomeWindowVisible = false
+        windowPresentationCoordinator.setVisibleForTesting(false, surface: .welcome)
         if let updateStatusObserverID {
             updateController.removeStatusObserver(updateStatusObserverID)
             self.updateStatusObserverID = nil
