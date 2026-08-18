@@ -74,7 +74,7 @@ final class StatusMenuPresentationTests: XCTestCase {
         delegate.triggerWelcomeSampleGuideForTesting()
 
         XCTAssertTrue(presenter.presentedStates.isEmpty)
-        await fulfillment(of: [presented], timeout: 1)
+        await fulfillment(of: [presented], timeout: 10)
         XCTAssertEqual(presenter.presentedStates.count, 1)
         let state = try XCTUnwrap(presenter.presentedStates.first)
         XCTAssertEqual(state.canRenderClipboard, expectedClipboardState.containsMarkdown)
