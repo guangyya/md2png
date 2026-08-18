@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-18
+
 ### Added
 
 - Customize the Render and Show Last Render global shortcuts from a native
