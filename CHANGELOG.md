@@ -18,6 +18,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   workflow demo.
 - Centralize shared window, card, section, status, footer, and shortcut styling
   in a project-level app theme for consistent reuse.
+- Organize Settings controllers, views, capture handling, models, and tests
+  under a dedicated feature boundary.
 
 ### Fixed
 

@@ -273,7 +273,8 @@ See [Releasing](docs/RELEASING.md) before running the command.
 ## Project layout
 
 ```text
-Sources/MD2PNG/{Application,About,Preview,Rendering,Updates,Welcome}/
+Sources/MD2PNG/{About,Application,DesignSystem,Diagnostics,Preview}/
+Sources/MD2PNG/{Rendering,Settings,Updates,Welcome}/
                             Feature-first native Swift/AppKit sources
 Sources/MD2PNG/Resources/   Localized strings and bundled renderer output
 Tests/MD2PNGTests/          Mirrored feature tests and test support

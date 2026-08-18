@@ -3,12 +3,12 @@ import Carbon
 import XCTest
 @testable import MD2PNG
 
-final class ShortcutSettingsControllerTests: XCTestCase {
+final class SettingsControllerTests: XCTestCase {
     func testSettingsCopyIsLocalizedAndDescribesMenuFallback() throws {
-        let english = ShortcutSettingsCopy(
+        let english = SettingsCopy(
             localizationBundle: try XCTUnwrap(L10n.localizedBundle(for: "en"))
         )
-        let chinese = ShortcutSettingsCopy(
+        let chinese = SettingsCopy(
             localizationBundle: try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
         )
 
@@ -41,7 +41,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         _ = NSApplication.shared
         var visibility: [Bool] = []
         let launchAtLoginService = SettingsLaunchAtLoginServiceStub(status: .notRegistered)
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             launchAtLoginController: LaunchAtLoginController(
                 service: launchAtLoginService
             ),
@@ -56,14 +56,14 @@ final class ShortcutSettingsControllerTests: XCTestCase {
 
         XCTAssertTrue(controller.window?.isVisible == true)
         XCTAssertTrue(controller.usesSwiftUIHostingBoundary)
-        XCTAssertEqual(controller.displayedContentSize, ShortcutSettingsLayout.windowSize)
+        XCTAssertEqual(controller.displayedContentSize, SettingsLayout.windowSize)
         XCTAssertEqual(
             controller.displayedFeedback,
             .registrationUnavailable([.render])
         )
-        XCTAssertEqual(ShortcutSettingsLayout.rowHeight, 56)
-        XCTAssertEqual(ShortcutSettingsLayout.generalRowHeight, 60)
-        XCTAssertEqual(ShortcutSettingsLayout.feedbackHeight, 44)
+        XCTAssertEqual(SettingsLayout.rowHeight, 56)
+        XCTAssertEqual(SettingsLayout.generalRowHeight, 60)
+        XCTAssertEqual(SettingsLayout.feedbackHeight, 44)
         XCTAssertEqual(visibility, [true])
 
         writeSnapshotIfRequested(
@@ -82,7 +82,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         let (preference, defaults, suiteName) = try makePreference()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var applied: [GlobalShortcutConfiguration] = []
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             preference: preference,
             onApply: {
                 applied.append($0)
@@ -113,7 +113,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var recordingLifecycle: [String] = []
         var applied: [GlobalShortcutConfiguration] = []
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             preference: preference,
             onApply: {
                 applied.append($0)
@@ -155,7 +155,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         _ = NSApplication.shared
         var recordingBeganCount = 0
         var applied: [GlobalShortcutConfiguration] = []
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             onApply: {
                 applied.append($0)
                 return []
@@ -190,7 +190,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         ))
         XCTAssertTrue(preference.save(custom))
         var applied: [GlobalShortcutConfiguration] = []
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             preference: preference,
             onApply: {
                 applied.append($0)
@@ -211,7 +211,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
     @MainActor
     func testRestoringAlreadySelectedDefaultsStillReportsCompletion() {
         _ = NSApplication.shared
-        let controller = ShortcutSettingsController(onApply: { _ in [] })
+        let controller = SettingsController(onApply: { _ in [] })
         controller.show(configuration: .default, failedRegistrationIDs: [])
         defer { controller.close() }
 
@@ -227,7 +227,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         service.statusAfterRegister = .requiresApproval
         service.statusAfterUnregister = .notRegistered
         var changeCount = 0
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             launchAtLoginController: LaunchAtLoginController(service: service),
             onApply: { _ in [] },
             onLaunchAtLoginChange: { changeCount += 1 }
@@ -274,7 +274,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         _ = NSApplication.shared
         let service = SettingsLaunchAtLoginServiceStub(status: .notRegistered)
         service.operationError = CocoaError(.fileWriteNoPermission)
-        let controller = ShortcutSettingsController(
+        let controller = SettingsController(
             launchAtLoginController: LaunchAtLoginController(service: service),
             onApply: { _ in [] }
         )
@@ -361,7 +361,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
     }
 
     private func makePreference() throws -> (GlobalShortcutPreference, UserDefaults, String) {
-        let suiteName = "MD2PNGShortcutSettingsControllerTests.\(UUID().uuidString)"
+        let suiteName = "MD2PNGSettingsControllerTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         return (GlobalShortcutPreference(defaults: defaults), defaults, suiteName)
     }

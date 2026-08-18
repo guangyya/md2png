@@ -2,14 +2,14 @@ import AppKit
 import Carbon
 import SwiftUI
 
-enum ShortcutSettingsLayout {
+enum SettingsLayout {
     static let windowSize = NSSize(width: 520, height: 390)
     static let generalRowHeight: CGFloat = 60
     static let rowHeight: CGFloat = 56
     static let feedbackHeight: CGFloat = 44
 }
 
-struct ShortcutSettingsCopy {
+struct SettingsCopy {
     let windowTitle: String
     let generalTitle: String
     let launchAtLogin: String
@@ -194,8 +194,8 @@ struct ShortcutSettingsCopy {
 }
 
 @MainActor
-final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
-    private let copy: ShortcutSettingsCopy
+final class SettingsController: NSWindowController, NSWindowDelegate {
+    private let copy: SettingsCopy
     private let contentModel: ShortcutSettingsModel
     private let launchAtLoginModel: LaunchAtLoginSettingsModel
     private let onVisibilityChange: (Bool) -> Void
@@ -223,7 +223,7 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         window?.contentView?.bounds.size ?? .zero
     }
     var usesSwiftUIHostingBoundary: Bool {
-        window?.contentViewController is NSHostingController<ShortcutSettingsContentView>
+        window?.contentViewController is NSHostingController<SettingsContentView>
     }
 #endif
 
@@ -237,7 +237,7 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         onLaunchAtLoginChange: @escaping () -> Void = {},
         onVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) {
-        copy = ShortcutSettingsCopy(localizationBundle: localizationBundle)
+        copy = SettingsCopy(localizationBundle: localizationBundle)
         contentModel = ShortcutSettingsModel(
             preference: preference,
             onRecordingBegan: onRecordingBegan,
@@ -250,7 +250,7 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         )
         self.onVisibilityChange = onVisibilityChange
         let window = AppWindow(
-            contentRect: NSRect(origin: .zero, size: ShortcutSettingsLayout.windowSize),
+            contentRect: NSRect(origin: .zero, size: SettingsLayout.windowSize),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -262,13 +262,13 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         window.contentViewController = NSHostingController(
-            rootView: ShortcutSettingsContentView(
+            rootView: SettingsContentView(
                 model: contentModel,
                 launchAtLoginModel: launchAtLoginModel,
                 copy: copy
             )
         )
-        window.setContentSize(ShortcutSettingsLayout.windowSize)
+        window.setContentSize(SettingsLayout.windowSize)
         window.center()
     }
 
@@ -343,12 +343,12 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
 #endif
 }
 
-struct ShortcutSettingsContentView: View {
+struct SettingsContentView: View {
     @State private var isLaunchAtLoginHovering = false
 
     @ObservedObject var model: ShortcutSettingsModel
     @ObservedObject var launchAtLoginModel: LaunchAtLoginSettingsModel
-    let copy: ShortcutSettingsCopy
+    let copy: SettingsCopy
 
     var body: some View {
         VStack(spacing: 0) {
@@ -369,8 +369,8 @@ struct ShortcutSettingsContentView: View {
                 .appWindowFooterStyle()
         }
         .frame(
-            width: ShortcutSettingsLayout.windowSize.width,
-            height: ShortcutSettingsLayout.windowSize.height,
+            width: SettingsLayout.windowSize.width,
+            height: SettingsLayout.windowSize.height,
             alignment: .topLeading
         )
         .background {
@@ -408,8 +408,8 @@ struct ShortcutSettingsContentView: View {
                 .padding(.horizontal, 16)
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: ShortcutSettingsLayout.generalRowHeight,
-                    maxHeight: ShortcutSettingsLayout.generalRowHeight,
+                    minHeight: SettingsLayout.generalRowHeight,
+                    maxHeight: SettingsLayout.generalRowHeight,
                     alignment: .leading
                 )
                 .contentShape(Rectangle())
@@ -453,8 +453,8 @@ struct ShortcutSettingsContentView: View {
         feedbackView
             .frame(
                 maxWidth: .infinity,
-                minHeight: ShortcutSettingsLayout.feedbackHeight,
-                maxHeight: ShortcutSettingsLayout.feedbackHeight,
+                minHeight: SettingsLayout.feedbackHeight,
+                maxHeight: SettingsLayout.feedbackHeight,
                 alignment: .leading
             )
     }
@@ -541,7 +541,7 @@ struct ShortcutSettingsContentView: View {
             .accessibilityIdentifier("ShortcutRecorder.\(command.rawValue)")
         }
         .padding(.horizontal, 16)
-        .frame(height: ShortcutSettingsLayout.rowHeight)
+        .frame(height: SettingsLayout.rowHeight)
     }
 
     @ViewBuilder

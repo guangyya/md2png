@@ -3,7 +3,7 @@ import Carbon
 import XCTest
 @testable import MD2PNG
 
-final class GlobalShortcutCaptureTests: XCTestCase {
+final class ShortcutSettingsTests: XCTestCase {
     func testCaptureBuildsAConfiguredLetterShortcut() throws {
         let event = try makeEvent(
             keyCode: UInt16(kVK_ANSI_K),
