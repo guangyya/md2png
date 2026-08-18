@@ -548,6 +548,45 @@ final class WelcomeTests: XCTestCase {
         XCTAssertGreaterThan(increased.keyBorderWidth, standard.keyBorderWidth)
     }
 
+    func testWelcomeShortcutFeedbackRespectsMotionAndIncreasedContrast() {
+        let standardMotion = WelcomeShortcutFeedbackMotion(
+            reduceMotion: false,
+            isShowingFeedback: true,
+            verificationCount: 3
+        )
+        XCTAssertEqual(standardMotion.bounceValue, 3)
+        XCTAssertGreaterThan(standardMotion.scale, 1)
+        XCTAssertNotNil(standardMotion.animationDuration)
+
+        let reducedMotion = WelcomeShortcutFeedbackMotion(
+            reduceMotion: true,
+            isShowingFeedback: true,
+            verificationCount: 3
+        )
+        XCTAssertEqual(reducedMotion.bounceValue, 0)
+        XCTAssertEqual(reducedMotion.scale, 1)
+        XCTAssertNil(reducedMotion.animationDuration)
+
+        let standardContrast = WelcomeShortcutRowContrastStyle(contrast: .standard)
+        let increasedContrast = WelcomeShortcutRowContrastStyle(contrast: .increased)
+        XCTAssertGreaterThan(
+            increasedContrast.shortcutBorderOpacity,
+            standardContrast.shortcutBorderOpacity
+        )
+        XCTAssertGreaterThan(
+            increasedContrast.shortcutBorderWidth,
+            standardContrast.shortcutBorderWidth
+        )
+        XCTAssertGreaterThan(
+            increasedContrast.idleRowBorderOpacity,
+            standardContrast.idleRowBorderOpacity
+        )
+        XCTAssertGreaterThan(
+            increasedContrast.feedbackRowBorderWidth,
+            standardContrast.feedbackRowBorderWidth
+        )
+    }
+
     func testSampleGuideRevealsTheMenuHierarchyInOrder() {
         XCTAssertFalse(SampleGuidePhase.mainMenu.highlightsExamples)
         XCTAssertFalse(SampleGuidePhase.mainMenu.showsSubmenu)
