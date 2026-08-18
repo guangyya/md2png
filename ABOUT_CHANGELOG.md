@@ -5,6 +5,8 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-18
+
 ### Added
 
 - Render with new High Contrast and Midnight Blue themes.
