@@ -91,8 +91,8 @@ final class PreviewDragExportStore {
         )
     }
 
-    isolated deinit {
-        try? fileManager.removeItem(at: rootDirectoryURL)
+    deinit {
+        try? FileManager.default.removeItem(at: rootDirectoryURL)
     }
 
     func export(

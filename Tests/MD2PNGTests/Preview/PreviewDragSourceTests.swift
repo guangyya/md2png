@@ -219,7 +219,6 @@ final class PreviewDragSourceTests: XCTestCase {
         pixelsHigh: Int,
         color: NSColor
     ) throws -> NSImage {
-        _ = NSApplication.shared
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: pixelsWide,
