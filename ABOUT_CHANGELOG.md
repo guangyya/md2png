@@ -18,6 +18,7 @@ for the complete project history and release details.
 
 - Open the Welcome Example list on the right without breaking its status-item
   anchor.
+- Keep keyboard navigation inside the Welcome Example popover while it is open.
 - Record shortcuts in Settings without activating them, show conflicts, and keep
   Restore Defaults available.
 

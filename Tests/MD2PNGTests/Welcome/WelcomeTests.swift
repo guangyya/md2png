@@ -703,6 +703,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertTrue(popover.isShown)
         XCTAssertNotNil(popover.contentViewController)
+        XCTAssertEqual(popover.keyboardFocusRequestCount, 1)
         XCTAssertEqual(statusButton.cell?.isHighlighted, true)
 
         controller.choose(.short)
@@ -819,6 +820,7 @@ final class WelcomeTests: XCTestCase {
 
         XCTAssertFalse(popover.isShown)
         XCTAssertNil(popover.contentViewController)
+        XCTAssertEqual(popover.keyboardFocusRequestCount, 0)
         XCTAssertTrue(deliveredSelections.isEmpty)
         XCTAssertEqual(statusButton.cell?.isHighlighted, false)
     }
@@ -1051,6 +1053,7 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
     var completesCloseImmediately = true
     var resetsContentSizeWhenInstallingController = false
     private(set) var closeCount = 0
+    private(set) var keyboardFocusRequestCount = 0
     private var isClosing = false
 
     func show(
@@ -1061,6 +1064,10 @@ private final class TestSampleGuidePopover: SampleGuidePopover {
         guard showsWhenRequested else { return }
         isShown = true
         isClosing = false
+    }
+
+    func requestKeyboardFocus() {
+        keyboardFocusRequestCount += 1
     }
 
     func close() {

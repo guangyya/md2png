@@ -26,6 +26,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Keep the Welcome Example guide's submenu on the familiar right side while
   preserving a valid status-item anchor.
+- Move keyboard focus into the Welcome Example guide so Full Keyboard Access
+  stays inside the popover instead of returning to the Welcome window.
 - Capture assigned global shortcuts inside Settings without triggering their
   actions, report conflicts, and keep Restore Defaults available.
 

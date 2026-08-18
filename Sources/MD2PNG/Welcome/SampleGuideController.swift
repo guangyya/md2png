@@ -299,10 +299,23 @@ protocol SampleGuidePopover: AnyObject {
         of positioningView: NSView,
         preferredEdge: NSRectEdge
     )
+    func requestKeyboardFocus()
     func close()
 }
 
-extension NSPopover: SampleGuidePopover {}
+extension NSPopover: SampleGuidePopover {
+    func requestKeyboardFocus() {
+        guard isShown else { return }
+        if let window = contentViewController?.view.window {
+            window.makeKey()
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isShown else { return }
+            self.contentViewController?.view.window?.makeKey()
+        }
+    }
+}
 
 @MainActor
 protocol SampleGuidePresenting: AnyObject {
@@ -393,6 +406,7 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
             clearStatusButtonHighlight()
             return
         }
+        popover.requestKeyboardFocus()
     }
 
     func dismiss() {
