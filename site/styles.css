@@ -30,20 +30,12 @@ html {
 
 body {
   margin: 0;
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: radial-gradient(rgba(23, 25, 28, 0.045) 0.7px, transparent 0.7px);
+  background-size: 5px 5px;
   color: var(--ink);
   font-family: "Manrope", "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-body::before {
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  background-image: radial-gradient(rgba(23, 25, 28, 0.045) 0.7px, transparent 0.7px);
-  background-size: 5px 5px;
-  content: "";
-  pointer-events: none;
 }
 
 a {
