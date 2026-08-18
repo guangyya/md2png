@@ -91,7 +91,7 @@ A GFM table needs a separator row:
 | Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
-| Theme | — | Selects Clean Light, Warm Paper, or Dark for subsequent renders and remembers the selection locally |
+| Theme | — | Selects one of five bundled render palettes and remembers the selection locally |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
@@ -102,10 +102,11 @@ A GFM table needs a separator row:
 The top of the menu contains a compact, read-only preview of the current
 clipboard. Standard preserves the original output sizing; Compact wraps prose
 sooner, while Wide gives large tables and diagrams more room. Clean Light is the
-default theme; Warm Paper and Dark apply coordinated Markdown, code-highlighting,
-and Mermaid colors without changing typography, spacing, or output width. The
-chosen theme is fixed into an opaque PNG. While a render is running, additional
-render commands, width or theme changes, and examples are temporarily disabled.
+default theme; Warm Paper, Dark, High Contrast, and Midnight Blue apply
+coordinated Markdown, code-highlighting, and Mermaid colors without changing
+typography, spacing, or output width. The chosen theme is fixed into an opaque
+PNG. While a render is running, additional render commands, width or theme
+changes, and examples are temporarily disabled.
 Re-render Last Markdown and Restore Last Markdown become available only after a
 successful render and ask before replacing clipboard content changed by another
 application.

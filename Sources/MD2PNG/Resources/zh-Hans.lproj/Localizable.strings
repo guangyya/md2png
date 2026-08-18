@@ -28,6 +28,8 @@
 "render_theme.clean_light" = "简洁浅色";
 "render_theme.warm_paper" = "暖色纸张";
 "render_theme.dark" = "深色";
+"render_theme.high_contrast" = "高对比度";
+"render_theme.midnight_blue" = "午夜蓝";
 
 "clipboard.labeled" = "剪贴板：%@";
 "clipboard.png_image" = "PNG 图片";

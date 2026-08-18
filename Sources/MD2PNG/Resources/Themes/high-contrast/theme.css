@@ -1,0 +1,24 @@
+:root {
+  color-scheme: only light;
+  --background: #ffffff;
+  --text: #000000;
+  --muted-text: #333333;
+  --border: #4a4a4a;
+  --heading-border: #2f2f2f;
+  --link: #003db8;
+  --inline-code: #e2e2e2;
+  --code-surface: #f2f2f2;
+  --code-text: #000000;
+  --table-alternate: #f7f7f7;
+  --syntax-comment: #3d3d3d;
+  --syntax-keyword: #a31515;
+  --syntax-string: #004b76;
+  --syntax-title: #5b2380;
+  --syntax-variable: #003c8f;
+  --syntax-symbol: #713600;
+  --syntax-meta: #006328;
+  --syntax-deletion-text: #7a0017;
+  --syntax-deletion-background: #ffd7de;
+  --syntax-addition-text: #005a20;
+  --syntax-addition-background: #d5f5df;
+}

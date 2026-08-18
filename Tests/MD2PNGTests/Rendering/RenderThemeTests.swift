@@ -4,10 +4,15 @@ import XCTest
 
 final class RenderThemeTests: XCTestCase {
     func testThemesHaveStableExplicitOrder() {
-        XCTAssertEqual(RenderTheme.allCases, [.cleanLight, .warmPaper, .dark])
+        XCTAssertEqual(
+            RenderTheme.allCases.map(\.rawValue),
+            ["cleanLight", "warmPaper", "dark", "highContrast", "midnightBlue"]
+        )
         XCTAssertEqual(RenderTheme.cleanLight.rawValue, "cleanLight")
         XCTAssertEqual(RenderTheme.warmPaper.rawValue, "warmPaper")
         XCTAssertEqual(RenderTheme.dark.rawValue, "dark")
+        XCTAssertNotNil(RenderTheme(rawValue: "highContrast"))
+        XCTAssertNotNil(RenderTheme(rawValue: "midnightBlue"))
     }
 
     func testBundledManifestProvidesMetadataAndExistingLocalStylesheets() throws {
@@ -15,7 +20,10 @@ final class RenderThemeTests: XCTestCase {
         let rendererDirectory = try XCTUnwrap(RendererResources.pageURL)
             .deletingLastPathComponent()
 
-        XCTAssertEqual(registry.descriptors.map(\.appearance), [.light, .light, .dark])
+        XCTAssertEqual(
+            registry.descriptors.map(\.appearance),
+            [.light, .light, .dark, .light, .dark]
+        )
         for descriptor in registry.descriptors {
             let stylesheetURL = rendererDirectory.appending(path: descriptor.stylesheet)
             XCTAssertTrue(
@@ -120,14 +128,18 @@ final class RenderThemeTests: XCTestCase {
     }
 
     @MainActor
-    func testEveryThemeRendersAllPhaseOneContentWithoutLayoutOrStyleLeakage() async throws {
+    func testEveryThemeRendersSupportedContentWithoutLayoutOrStyleLeakage() async throws {
         _ = NSApplication.shared
         let renderer = MarkdownRenderer()
-        let sequence: [RenderTheme] = [.cleanLight, .dark, .warmPaper, .cleanLight]
+        let highContrast = try XCTUnwrap(RenderTheme(rawValue: "highContrast"))
+        let midnightBlue = try XCTUnwrap(RenderTheme(rawValue: "midnightBlue"))
+        let sequence = RenderTheme.allCases + [.cleanLight]
         let expectedBackgrounds: [RenderTheme: NSColor] = [
             .cleanLight: color(0xFF, 0xFF, 0xFF),
             .warmPaper: color(0xFA, 0xF8, 0xF3),
-            .dark: color(0x0D, 0x11, 0x17)
+            .dark: color(0x0D, 0x11, 0x17),
+            highContrast: color(0xFF, 0xFF, 0xFF),
+            midnightBlue: color(0x0B, 0x13, 0x24)
         ]
         var renderedSizes: [NSSize] = []
 
@@ -157,6 +169,10 @@ final class RenderThemeTests: XCTestCase {
                     theme: .warmPaper
                 )
                 try assertWarmPaperPlainCodeText(in: plainCodeImage)
+            } else if theme == highContrast {
+                try assertHighContrastPalette(in: image)
+            } else if theme == midnightBlue {
+                try assertMidnightBluePalette(in: image)
             }
         }
 
@@ -415,6 +431,176 @@ final class RenderThemeTests: XCTestCase {
             file: file,
             line: line
         )
+    }
+
+    private func assertHighContrastPalette(
+        in image: NSImage,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let codeSurface = color(0xF2, 0xF2, 0xF2)
+        assertContrast(
+            color(0x00, 0x00, 0x00),
+            against: codeSurface,
+            atLeast: 7,
+            message: "High Contrast code text",
+            file: file,
+            line: line
+        )
+        for (name, syntaxColor) in [
+            ("comment", color(0x3D, 0x3D, 0x3D)),
+            ("keyword", color(0xA3, 0x15, 0x15)),
+            ("string", color(0x00, 0x4B, 0x76)),
+            ("title", color(0x5B, 0x23, 0x80)),
+            ("variable", color(0x00, 0x3C, 0x8F)),
+            ("symbol", color(0x71, 0x36, 0x00)),
+            ("meta", color(0x00, 0x63, 0x28))
+        ] {
+            assertContrast(
+                syntaxColor,
+                against: codeSurface,
+                atLeast: 4.5,
+                message: "High Contrast syntax \(name)",
+                file: file,
+                line: line
+            )
+        }
+        assertContrast(
+            color(0x00, 0x00, 0x00),
+            against: color(0xDC, 0xEA, 0xFF),
+            atLeast: 7,
+            message: "High Contrast Mermaid secondary surface",
+            file: file,
+            line: line
+        )
+        assertContrast(
+            color(0x1F, 0x1F, 0x1F),
+            against: color(0xFF, 0xE7, 0xB3),
+            atLeast: 7,
+            message: "High Contrast Mermaid tertiary surface",
+            file: file,
+            line: line
+        )
+        try assertExpectedColors(
+            in: image,
+            expectations: [
+                ("code surface", codeSurface, 100, 0.08),
+                ("syntax keyword", color(0xA3, 0x15, 0x15), 3, 0.26),
+                ("Mermaid secondary surface", color(0xDC, 0xEA, 0xFF), 100, 0.08),
+                ("Mermaid tertiary surface", color(0xFF, 0xE7, 0xB3), 10, 0.08)
+            ],
+            themeName: "High Contrast",
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertMidnightBluePalette(
+        in image: NSImage,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let codeSurface = color(0x11, 0x1D, 0x30)
+        assertContrast(
+            color(0xED, 0xF4, 0xFF),
+            against: codeSurface,
+            atLeast: 7,
+            message: "Midnight Blue code text",
+            file: file,
+            line: line
+        )
+        for (name, syntaxColor) in [
+            ("comment", color(0x9A, 0xAA, 0xC0)),
+            ("keyword", color(0xFF, 0x8E, 0x9E)),
+            ("string", color(0x9E, 0xD0, 0xFF)),
+            ("title", color(0xD7, 0xB0, 0xFF)),
+            ("variable", color(0x7F, 0xC6, 0xFF)),
+            ("symbol", color(0xFF, 0xC0, 0x78)),
+            ("meta", color(0x7D, 0xDB, 0xAE))
+        ] {
+            assertContrast(
+                syntaxColor,
+                against: codeSurface,
+                atLeast: 4.5,
+                message: "Midnight Blue syntax \(name)",
+                file: file,
+                line: line
+            )
+        }
+        assertContrast(
+            color(0xE6, 0xED, 0xF7),
+            against: color(0x18, 0x3A, 0x5C),
+            atLeast: 7,
+            message: "Midnight Blue Mermaid secondary surface",
+            file: file,
+            line: line
+        )
+        assertContrast(
+            color(0xE6, 0xED, 0xF7),
+            against: color(0x3D, 0x31, 0x5C),
+            atLeast: 7,
+            message: "Midnight Blue Mermaid tertiary surface",
+            file: file,
+            line: line
+        )
+        try assertExpectedColors(
+            in: image,
+            expectations: [
+                ("code surface", codeSurface, 100, 0.08),
+                ("syntax keyword", color(0xFF, 0x8E, 0x9E), 3, 0.26),
+                ("Mermaid secondary surface", color(0x18, 0x3A, 0x5C), 100, 0.12),
+                ("Mermaid tertiary surface", color(0x3D, 0x31, 0x5C), 10, 0.12)
+            ],
+            themeName: "Midnight Blue",
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertExpectedColors(
+        in image: NSImage,
+        expectations: [(String, NSColor, Int, CGFloat)],
+        themeName: String,
+        file: StaticString,
+        line: UInt
+    ) throws {
+        let tiff = try XCTUnwrap(image.tiffRepresentation, file: file, line: line)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff), file: file, line: line)
+        var hitCounts = Array(repeating: 0, count: expectations.count)
+        var nearestDistances = Array(
+            repeating: CGFloat.greatestFiniteMagnitude,
+            count: expectations.count
+        )
+
+        scan: for y in stride(from: 0, to: bitmap.pixelsHigh, by: 2) {
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+                guard let sample = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    continue
+                }
+                for index in expectations.indices {
+                    let expectation = expectations[index]
+                    let distance = colorDistance(sample, expectation.1)
+                    nearestDistances[index] = min(nearestDistances[index], distance)
+                    if hitCounts[index] < expectation.2 && distance < expectation.3 {
+                        hitCounts[index] += 1
+                    }
+                }
+                if expectations.indices.allSatisfy({ hitCounts[$0] >= expectations[$0].2 }) {
+                    break scan
+                }
+            }
+        }
+
+        for index in expectations.indices {
+            XCTAssertGreaterThanOrEqual(
+                hitCounts[index],
+                expectations[index].2,
+                "\(themeName) render is missing \(expectations[index].0); "
+                    + "nearest distance: \(nearestDistances[index])",
+                file: file,
+                line: line
+            )
+        }
     }
 
     private func assertContrast(
