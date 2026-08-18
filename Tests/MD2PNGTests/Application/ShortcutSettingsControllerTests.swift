@@ -133,6 +133,11 @@ final class ShortcutSettingsControllerTests: XCTestCase {
             onCancel: { cancelCount += 1 },
             onCapture: { capturedEvents.append($0) }
         )
+        XCTAssertTrue(recorder.acceptsFirstResponder)
+        XCTAssertEqual(recorder.accessibilityRole(), .button)
+        XCTAssertEqual(recorder.accessibilityLabel(), "Render shortcut")
+        XCTAssertEqual(recorder.accessibilityValue() as? String, "Type shortcut…")
+        XCTAssertEqual(recorder.accessibilityHelp(), "Press a shortcut")
         let escape = try makeEvent(
             keyCode: UInt16(kVK_Escape),
             characters: "\u{1b}",
