@@ -3,7 +3,7 @@ import Carbon
 import SwiftUI
 
 enum ShortcutSettingsLayout {
-    static let windowSize = NSSize(width: 520, height: 448)
+    static let windowSize = NSSize(width: 520, height: 390)
     static let generalRowHeight: CGFloat = 72
     static let rowHeight: CGFloat = 56
     static let feedbackHeight: CGFloat = 44
@@ -333,43 +333,37 @@ struct ShortcutSettingsContentView: View {
     let copy: ShortcutSettingsCopy
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            generalSection
-            shortcutSection
-
-            feedbackView
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: ShortcutSettingsLayout.feedbackHeight,
-                    maxHeight: ShortcutSettingsLayout.feedbackHeight,
-                    alignment: .topLeading
-                )
-
-            HStack {
-                Button {
-                    model.restoreDefaults()
-                } label: {
-                    Text(copy.restoreDefaults)
-                        .foregroundStyle(.primary)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("ShortcutSettingsRestoreDefaults")
-                Spacer()
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                generalSection
+                shortcutSection
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            Divider()
+
+            settingsFooter
+                .padding(.horizontal, 22)
+                .padding(.vertical, 11)
+                .background(.regularMaterial)
         }
-        .padding(24)
         .frame(
             width: ShortcutSettingsLayout.windowSize.width,
             height: ShortcutSettingsLayout.windowSize.height,
             alignment: .topLeading
         )
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            AppWindowBackdrop()
+        }
     }
 
     private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(copy.generalTitle)
-                .font(.title2.weight(.semibold))
+                .font(.headline)
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -400,22 +394,23 @@ struct ShortcutSettingsContentView: View {
             }
             .padding(.horizontal, 16)
             .frame(height: ShortcutSettingsLayout.generalRowHeight)
-            .background(
-                Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
+            .background {
+                AppWindowCardBackground()
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    )
+            }
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.75)
+                AppWindowCardBorder()
             }
         }
     }
 
     private var shortcutSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(copy.title)
-                    .font(.title2.weight(.semibold))
+                    .font(.headline)
                 Text(copy.subtitle)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -426,14 +421,37 @@ struct ShortcutSettingsContentView: View {
                 Divider().padding(.leading, 16)
                 shortcutRow(.showLastRender)
             }
-            .background(
-                Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.75)
+            .background {
+                AppWindowCardBackground()
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    )
             }
+            .overlay {
+                AppWindowCardBorder()
+            }
+        }
+    }
+
+    private var settingsFooter: some View {
+        HStack(alignment: .center, spacing: 10) {
+            feedbackView
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: ShortcutSettingsLayout.feedbackHeight,
+                    maxHeight: ShortcutSettingsLayout.feedbackHeight,
+                    alignment: .leading
+                )
+
+            Button {
+                model.restoreDefaults()
+            } label: {
+                Text(copy.restoreDefaults)
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .accessibilityIdentifier("ShortcutSettingsRestoreDefaults")
         }
     }
 

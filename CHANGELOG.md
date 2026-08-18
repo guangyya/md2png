@@ -11,6 +11,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Move Launch at Login from the status menu into Settings → General, while
   keeping its effective state synchronized after changes in Login Items.
+- Match Settings to Welcome with the same subtle window backdrop, lightweight
+  section hierarchy, tinted cards, and material footer treatment.
 
 ## [0.10.0] - 2026-08-18
 

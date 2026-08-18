@@ -8,6 +8,7 @@ for the complete project history and release details.
 ### Changed
 
 - Manage Launch at Login from Settings → General instead of the status menu.
+- Match the Settings visual style to Welcome.
 
 ## [0.10.0] - 2026-08-18
 
