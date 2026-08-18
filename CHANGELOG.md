@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-18
+
 ### Changed
 
 - Move Launch at Login from the status menu into Settings → General, while
