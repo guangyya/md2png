@@ -68,14 +68,14 @@ final class RenderCoordinator {
         ) async throws -> Void
 
         static func live(
-            renderer: MarkdownRenderer? = nil,
+            rendererFactory: (() -> any MarkdownRendering)? = nil,
             widthPreference: RenderWidthPreference = RenderWidthPreference(),
             themePreference: RenderThemePreference = RenderThemePreference(),
             diagnosticLogger: DiagnosticLogger = .shared
         ) -> Dependencies {
-            let renderer = renderer ?? MarkdownRenderer(
-                diagnosticLogger: diagnosticLogger
-            )
+            let renderer = LazyMarkdownRenderer(factory: rendererFactory ?? {
+                MarkdownRenderer(diagnosticLogger: diagnosticLogger)
+            })
             return Dependencies(
                 render: { markdown, widthPreset, theme, operationID, completion in
                     renderer.render(
