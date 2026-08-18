@@ -28,6 +28,8 @@
 "render_theme.clean_light" = "Clean Light";
 "render_theme.warm_paper" = "Warm Paper";
 "render_theme.dark" = "Dark";
+"render_theme.high_contrast" = "High Contrast";
+"render_theme.midnight_blue" = "Midnight Blue";
 
 "clipboard.labeled" = "Clipboard: %@";
 "clipboard.png_image" = "PNG image";

@@ -77,8 +77,8 @@ sending it.
 - Duplicate render entry points disabled while one render is in progress.
 - Compact, Standard, and Wide output-width presets, with the last explicit
   selection remembered locally and Standard preserving the original sizing.
-- Clean Light, Warm Paper, and Dark render themes, with the last explicit
-  selection remembered locally and Clean Light preserving the original look.
+- Five bundled render themes, with the last explicit selection remembered
+  locally and Clean Light preserving the original look.
 
 ## Width presets
 
@@ -103,9 +103,11 @@ reference images. Click a preview to inspect its PNG.
 Clean Light preserves the original renderer and remains the default. Warm Paper
 uses a subtle warm off-white surface with earth-toned accents and distinct code
 surfaces. Dark uses an opaque dark surface with high-contrast text and syntax
-colors. Each palette is bundled and applies together to Markdown surfaces,
-borders, syntax highlighting, and Mermaid flowcharts, sequence diagrams, and
-Gantt charts.
+colors. High Contrast uses pure white, black text, stronger borders, and syntax
+colors designed to remain distinct on light surfaces. Midnight Blue uses a
+softer navy background with cool blue and violet accents. Each palette is
+bundled and applies together to Markdown surfaces, borders, syntax highlighting,
+and Mermaid flowcharts, sequence diagrams, and Gantt charts.
 
 Theme selection is explicit and local. The shortcut, menu command, and bundled
 examples capture the currently selected theme when rendering starts, and the

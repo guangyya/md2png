@@ -131,7 +131,7 @@ jobs:
           test -s "$renderer_page"
           test -s "$renderer_base_style"
           test -s "$renderer_theme_manifest"
-          test "$(find "$swift_resources" -type f -path '*/Themes/*/theme.css' | wc -l | tr -d ' ')" = "3"
+          test "$(find "$swift_resources" -type f -path '*/Themes/*/theme.css' | wc -l | tr -d ' ')" = "5"
           test -s "$resources/ABOUT_CHANGELOG.md"
           test -s "$resources/Examples/formatting.md"
           test -s "$resources/Examples/renderer-self-test.md"

@@ -7,6 +7,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add High Contrast and Midnight Blue render themes, including coordinated
+  Markdown, syntax-highlighting, table, and Mermaid palettes.
+
 ### Changed
 
 - Move renderer layout rules and each bundled palette into versioned local theme
