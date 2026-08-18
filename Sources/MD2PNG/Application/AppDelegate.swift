@@ -259,8 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             result: .succeeded,
             level: .verbose
         )
-        guard statusMenuController != nil else { return }
-        updateLaunchAtLoginMenu()
+        windowPresentationCoordinator.refreshLaunchAtLoginIfVisible()
     }
 
     func applicationShouldTerminate(
@@ -348,9 +347,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 selectTheme: { [weak self] theme in
                     self?.renderCoordinator.selectTheme(theme)
                 },
-                performLaunchAtLoginAction: { [weak self] in
-                    self?.performLaunchAtLoginAction()
-                },
                 showSettings: { [weak self] in
                     self?.windowPresentationCoordinator.showSettings()
                 },
@@ -369,7 +365,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenuController = controller
         refreshClipboardMenuState()
         applyRenderState(renderState)
-        updateLaunchAtLoginMenu()
 
         updateStatusObserverID = updateController.observeStatus { [weak self] status in
             self?.updateStatusPresenter.apply(status)
@@ -379,7 +374,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func statusMenuWillOpen() {
         sampleGuidePresenter.dismiss()
         refreshClipboardMenuState()
-        updateLaunchAtLoginMenu()
     }
 
     private func applyRenderState(_ state: RenderCoordinatorState) {
@@ -492,32 +486,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func performLaunchAtLoginAction() {
-        do {
-            let result = try launchAtLoginController.performPrimaryAction()
-            updateLaunchAtLoginMenu()
-            if result == .statusChanged(.requiresApproval) {
-                hud.show(
-                    L10n.text(
-                        "hud.launch_at_login_requires_approval",
-                        defaultValue: "Allow md2png in Login Items to finish setup"
-                    ),
-                    symbol: "gear.badge",
-                    style: .informational
-                )
-            }
-        } catch {
-            updateLaunchAtLoginMenu()
-            show(error)
-        }
-    }
-
-    private func updateLaunchAtLoginMenu() {
-        let presentation = launchAtLoginController.presentation
-        statusMenuController?.applyLaunchAtLogin(presentation)
-        windowPresentationCoordinator.refreshWelcomeLaunchAtLoginIfVisible()
-    }
-
     private func showSampleGuide() {
         guard !isSampleGuidePresentationScheduled else { return }
         isSampleGuidePresentationScheduled = true
@@ -547,8 +515,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sampleGuidePresenter.show(
             relativeTo: button,
             menuState: SampleGuideMenuState(
-                statusMenuPresentation: statusMenuPresentation,
-                launchAtLoginPresentation: launchAtLoginController.presentation
+                statusMenuPresentation: statusMenuPresentation
             )
         )
     }
@@ -561,10 +528,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func triggerWelcomeSampleGuideForTesting() {
         windowPresentationCoordinator.triggerWelcomeSampleGuideForTesting()
-    }
-
-    var welcomeLaunchAtLoginRefreshCountForTesting: Int {
-        windowPresentationCoordinator.welcomeLaunchAtLoginRefreshCountForTesting
     }
 
     func cleanUpWelcomeSampleGuidePathForTesting() {

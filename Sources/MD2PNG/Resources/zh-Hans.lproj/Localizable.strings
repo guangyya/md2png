@@ -47,6 +47,12 @@
 "hotkey.show_last_render_title" = "显示上次渲染";
 "hotkey.command_format" = "%1$@（%2$@）";
 "settings.window_title" = "设置";
+"settings.general_title" = "通用";
+"settings.launch_at_login" = "登录时启动";
+"settings.launch_at_login_detail" = "登录时自动启动 md2png。";
+"settings.launch_at_login_approval" = "需要在“登录项”中批准。";
+"settings.launch_at_login_unavailable" = "此 Mac 无法使用这项设置。";
+"settings.open_system_settings" = "打开系统设置…";
 "settings.shortcuts_title" = "键盘快捷键";
 "settings.shortcuts_subtitle" = "点击快捷键，然后按下新的组合键。";
 "settings.recording" = "请按快捷键…";

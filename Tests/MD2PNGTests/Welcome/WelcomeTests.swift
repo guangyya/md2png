@@ -903,19 +903,12 @@ final class WelcomeTests: XCTestCase {
             isRendering: false,
             isUpdateInstallPending: false
         ))
-        let launchPresentation = LaunchAtLoginPresentation(status: .requiresApproval)
-
-        let state = SampleGuideMenuState(
-            statusMenuPresentation: statusPresentation,
-            launchAtLoginPresentation: launchPresentation
-        )
+        let state = SampleGuideMenuState(statusMenuPresentation: statusPresentation)
 
         XCTAssertFalse(state.canRenderClipboard)
         XCTAssertTrue(state.canRerenderLastMarkdown)
         XCTAssertTrue(state.canRestoreLastMarkdown)
         XCTAssertTrue(state.canShowLastRender)
-        XCTAssertEqual(state.launchAtLoginAction, .allowInSystemSettings)
-        XCTAssertTrue(state.canUseLaunchAtLogin)
     }
 
     @MainActor

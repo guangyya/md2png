@@ -28,35 +28,24 @@ struct SampleGuideMenuState: Equatable {
     let canShowLastRender: Bool
     let canRenderClipboard: Bool
     let canRerenderLastMarkdown: Bool
-    let launchAtLoginAction: LaunchAtLoginMenuAction
-    let canUseLaunchAtLogin: Bool
 
     init(
         canRestoreLastMarkdown: Bool,
         canShowLastRender: Bool,
         canRenderClipboard: Bool = true,
-        canRerenderLastMarkdown: Bool = false,
-        launchAtLoginAction: LaunchAtLoginMenuAction = .enable,
-        canUseLaunchAtLogin: Bool = true
+        canRerenderLastMarkdown: Bool = false
     ) {
         self.canRestoreLastMarkdown = canRestoreLastMarkdown
         self.canShowLastRender = canShowLastRender
         self.canRenderClipboard = canRenderClipboard
         self.canRerenderLastMarkdown = canRerenderLastMarkdown
-        self.launchAtLoginAction = launchAtLoginAction
-        self.canUseLaunchAtLogin = canUseLaunchAtLogin
     }
 
-    init(
-        statusMenuPresentation: StatusMenuPresentation,
-        launchAtLoginPresentation: LaunchAtLoginPresentation
-    ) {
+    init(statusMenuPresentation: StatusMenuPresentation) {
         canRestoreLastMarkdown = statusMenuPresentation[.restoreLastMarkdown].isEnabled
         canShowLastRender = statusMenuPresentation[.showLastRender].isEnabled
         canRenderClipboard = statusMenuPresentation[.renderClipboard].isEnabled
         canRerenderLastMarkdown = statusMenuPresentation[.rerenderLastMarkdown].isEnabled
-        launchAtLoginAction = launchAtLoginPresentation.menuAction
-        canUseLaunchAtLogin = launchAtLoginPresentation.canPerformAction
     }
 }
 
@@ -240,34 +229,6 @@ struct SampleGuideCopy {
         kind.menuTitle(localizationBundle: localizationBundle)
     }
 
-    func launchAtLoginTitle(for action: LaunchAtLoginMenuAction) -> String {
-        switch action {
-        case .enable:
-            L10n.text(
-                "menu.enable_launch_at_login",
-                defaultValue: "Enable Launch at Login",
-                bundle: localizationBundle
-            )
-        case .disable:
-            L10n.text(
-                "menu.disable_launch_at_login",
-                defaultValue: "Disable Launch at Login",
-                bundle: localizationBundle
-            )
-        case .allowInSystemSettings:
-            L10n.text(
-                "menu.allow_launch_at_login",
-                defaultValue: "Allow Launch at Login…",
-                bundle: localizationBundle
-            )
-        case .unavailable:
-            L10n.text(
-                "menu.launch_at_login_unavailable",
-                defaultValue: "Launch at Login Unavailable",
-                bundle: localizationBundle
-            )
-        }
-    }
 }
 
 struct GuideMenuHighlightStyle: Equatable {
@@ -733,11 +694,6 @@ private struct SampleMainMenu: View {
                 title: copy.examples,
                 showsChevron: true,
                 isHighlighted: phase.highlightsExamples
-            )
-        case .launchAtLogin:
-            GuideMenuRow(
-                title: copy.launchAtLoginTitle(for: menuState.launchAtLoginAction),
-                isDisabled: !menuState.canUseLaunchAtLogin
             )
         case .settings:
             GuideMenuRow(title: copy.settings, trailing: "⌘,")

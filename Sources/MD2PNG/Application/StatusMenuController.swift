@@ -16,7 +16,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let renderExample: (ExampleKind) -> Void
         let selectWidthPreset: (RenderWidthPreset) -> Void
         let selectTheme: (RenderTheme) -> Void
-        let performLaunchAtLoginAction: () -> Void
         let showSettings: () -> Void
         let showWelcome: () -> Void
         let showAbout: () -> Void
@@ -29,7 +28,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private var statusMenuItems: [StatusMenuCommand: NSMenuItem] = [:]
     private var widthMenuItems: [RenderWidthPreset: NSMenuItem] = [:]
     private var themeMenuItems: [RenderTheme: NSMenuItem] = [:]
-    private var launchAtLoginMenuItem: NSMenuItem!
     private lazy var brandStatusImage = BrandIcon.statusBarImage()
 
 #if DEBUG
@@ -83,7 +81,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     func apply(_ presentation: StatusMenuPresentation) {
-        for (command, item) in statusMenuItems where command != .launchAtLogin {
+        for (command, item) in statusMenuItems {
             let itemPresentation = presentation[command]
             item.title = itemPresentation.title
             item.isEnabled = itemPresentation.isEnabled
@@ -100,41 +98,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         for (theme, item) in themeMenuItems {
             item.state = theme == selectedTheme ? .on : .off
         }
-    }
-
-    func applyLaunchAtLogin(_ presentation: LaunchAtLoginPresentation) {
-        launchAtLoginMenuItem.title = switch presentation.menuAction {
-        case .enable:
-            L10n.text(
-                "menu.enable_launch_at_login",
-                defaultValue: "Enable Launch at Login"
-            )
-        case .disable:
-            L10n.text(
-                "menu.disable_launch_at_login",
-                defaultValue: "Disable Launch at Login"
-            )
-        case .allowInSystemSettings:
-            L10n.text(
-                "menu.allow_launch_at_login",
-                defaultValue: "Allow Launch at Login…"
-            )
-        case .unavailable:
-            L10n.text(
-                "menu.launch_at_login_unavailable",
-                defaultValue: "Launch at Login Unavailable"
-            )
-        }
-        launchAtLoginMenuItem.badge = presentation.menuAction == .allowInSystemSettings
-            ? NSMenuItemBadge(string: "!")
-            : nil
-        launchAtLoginMenuItem.toolTip = presentation.menuAction == .allowInSystemSettings
-            ? L10n.text(
-                "accessibility.launch_at_login_requires_approval",
-                defaultValue: "Approval required in System Settings"
-            )
-            : nil
-        launchAtLoginMenuItem.isEnabled = presentation.canPerformAction
     }
 
     func applyShortcuts(_ configuration: GlobalShortcutConfiguration) {
@@ -272,13 +235,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         examplesMenuItem.submenu = examplesMenu
 
-        launchAtLoginMenuItem = NSMenuItem(
-            title: StatusMenuPresentation.title(for: .launchAtLogin),
-            action: #selector(performLaunchAtLoginAction),
-            keyEquivalent: ""
-        )
-        launchAtLoginMenuItem.target = self
-
         let settingsItem = NSMenuItem(
             title: StatusMenuPresentation.title(for: .settings),
             action: #selector(showSettings),
@@ -316,7 +272,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             .theme: renderThemeMenuItem,
             .outputWidth: renderWidthMenuItem,
             .examples: examplesMenuItem,
-            .launchAtLogin: launchAtLoginMenuItem,
             .settings: settingsItem,
             .showWelcome: welcomeItem,
             .about: aboutItem,
@@ -382,10 +337,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             return
         }
         actions.selectTheme(theme)
-    }
-
-    @objc private func performLaunchAtLoginAction() {
-        actions.performLaunchAtLoginAction()
     }
 
     @objc private func showSettings() {
