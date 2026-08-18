@@ -9,6 +9,7 @@ enum StatusMenuCommand: String, CaseIterable, Hashable {
     case outputWidth
     case examples
     case launchAtLogin
+    case settings
     case showWelcome
     case about
     case quit
@@ -21,7 +22,7 @@ enum StatusMenuLayout {
         [.renderClipboard, .showLastRender],
         [.rerenderLastMarkdown, .restoreLastMarkdown],
         [.theme, .outputWidth, .examples],
-        [.launchAtLogin, .showWelcome, .about],
+        [.launchAtLogin, .settings, .showWelcome, .about],
         [.quit]
     ]
 }
@@ -59,7 +60,7 @@ struct StatusMenuPresentation: Equatable {
                 canUseLastSource
             case .theme, .outputWidth, .examples:
                 !blocksRenderingChanges
-            case .launchAtLogin, .showWelcome, .about, .quit:
+            case .launchAtLogin, .settings, .showWelcome, .about, .quit:
                 true
             }
             return (
@@ -127,6 +128,12 @@ struct StatusMenuPresentation: Equatable {
             L10n.text(
                 "menu.enable_launch_at_login",
                 defaultValue: "Enable Launch at Login",
+                bundle: localizationBundle
+            )
+        case .settings:
+            L10n.text(
+                "menu.settings",
+                defaultValue: "Settings…",
                 bundle: localizationBundle
             )
         case .showWelcome:

@@ -15,7 +15,10 @@ The default shortcuts are:
 
 Another utility can reserve the same system-wide combination. md2png shows a
 local warning when registration fails; the equivalent menu bar commands remain
-available. The app does not require Accessibility permission for these hotkeys.
+available. Choose **Settings…**, click the unavailable shortcut, and press a
+different combination. Changes apply immediately; **Restore Defaults** returns
+to the combinations above. The app does not require Accessibility permission
+to record or use these hotkeys.
 
 ## The clipboard is empty or is not recognized as Markdown
 

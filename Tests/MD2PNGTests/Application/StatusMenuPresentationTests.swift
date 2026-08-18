@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Foundation
 import XCTest
 @testable import MD2PNG
@@ -9,7 +10,7 @@ final class StatusMenuPresentationTests: XCTestCase {
             [.renderClipboard, .showLastRender],
             [.rerenderLastMarkdown, .restoreLastMarkdown],
             [.theme, .outputWidth, .examples],
-            [.launchAtLogin, .showWelcome, .about],
+            [.launchAtLogin, .settings, .showWelcome, .about],
             [.quit]
         ])
 
@@ -34,6 +35,7 @@ final class StatusMenuPresentationTests: XCTestCase {
         XCTAssertTrue(empty[.outputWidth].isEnabled)
         XCTAssertTrue(empty[.examples].isEnabled)
         XCTAssertTrue(empty[.showWelcome].isEnabled)
+        XCTAssertTrue(empty[.settings].isEnabled)
         XCTAssertTrue(empty[.about].isEnabled)
         XCTAssertTrue(empty[.quit].isEnabled)
     }
@@ -116,6 +118,7 @@ final class StatusMenuPresentationTests: XCTestCase {
             XCTAssertFalse(presentation[.outputWidth].isEnabled)
             XCTAssertFalse(presentation[.examples].isEnabled)
             XCTAssertTrue(presentation[.showWelcome].isEnabled)
+            XCTAssertTrue(presentation[.settings].isEnabled)
             XCTAssertTrue(presentation[.about].isEnabled)
             XCTAssertTrue(presentation[.quit].isEnabled)
         }
@@ -135,9 +138,54 @@ final class StatusMenuPresentationTests: XCTestCase {
         )
         XCTAssertEqual(chineseCopy.rerenderLastMarkdown, "重新渲染上次的 Markdown")
         XCTAssertEqual(chineseCopy.theme, "主题")
+        XCTAssertEqual(chineseCopy.settings, "设置…")
         XCTAssertEqual(
             chineseCopy.launchAtLoginTitle(for: .unavailable),
             "登录时启动不可用"
+        )
+    }
+
+    @MainActor
+    func testStatusMenuUsesConfiguredShortcutsAndStandardSettingsEquivalent() throws {
+        _ = NSApplication.shared
+        let render = try XCTUnwrap(GlobalShortcut(
+            key: .x,
+            modifiers: [.option, .command]
+        ))
+        let showLastRenderKey = try XCTUnwrap(GlobalShortcutCapture.key(
+            keyCode: UInt16(kVK_F12),
+            charactersIgnoringModifiers: nil
+        ))
+        let showLastRender = try XCTUnwrap(GlobalShortcut(
+            key: showLastRenderKey,
+            modifiers: [.control]
+        ))
+        let configuration = GlobalShortcutConfiguration(
+            render: render,
+            showLastRender: showLastRender
+        )
+        let controller = StatusMenuController(
+            selectedWidthPreset: .standard,
+            selectedTheme: .cleanLight,
+            shortcutConfiguration: configuration,
+            actions: emptyStatusMenuActions()
+        )
+        defer { controller.removeStatusItem() }
+
+        XCTAssertEqual(controller.keyEquivalentForTesting(.renderClipboard), "x")
+        XCTAssertEqual(
+            controller.keyEquivalentModifierMaskForTesting(.renderClipboard),
+            [.option, .command]
+        )
+        XCTAssertEqual(controller.keyEquivalentForTesting(.showLastRender), "\u{F70F}")
+        XCTAssertEqual(
+            controller.keyEquivalentModifierMaskForTesting(.showLastRender),
+            [.control]
+        )
+        XCTAssertEqual(controller.keyEquivalentForTesting(.settings), ",")
+        XCTAssertEqual(
+            controller.keyEquivalentModifierMaskForTesting(.settings),
+            [.command]
         )
     }
 
@@ -184,6 +232,25 @@ final class StatusMenuPresentationTests: XCTestCase {
                 isUpdateInstallPending: false
             ),
             localizationBundle: localizationBundle
+        )
+    }
+
+    @MainActor
+    private func emptyStatusMenuActions() -> StatusMenuController.Actions {
+        StatusMenuController.Actions(
+            menuWillOpen: {},
+            renderClipboard: {},
+            showLastRender: {},
+            rerenderLastMarkdown: {},
+            restoreLastMarkdown: {},
+            renderExample: { _ in },
+            selectWidthPreset: { _ in },
+            selectTheme: { _ in },
+            performLaunchAtLoginAction: {},
+            showSettings: {},
+            showWelcome: {},
+            showAbout: {},
+            quit: {}
         )
     }
 }

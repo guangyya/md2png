@@ -17,6 +17,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let selectWidthPreset: (RenderWidthPreset) -> Void
         let selectTheme: (RenderTheme) -> Void
         let performLaunchAtLoginAction: () -> Void
+        let showSettings: () -> Void
         let showWelcome: () -> Void
         let showAbout: () -> Void
         let quit: () -> Void
@@ -33,11 +34,22 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
 #if DEBUG
     private(set) var clipboardPreviewUpdateCount = 0
+
+    func keyEquivalentForTesting(_ command: StatusMenuCommand) -> String? {
+        statusMenuItems[command]?.keyEquivalent
+    }
+
+    func keyEquivalentModifierMaskForTesting(
+        _ command: StatusMenuCommand
+    ) -> NSEvent.ModifierFlags? {
+        statusMenuItems[command]?.keyEquivalentModifierMask
+    }
 #endif
 
     init(
         selectedWidthPreset: RenderWidthPreset,
         selectedTheme: RenderTheme,
+        shortcutConfiguration: GlobalShortcutConfiguration = .default,
         actions: Actions
     ) {
         self.actions = actions
@@ -45,7 +57,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         super.init()
         configureStatusItem(
             selectedWidthPreset: selectedWidthPreset,
-            selectedTheme: selectedTheme
+            selectedTheme: selectedTheme,
+            shortcutConfiguration: shortcutConfiguration
         )
     }
 
@@ -115,6 +128,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         launchAtLoginMenuItem.isEnabled = presentation.canPerformAction
     }
 
+    func applyShortcuts(_ configuration: GlobalShortcutConfiguration) {
+        precondition(configuration.isValid)
+        applyShortcut(configuration.render, to: .renderClipboard)
+        applyShortcut(configuration.showLastRender, to: .showLastRender)
+    }
+
     func applyStatusItem(_ presentation: StatusItemPresentation) {
         guard let button = statusItem.button else { return }
         if let symbolName = presentation.symbolName,
@@ -140,7 +159,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     private func configureStatusItem(
         selectedWidthPreset: RenderWidthPreset,
-        selectedTheme: RenderTheme
+        selectedTheme: RenderTheme,
+        shortcutConfiguration: GlobalShortcutConfiguration
     ) {
         applyStatusItem(StatusItemPresentation(
             symbolName: nil,
@@ -161,17 +181,15 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let renderMenuItem = NSMenuItem(
             title: StatusMenuPresentation.title(for: .renderClipboard),
             action: #selector(renderClipboard),
-            keyEquivalent: "x"
+            keyEquivalent: ""
         )
-        renderMenuItem.keyEquivalentModifierMask = [.command, .control]
         renderMenuItem.target = self
 
         let previewMenuItem = NSMenuItem(
             title: StatusMenuPresentation.title(for: .showLastRender),
             action: #selector(showLastRender),
-            keyEquivalent: "z"
+            keyEquivalent: ""
         )
-        previewMenuItem.keyEquivalentModifierMask = [.command, .control]
         previewMenuItem.target = self
 
         let rerenderLastMarkdownMenuItem = NSMenuItem(
@@ -252,6 +270,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         )
         launchAtLoginMenuItem.target = self
 
+        let settingsItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .settings),
+            action: #selector(showSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.keyEquivalentModifierMask = [.command]
+        settingsItem.target = self
+
         let welcomeItem = NSMenuItem(
             title: StatusMenuPresentation.title(for: .showWelcome),
             action: #selector(showWelcome),
@@ -282,6 +308,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             .outputWidth: renderWidthMenuItem,
             .examples: examplesMenuItem,
             .launchAtLogin: launchAtLoginMenuItem,
+            .settings: settingsItem,
             .showWelcome: welcomeItem,
             .about: aboutItem,
             .quit: quitItem
@@ -299,6 +326,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
         selectWidthPreset(selectedWidthPreset)
         selectTheme(selectedTheme)
+        applyShortcuts(shortcutConfiguration)
+    }
+
+    private func applyShortcut(
+        _ shortcut: GlobalShortcut,
+        to command: StatusMenuCommand
+    ) {
+        guard let item = statusMenuItems[command] else { return }
+        item.keyEquivalent = shortcut.key.keyEquivalent
+        item.keyEquivalentModifierMask = shortcut.menuModifierMask
     }
 
     @objc private func renderClipboard() {
@@ -340,6 +377,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func performLaunchAtLoginAction() {
         actions.performLaunchAtLoginAction()
+    }
+
+    @objc private func showSettings() {
+        actions.showSettings()
     }
 
     @objc private func showWelcome() {

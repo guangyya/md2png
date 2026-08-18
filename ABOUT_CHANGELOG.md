@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Customize global shortcuts in Settings and restore their defaults.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added

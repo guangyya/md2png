@@ -82,14 +82,15 @@ A GFM table needs a separator row:
 
 | Command | Shortcut | Behavior |
 |---|---|---|
-| Render Clipboard as Image | `Control-Command-X` (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
-| Show Last Render | `Control-Command-Z` (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
+| Render Clipboard as Image | `Control-Command-X` by default (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
+| Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Theme | — | Selects Clean Light, Warm Paper, or Dark for subsequent renders and remembers the selection locally |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Copies and renders the selected bundled sample, then opens its preview |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
+| Settings… | `Command-,` | Records, applies, and restores the two global shortcuts |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
 | About md2png | — | Shows release and update information, runs the bundled renderer self-test, and saves privacy-safe diagnostic logs |
 
@@ -102,12 +103,20 @@ chosen theme is fixed into an opaque PNG. While a render is running, additional
 render commands, width or theme changes, and examples are temporarily disabled.
 Re-render Last Markdown and Restore Last Markdown become available only after a
 successful render and ask before replacing clipboard content changed by another
-application. The
-Last Render window opens at a width that reflects the output, within the current
-screen, and identifies the preset and PNG pixel dimensions in its title. Its
-toolbar can copy the image again, save it explicitly, open it in Preview, fit it
-to the window, inspect one PNG pixel per display backing pixel, and zoom without
-changing the generated image or clipboard contents.
+application.
+
+Choose **Settings…** to change either global shortcut. A shortcut must include
+Control, Option, or Command, and the two commands cannot use the same
+combination. Changes apply immediately and stay local. If macOS cannot register
+a combination, Settings marks it unavailable while the equivalent menu command
+continues to work; **Restore Defaults** returns to `Control-Command-X` and
+`Control-Command-Z`.
+
+The Last Render window opens at a width that reflects the output, within the
+current screen, and identifies the preset and PNG pixel dimensions in its
+title. Its toolbar can copy the image again, save it explicitly, open it in
+Preview, fit it to the window, inspect one PNG pixel per display backing pixel,
+and zoom without changing the generated image or clipboard contents.
 
 When rendering fails, md2png shows a compact details dialog that distinguishes
 Mermaid syntax, bundled-resource, WebKit recovery, timeout, size-limit, invalid

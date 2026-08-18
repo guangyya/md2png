@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Customize the Render and Show Last Render global shortcuts from a native
+  Settings window, with duplicate and system-registration feedback, immediate
+  local persistence, synchronized menu equivalents, and Restore Defaults.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added

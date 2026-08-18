@@ -46,6 +46,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
     private let globalShortcutPreference: GlobalShortcutPreference
+    private lazy var shortcutSettingsController = ShortcutSettingsController(
+        preference: globalShortcutPreference,
+        onApply: { [weak self] configuration in
+            self?.registerGlobalShortcuts(configuration: configuration) ?? []
+        },
+        onVisibilityChange: { [weak self] isVisible in
+            self?.setShortcutSettingsWindowVisible(isVisible)
+        }
+    )
     private lazy var welcomeController = WelcomeController(
         preference: welcomePreference,
         launchAtLoginController: launchAtLoginController,
@@ -125,6 +134,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusMenuController: StatusMenuController?
     private let globalHotKeyRegistrar = GlobalHotKeyRegistrar()
+    private var globalShortcutConfiguration = GlobalShortcutConfiguration.default
+    private var failedGlobalShortcutRegistrationIDs: Set<UInt32> = []
     private var welcomeShortcutStatuses: [WelcomeShortcutStatus] = []
     private var clipboardContainsMarkdown = false
     private var isSampleGuidePresentationScheduled = false
@@ -132,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updateStatusObserverID: UUID?
     private var isPreviewWindowVisible = false
     private var isWelcomeWindowVisible = false
+    private var isShortcutSettingsWindowVisible = false
 
 #if DEBUG
     var clipboardMenuRefreshCountForTesting: Int {
@@ -161,11 +173,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             result: .started
         )
         NSApp.setActivationPolicy(.accessory)
+        globalShortcutConfiguration = globalShortcutPreference.configuration
         configureStatusItem()
         updateStatusPresenter.presentRelaunchResultIfNeeded()
 
         let failedRegistrationIDs = registerGlobalShortcuts(
-            configuration: globalShortcutPreference.configuration
+            configuration: globalShortcutConfiguration
         )
 
         if welcomePreference.shouldShowOnLaunch {
@@ -210,11 +223,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let failedRegistrationIDs = globalHotKeyRegistrar.replace(
             registrations: registrations
         )
+        globalShortcutConfiguration = configuration
+        failedGlobalShortcutRegistrationIDs = failedRegistrationIDs
         welcomeShortcutStatuses = registrations.map {
             WelcomeShortcutStatus(
                 registration: $0,
                 failedRegistrationIDs: failedRegistrationIDs
             )
+        }
+        statusMenuController?.applyShortcuts(configuration)
+        if isWelcomeWindowVisible {
+            welcomeController.refreshShortcuts(welcomeShortcutStatuses)
         }
         diagnosticLogger.record(
             category: .shortcut,
@@ -299,6 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = StatusMenuController(
             selectedWidthPreset: renderState.selectedWidthPreset,
             selectedTheme: renderState.selectedTheme,
+            shortcutConfiguration: globalShortcutConfiguration,
             actions: StatusMenuController.Actions(
                 menuWillOpen: { [weak self] in self?.statusMenuWillOpen() },
                 renderClipboard: { [weak self] in
@@ -325,6 +345,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 performLaunchAtLoginAction: { [weak self] in
                     self?.performLaunchAtLoginAction()
                 },
+                showSettings: { [weak self] in self?.showShortcutSettings() },
                 showWelcome: { [weak self] in self?.showWelcome() },
                 showAbout: { [weak self] in self?.showAbout() },
                 quit: { NSApp.terminate(nil) }
@@ -441,6 +462,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         aboutController.show()
     }
 
+    private func showShortcutSettings() {
+        sampleGuidePresenter.dismiss()
+        shortcutSettingsController.show(
+            configuration: globalShortcutConfiguration,
+            failedRegistrationIDs: failedGlobalShortcutRegistrationIDs
+        )
+    }
+
     private func showWelcome() {
         welcomeController.show(shortcuts: welcomeShortcutStatuses)
     }
@@ -518,9 +547,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateWindowedActivationPolicy()
     }
 
+    private func setShortcutSettingsWindowVisible(_ isVisible: Bool) {
+        isShortcutSettingsWindowVisible = isVisible
+        updateWindowedActivationPolicy()
+    }
+
     private func updateWindowedActivationPolicy() {
         NSApp.setActivationPolicy(
-            isPreviewWindowVisible || isWelcomeWindowVisible ? .regular : .accessory
+            isPreviewWindowVisible
+                || isWelcomeWindowVisible
+                || isShortcutSettingsWindowVisible
+                ? .regular
+                : .accessory
         )
     }
 
