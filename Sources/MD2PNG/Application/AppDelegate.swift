@@ -430,12 +430,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 defaultValue: "Replace"
             )
         }
-        alert.addButton(withTitle: primaryButtonTitle)
+        let primaryButton = alert.addButton(withTitle: primaryButtonTitle)
         let cancelButton = alert.addButton(withTitle: L10n.text(
             "common.cancel",
             defaultValue: "Cancel"
         ))
-        cancelButton.keyEquivalent = "\u{1b}"
+        AlertKeyboard.configureDefaultAndCancel(
+            in: alert,
+            defaultButton: primaryButton,
+            cancelButton: cancelButton
+        )
         NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn
     }
@@ -674,14 +678,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "update.confirm_relaunch_detail",
             defaultValue: "Relaunching clears Last Render and Last Markdown because they exist only in memory. Your clipboard will not be changed."
         )
-        alert.addButton(withTitle: L10n.text(
+        let installButton = alert.addButton(withTitle: L10n.text(
             "about.update_install_relaunch",
             defaultValue: "Install and Relaunch"
         ))
-        alert.addButton(withTitle: L10n.text(
+        let laterButton = alert.addButton(withTitle: L10n.text(
             "about.update_later",
             defaultValue: "Later"
         ))
+        AlertKeyboard.configureDefaultAndCancel(
+            in: alert,
+            defaultButton: installButton,
+            cancelButton: laterButton
+        )
         return alert.runModal() == .alertFirstButtonReturn
     }
 

@@ -399,6 +399,8 @@ final class ShortcutRecorderControl: NSButton {
 
     init() {
         super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
         bezelStyle = .rounded
         controlSize = .regular
         font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)

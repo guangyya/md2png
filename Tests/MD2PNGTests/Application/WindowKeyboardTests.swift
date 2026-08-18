@@ -9,11 +9,13 @@ final class WindowKeyboardTests: XCTestCase {
         let commandComma = try keyEvent(",")
         let commandC = try keyEvent("c")
         let optionCommandW = try keyEvent("w", modifiers: [.command, .option])
+        let escape = try keyEvent("\u{1b}", modifiers: [])
 
         XCTAssertEqual(AppWindow.appCommand(for: commandW), .close)
         XCTAssertEqual(AppWindow.appCommand(for: commandComma), .showSettings)
         XCTAssertNil(AppWindow.appCommand(for: commandC))
         XCTAssertNil(AppWindow.appCommand(for: optionCommandW))
+        XCTAssertNil(AppWindow.appCommand(for: escape))
     }
 
     func testAppWindowPerformsCloseAndInjectedSettingsAction() throws {
