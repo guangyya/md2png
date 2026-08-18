@@ -177,7 +177,7 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
             applyConfiguration: onApply
         )
         self.onVisibilityChange = onVisibilityChange
-        let window = PreviewWindow(
+        let window = AppWindow(
             contentRect: NSRect(origin: .zero, size: ShortcutSettingsLayout.windowSize),
             styleMask: [.titled, .closable],
             backing: .buffered,
