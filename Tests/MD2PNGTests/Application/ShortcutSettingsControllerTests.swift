@@ -131,6 +131,10 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         )
 
         controller.beginRecordingForTesting(.showLastRender)
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_SETTINGS_RECORDING_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(controller.window?.contentView)
+        )
         XCTAssertFalse(controller.captureForTesting(
             conflictingEvent,
             command: .showLastRender
@@ -303,6 +307,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         )
         XCTAssertTrue(recorder.acceptsFirstResponder)
         XCTAssertFalse(recorder.isBordered)
+        XCTAssertEqual(recorder.focusRingType, .none)
         XCTAssertEqual(recorder.accessibilityRole(), .button)
         XCTAssertEqual(recorder.accessibilityLabel(), "Render shortcut")
         XCTAssertEqual(recorder.accessibilityValue() as? String, "Type shortcut…")
