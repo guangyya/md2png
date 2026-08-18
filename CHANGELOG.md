@@ -17,6 +17,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   splitting fitting code blocks, Mermaid diagrams, and table rows. The explicit
   error-dialog action leaves the clipboard unchanged.
 
+### Changed
+
+- Defer the local WebKit renderer until the first render request, then reuse the
+  same initialized renderer for later single-image and split-image work.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added

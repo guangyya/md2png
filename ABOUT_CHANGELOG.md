@@ -10,6 +10,10 @@ for the complete project history and release details.
 - Customize global shortcuts in Settings and restore their defaults.
 - Save tall Markdown as numbered, block-aware PNGs without changing the clipboard.
 
+### Changed
+
+- Start without loading the renderer until the first render request.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added
