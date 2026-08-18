@@ -95,7 +95,7 @@ final class WindowPresentationCoordinator {
             self?.showSettings()
         }
     )
-    private lazy var shortcutSettingsController = ShortcutSettingsController(
+    private lazy var settingsController = SettingsController(
         preference: globalShortcutPreference,
         launchAtLoginController: launchAtLoginController,
         onApply: { [weak self] configuration in
@@ -170,7 +170,7 @@ final class WindowPresentationCoordinator {
     func showSettings() {
         actions.dismissTransientPresentation()
         let state = shortcutState()
-        shortcutSettingsController.show(
+        settingsController.show(
             configuration: state.configuration,
             failedRegistrationIDs: state.failedRegistrationIDs
         )
@@ -200,7 +200,7 @@ final class WindowPresentationCoordinator {
             welcomeController.refreshLaunchAtLogin()
         }
         if isVisible(.settings) {
-            shortcutSettingsController.refreshLaunchAtLogin()
+            settingsController.refreshLaunchAtLogin()
         }
     }
 

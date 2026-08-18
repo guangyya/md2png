@@ -45,7 +45,7 @@ final class WindowKeyboardTests: XCTestCase {
         let suiteName = "WindowKeyboardTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let settings = ShortcutSettingsController(
+        let settings = SettingsController(
             preference: GlobalShortcutPreference(defaults: defaults),
             onApply: { _ in [] }
         )
