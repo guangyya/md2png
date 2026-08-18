@@ -250,6 +250,9 @@ final class ClipboardTests: XCTestCase {
         XCTAssertNotNil(AppError.rendererFailed.errorDescription)
         XCTAssertNotNil(AppError.invalidRendererResponse.errorDescription)
         XCTAssertNotNil(AppError.contentTooLarge(width: 1, height: 2).errorDescription)
+        XCTAssertNotNil(
+            AppError.splitExportContentTooLarge(width: 1, height: 2).errorDescription
+        )
         XCTAssertNotNil(AppError.rendererPNGEncodingFailed.errorDescription)
         XCTAssertNotNil(AppError.pngEncodingFailed.errorDescription)
         XCTAssertNotNil(AppError.pngWriteFailed.errorDescription)

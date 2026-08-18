@@ -45,6 +45,10 @@ The render command never activates another app, pastes into it, or sends a
 message. If clipboard rendering fails, the source Markdown remains on the
 clipboard.
 
+For a very tall result, choose **Save Clipboard as Split PNGs…** instead. Pick a
+parent folder and md2png creates a new, safely named folder of numbered PNGs.
+This explicit export reads the current clipboard but never replaces it.
+
 ## Supported content
 
 | Content | Notes |
@@ -83,6 +87,7 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` by default (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
+| Save Clipboard as Split PNGs… | — | Creates a new folder of numbered PNGs from clipboard Markdown without changing the clipboard |
 | Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
@@ -104,6 +109,14 @@ render commands, width or theme changes, and examples are temporarily disabled.
 Re-render Last Markdown and Restore Last Markdown become available only after a
 successful render and ask before replacing clipboard content changed by another
 application.
+
+Split export uses the selected Theme and Output Width and limits each logical
+slice to 4,000 points. It prefers boundaries between blocks and list items,
+keeps headings with following content, and avoids cutting a code block, Mermaid
+diagram, or table row when that element fits within one slice. An element taller
+than a full slice is cut at the hard limit so export can still finish. Files are
+written into one newly created folder with stable zero-padded numbering; an
+existing folder is never overwritten.
 
 Choose **Settings…** to change either global shortcut. A shortcut must include
 Control, Option, or Command, and the two commands cannot use the same
@@ -161,6 +174,8 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 
 - Rendering happens in a non-persistent local `WKWebView` using bundled assets.
 - Markdown and generated images are never uploaded.
+- Split PNG export is user-initiated, Save-only, and never writes images to the
+  clipboard.
 - The latest successful Markdown source is retained only in memory for the Last
   Markdown actions and is discarded when md2png quits.
 - External Markdown images are replaced with a text placeholder instead of

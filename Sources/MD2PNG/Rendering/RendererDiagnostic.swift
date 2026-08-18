@@ -164,7 +164,7 @@ struct RendererFailure: LocalizedError, CustomNSError, Equatable, Sendable {
         case .sizeLimit:
             return L10n.text(
                 "renderer_error.hint_size_limit",
-                defaultValue: "Shorten the Markdown or render smaller sections separately.",
+                defaultValue: "If the content is too tall, choose Save Clipboard as Split PNGs from the md2png menu. Otherwise shorten the Markdown and try again.",
                 bundle: localizationBundle
             )
         case .webKitRecovery:
