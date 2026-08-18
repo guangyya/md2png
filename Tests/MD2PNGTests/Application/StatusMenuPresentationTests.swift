@@ -7,7 +7,7 @@ import XCTest
 final class StatusMenuPresentationTests: XCTestCase {
     func testMenuLayoutKeepsFrequentCommandsFirstAndEveryCommandStable() {
         XCTAssertEqual(StatusMenuLayout.sections, [
-            [.renderClipboard, .saveClipboardAsSplitPNGs, .showLastRender],
+            [.renderClipboard, .showLastRender],
             [.rerenderLastMarkdown, .restoreLastMarkdown],
             [.theme, .outputWidth, .examples],
             [.launchAtLogin, .settings, .showWelcome, .about],
@@ -28,11 +28,6 @@ final class StatusMenuPresentationTests: XCTestCase {
 
         XCTAssertEqual(empty[.renderClipboard].title, "Render Clipboard as Image")
         XCTAssertFalse(empty[.renderClipboard].isEnabled)
-        XCTAssertEqual(
-            empty[.saveClipboardAsSplitPNGs].title,
-            "Save Clipboard as Split PNGs…"
-        )
-        XCTAssertFalse(empty[.saveClipboardAsSplitPNGs].isEnabled)
         XCTAssertFalse(empty[.showLastRender].isEnabled)
         XCTAssertFalse(empty[.rerenderLastMarkdown].isEnabled)
         XCTAssertFalse(empty[.restoreLastMarkdown].isEnabled)
@@ -55,11 +50,6 @@ final class StatusMenuPresentationTests: XCTestCase {
         )
 
         XCTAssertTrue(presentation[.renderClipboard].isEnabled)
-        XCTAssertTrue(presentation[.saveClipboardAsSplitPNGs].isEnabled)
-        XCTAssertEqual(
-            presentation[.saveClipboardAsSplitPNGs].title,
-            "将剪贴板分片保存为 PNG…"
-        )
         XCTAssertTrue(presentation[.showLastRender].isEnabled)
         XCTAssertTrue(presentation[.rerenderLastMarkdown].isEnabled)
         XCTAssertTrue(presentation[.restoreLastMarkdown].isEnabled)
@@ -121,7 +111,6 @@ final class StatusMenuPresentationTests: XCTestCase {
         ] {
             let presentation = StatusMenuPresentation(state: state)
             XCTAssertFalse(presentation[.renderClipboard].isEnabled)
-            XCTAssertFalse(presentation[.saveClipboardAsSplitPNGs].isEnabled)
             XCTAssertTrue(presentation[.showLastRender].isEnabled)
             XCTAssertFalse(presentation[.rerenderLastMarkdown].isEnabled)
             XCTAssertFalse(presentation[.restoreLastMarkdown].isEnabled)
@@ -204,24 +193,6 @@ final class StatusMenuPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testSplitExportMenuItemInvokesItsExplicitAction() {
-        _ = NSApplication.shared
-        var invocationCount = 0
-        let controller = StatusMenuController(
-            selectedWidthPreset: .standard,
-            selectedTheme: .cleanLight,
-            actions: emptyStatusMenuActions(
-                saveClipboardAsSplitPNGs: { invocationCount += 1 }
-            )
-        )
-        defer { controller.removeStatusItem() }
-
-        controller.performCommandForTesting(.saveClipboardAsSplitPNGs)
-
-        XCTAssertEqual(invocationCount, 1)
-    }
-
-    @MainActor
     func testShortcutConflictKeepsEquivalentMenuCommandsAndAccessibleNames() throws {
         let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
         let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
@@ -269,17 +240,9 @@ final class StatusMenuPresentationTests: XCTestCase {
 
     @MainActor
     private func emptyStatusMenuActions() -> StatusMenuController.Actions {
-        emptyStatusMenuActions(saveClipboardAsSplitPNGs: {})
-    }
-
-    @MainActor
-    private func emptyStatusMenuActions(
-        saveClipboardAsSplitPNGs: @escaping () -> Void
-    ) -> StatusMenuController.Actions {
         StatusMenuController.Actions(
             menuWillOpen: {},
             renderClipboard: {},
-            saveClipboardAsSplitPNGs: saveClipboardAsSplitPNGs,
             showLastRender: {},
             rerenderLastMarkdown: {},
             restoreLastMarkdown: {},

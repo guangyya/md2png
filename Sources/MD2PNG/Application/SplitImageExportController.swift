@@ -5,7 +5,6 @@ final class SplitImageExportController {
     typealias RenderCompletion = (Result<SplitRenderResult, Error>) -> Void
 
     struct Dependencies {
-        let readClipboardMarkdown: () throws -> String
         let chooseDestination: (_ suggestedDirectoryName: String) -> URL?
         let render: (
             _ markdown: String,
@@ -42,32 +41,11 @@ final class SplitImageExportController {
     }
 
     func start(
+        markdown: String,
         widthPreset: RenderWidthPreset,
         theme: RenderTheme
     ) {
         guard !isExporting else { return }
-        let markdown: String
-        do {
-            markdown = try dependencies.readClipboardMarkdown()
-            diagnosticLogger.record(
-                category: .clipboard,
-                stage: .clipboardRead,
-                result: .succeeded,
-                clipboardType: .markdown
-            )
-        } catch {
-            diagnosticLogger.record(
-                category: .clipboard,
-                stage: .clipboardRead,
-                result: .failed,
-                level: .error,
-                error: error,
-                clipboardType: .empty
-            )
-            onError(error)
-            return
-        }
-
         let operationID = DiagnosticOperationID()
         let startedAt = DispatchTime.now().uptimeNanoseconds
         setExporting(true)

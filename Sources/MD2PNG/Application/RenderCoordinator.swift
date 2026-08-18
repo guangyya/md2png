@@ -32,6 +32,12 @@ final class RenderCoordinator {
     typealias RenderCompletion = (Result<NSImage, Error>) -> Void
     typealias SplitRenderCompletion = (Result<SplitRenderResult, Error>) -> Void
 
+    private struct SplitExportRecovery {
+        let markdown: String
+        let widthPreset: RenderWidthPreset
+        let theme: RenderTheme
+    }
+
     @MainActor
     struct Dependencies {
         let render: (
@@ -121,7 +127,6 @@ final class RenderCoordinator {
     private let diagnosticLogger: DiagnosticLogger
     private lazy var splitImageExportController = SplitImageExportController(
         dependencies: SplitImageExportController.Dependencies(
-            readClipboardMarkdown: dependencies.readClipboardMarkdown,
             chooseDestination: dependencies.chooseSplitExportDestination,
             render: dependencies.renderSplit,
             write: dependencies.writeSplitExport
@@ -143,6 +148,7 @@ final class RenderCoordinator {
     private var lastSource = LastSourceState()
     private var lastImage: NSImage?
     private var lastRenderWidthPreset: RenderWidthPreset?
+    private var pendingSplitExportRecovery: SplitExportRecovery?
     private var isPresentingClipboardConfirmation = false
     private(set) var isRendering = false
     private(set) var isUpdateInstallPending = false
@@ -248,11 +254,13 @@ final class RenderCoordinator {
         }
     }
 
-    func saveClipboardAsSplitPNGs() {
-        guard canStartRenderAction else { return }
+    func saveFailedRenderAsSplitPNGs() {
+        guard canStartRenderAction, let recovery = pendingSplitExportRecovery else { return }
+        pendingSplitExportRecovery = nil
         splitImageExportController.start(
-            widthPreset: selectedWidthPreset,
-            theme: selectedTheme
+            markdown: recovery.markdown,
+            widthPreset: recovery.widthPreset,
+            theme: recovery.theme
         )
     }
 
@@ -384,6 +392,7 @@ final class RenderCoordinator {
         showsPreviewOnSuccess: Bool = false
     ) {
         guard canStartRenderAction else { return }
+        pendingSplitExportRecovery = nil
         isRendering = true
         let operationID = DiagnosticOperationID()
         let startedAt = DispatchTime.now().uptimeNanoseconds
@@ -404,10 +413,6 @@ final class RenderCoordinator {
             operationID
         ) { [weak self] result in
             guard let self else { return }
-            defer {
-                self.isRendering = false
-                self.notifyStateChange()
-            }
 
             switch result {
             case let .success(image):
@@ -439,6 +444,7 @@ final class RenderCoordinator {
                         ),
                         dimensions: dimensions
                     )
+                    self.finishRender()
                     self.onNotice(.imageCopied)
                     if showsPreviewOnSuccess, let lastRender = self.lastRender {
                         self.onPreviewRequested(lastRender)
@@ -465,9 +471,11 @@ final class RenderCoordinator {
                         ),
                         error: error
                     )
+                    self.finishRender()
                     self.onError(error)
                 }
             case let .failure(error):
+                let failure = RendererFailure.from(error)
                 self.diagnosticLogger.record(
                     category: .renderer,
                     stage: .renderCompletion,
@@ -479,12 +487,27 @@ final class RenderCoordinator {
                     ),
                     error: error
                 )
+                if failure.supportsSplitExportRecovery {
+                    self.pendingSplitExportRecovery = SplitExportRecovery(
+                        markdown: markdown,
+                        widthPreset: requestedWidthPreset,
+                        theme: requestedTheme
+                    )
+                }
+                self.finishRender()
                 self.onError(RendererErrorReport(
-                    failure: RendererFailure.from(error),
+                    failure: failure,
                     operationID: operationID
                 ))
+                self.pendingSplitExportRecovery = nil
             }
         }
+    }
+
+    private func finishRender() {
+        guard isRendering else { return }
+        isRendering = false
+        notifyStateChange()
     }
 
     private func confirmClipboardOverwriteIfNeeded(

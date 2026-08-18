@@ -45,9 +45,10 @@ The render command never activates another app, pastes into it, or sends a
 message. If clipboard rendering fails, the source Markdown remains on the
 clipboard.
 
-For a very tall result, choose **Save Clipboard as Split PNGs…** instead. Pick a
-parent folder and md2png creates a new, safely named folder of numbered PNGs.
-This explicit export reads the current clipboard but never replaces it.
+For a result that exceeds the single-image height limit, the error dialog offers
+**Save as Split PNGs…**. Pick a parent folder and md2png creates a new, safely
+named folder of numbered PNGs without replacing the source Markdown on the
+clipboard.
 
 ## Supported content
 
@@ -87,7 +88,6 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` by default (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
-| Save Clipboard as Split PNGs… | — | Creates a new folder of numbered PNGs from clipboard Markdown without changing the clipboard |
 | Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
@@ -174,8 +174,8 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 
 - Rendering happens in a non-persistent local `WKWebView` using bundled assets.
 - Markdown and generated images are never uploaded.
-- Split PNG export is user-initiated, Save-only, and never writes images to the
-  clipboard.
+- Split PNG export is offered only as an explicit recovery action after a
+  size-limit error, is Save-only, and never writes images to the clipboard.
 - The latest successful Markdown source is retained only in memory for the Last
   Markdown actions and is discarded when md2png quits.
 - External Markdown images are replaced with a text placeholder instead of

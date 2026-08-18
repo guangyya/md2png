@@ -176,7 +176,6 @@ struct SampleGuideCopy {
     let title: String
     let clipboard: String
     let render: String
-    let saveClipboardAsSplitPNGs: String
     let rerenderLastMarkdown: String
     let restoreLastMarkdown: String
     let showLastRender: String
@@ -203,10 +202,6 @@ struct SampleGuideCopy {
         )
         render = StatusMenuPresentation.title(
             for: .renderClipboard,
-            localizationBundle: localizationBundle
-        )
-        saveClipboardAsSplitPNGs = StatusMenuPresentation.title(
-            for: .saveClipboardAsSplitPNGs,
             localizationBundle: localizationBundle
         )
         rerenderLastMarkdown = StatusMenuPresentation.title(
@@ -715,11 +710,6 @@ private struct SampleMainMenu: View {
             GuideMenuRow(
                 title: copy.render,
                 trailing: "⌃⌘X",
-                isDisabled: !menuState.canRenderClipboard
-            )
-        case .saveClipboardAsSplitPNGs:
-            GuideMenuRow(
-                title: copy.saveClipboardAsSplitPNGs,
                 isDisabled: !menuState.canRenderClipboard
             )
         case .showLastRender:

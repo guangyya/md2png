@@ -138,11 +138,22 @@ final class RendererDiagnosticTests: XCTestCase {
 
         XCTAssertTrue(
             failure.suggestion(localizationBundle: english)
-                .contains("Save Clipboard as Split PNGs")
+                .contains("split PNGs")
         )
         XCTAssertTrue(
             failure.suggestion(localizationBundle: chinese)
-                .contains("将剪贴板分片保存为 PNG")
+                .contains("分片保存为 PNG")
+        )
+
+        let wideFailure = RendererFailure(
+            kind: .sizeLimit,
+            width: 1_601,
+            height: 4_000
+        )
+        XCTAssertFalse(wideFailure.supportsSplitExportRecovery)
+        XCTAssertTrue(
+            wideFailure.suggestion(localizationBundle: english)
+                .contains("narrower Output Width")
         )
     }
 
@@ -177,14 +188,67 @@ final class RendererDiagnosticTests: XCTestCase {
             system: DiagnosticSystemInfo(macOSVersion: "26.0.0", architecture: "arm64")
         )
 
-        XCTAssertFalse(presenter.show(report))
+        XCTAssertEqual(presenter.show(report), .dismissed)
         XCTAssertNotNil(presented)
+        XCTAssertFalse(try XCTUnwrap(presented).offersSplitExport)
         XCTAssertTrue(copied.isEmpty)
 
         action = .copy
-        XCTAssertTrue(presenter.show(report))
+        XCTAssertEqual(presenter.show(report), .detailsCopied)
         XCTAssertEqual(copied.count, 1)
         XCTAssertTrue(copied[0].contains("Issue: mermaid_syntax"))
         XCTAssertFalse(copied[0].contains("```mermaid"))
+
+        action = .saveSplitPNGs
+        XCTAssertEqual(presenter.show(report), .dismissed)
+    }
+
+    @MainActor
+    func testSizeLimitOffersSplitExportAndReturnsRecoveryRequest() throws {
+        let operationID = try XCTUnwrap(DiagnosticOperationID(rawValue: "012345abcdef"))
+        let report = RendererErrorReport(
+            failure: RendererFailure(kind: .sizeLimit, width: 1_120, height: 20_000),
+            operationID: operationID
+        )
+        var presented: RendererErrorDetailsPresentation?
+        var copied: [String] = []
+        let presenter = RendererErrorDetailsPresenter(
+            dependencies: RendererErrorDetailsDependencies(
+                present: { presentation in
+                    presented = presentation
+                    return .saveSplitPNGs
+                },
+                copy: { text in
+                    copied.append(text)
+                    return true
+                }
+            )
+        )
+
+        XCTAssertEqual(presenter.show(report), .splitExportRequested)
+        XCTAssertTrue(try XCTUnwrap(presented).offersSplitExport)
+        XCTAssertTrue(copied.isEmpty)
+    }
+
+    @MainActor
+    func testWideSizeLimitDoesNotOfferSplitExport() throws {
+        let operationID = try XCTUnwrap(DiagnosticOperationID(rawValue: "012345abcdef"))
+        let report = RendererErrorReport(
+            failure: RendererFailure(kind: .sizeLimit, width: 1_601, height: 4_000),
+            operationID: operationID
+        )
+        var presented: RendererErrorDetailsPresentation?
+        let presenter = RendererErrorDetailsPresenter(
+            dependencies: RendererErrorDetailsDependencies(
+                present: { presentation in
+                    presented = presentation
+                    return .saveSplitPNGs
+                },
+                copy: { _ in true }
+            )
+        )
+
+        XCTAssertEqual(presenter.show(report), .dismissed)
+        XCTAssertFalse(try XCTUnwrap(presented).offersSplitExport)
     }
 }

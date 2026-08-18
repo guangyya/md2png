@@ -12,9 +12,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Customize the Render and Show Last Render global shortcuts from a native
   Settings window, with duplicate and system-registration feedback, immediate
   local persistence, synchronized menu equivalents, and Restore Defaults.
-- Save tall clipboard Markdown as a new folder of numbered PNGs, with
-  block-aware boundaries that avoid splitting fitting code blocks, Mermaid
-  diagrams, and table rows. The explicit export leaves the clipboard unchanged.
+- Recover from a single-image size-limit error by saving tall clipboard Markdown
+  as a new folder of numbered PNGs, with block-aware boundaries that avoid
+  splitting fitting code blocks, Mermaid diagrams, and table rows. The explicit
+  error-dialog action leaves the clipboard unchanged.
 
 ## [0.9.0] - 2026-08-17
 

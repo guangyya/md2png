@@ -332,9 +332,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 renderClipboard: { [weak self] in
                     self?.renderCoordinator.renderClipboard()
                 },
-                saveClipboardAsSplitPNGs: { [weak self] in
-                    self?.renderCoordinator.saveClipboardAsSplitPNGs()
-                },
                 showLastRender: { [weak self] in
                     self?.renderCoordinator.showLastRender()
                 },
@@ -619,7 +616,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func show(_ error: Error) {
         if let report = error as? RendererErrorReport {
-            if rendererErrorDetailsPresenter.show(report) {
+            switch rendererErrorDetailsPresenter.show(report) {
+            case .detailsCopied:
                 hud.show(
                     L10n.text(
                         "renderer_error.details_copied",
@@ -628,6 +626,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     symbol: "doc.on.clipboard.fill",
                     style: .informational
                 )
+            case .splitExportRequested:
+                renderCoordinator.saveFailedRenderAsSplitPNGs()
+            case .dismissed:
+                break
             }
             return
         }

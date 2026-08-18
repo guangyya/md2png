@@ -77,6 +77,21 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.state.isRendering)
     }
 
+    func testSizeLimitErrorCanStartSplitRecoveryFromErrorCallback() {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Tall source"
+        harness.splitExportDestinationURL = URL(fileURLWithPath: "/tmp/export")
+        let coordinator = harness.makeCoordinator()
+
+        harness.startSplitRecovery(using: coordinator) {
+            harness.clipboardMarkdown = "# New clipboard content"
+        }
+
+        XCTAssertEqual(harness.splitRenderRequests.count, 1)
+        XCTAssertEqual(harness.splitRenderRequests.first?.markdown, "# Tall source")
+        XCTAssertTrue(coordinator.state.isRendering)
+    }
+
     func testExternalClipboardChangeRequiresConfirmationBeforeRestore() {
         let harness = RenderCoordinatorHarness()
         harness.clipboardMarkdown = "Private source"
@@ -122,7 +137,7 @@ final class RenderCoordinatorTests: XCTestCase {
         coordinator.selectWidthPreset(.compact)
         coordinator.selectTheme(.warmPaper)
         coordinator.renderClipboard()
-        coordinator.saveClipboardAsSplitPNGs()
+        coordinator.saveFailedRenderAsSplitPNGs()
 
         XCTAssertTrue(coordinator.state.isUpdateInstallPending)
         XCTAssertEqual(coordinator.state.selectedWidthPreset, .wide)
@@ -143,7 +158,7 @@ final class RenderCoordinatorTests: XCTestCase {
         coordinator.selectWidthPreset(.wide)
         coordinator.selectTheme(.dark)
 
-        coordinator.saveClipboardAsSplitPNGs()
+        harness.startSplitRecovery(using: coordinator)
 
         XCTAssertTrue(coordinator.state.isRendering)
         XCTAssertEqual(harness.chosenSplitExportNames, ["Tall release notes-split"])
@@ -174,7 +189,7 @@ final class RenderCoordinatorTests: XCTestCase {
         harness.clipboardMarkdown = "# Keep me"
         let coordinator = harness.makeCoordinator()
 
-        coordinator.saveClipboardAsSplitPNGs()
+        harness.startSplitRecovery(using: coordinator)
 
         XCTAssertFalse(coordinator.state.isRendering)
         XCTAssertEqual(harness.chosenSplitExportNames, ["Keep me-split"])
@@ -182,7 +197,7 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertTrue(harness.writtenImages.isEmpty)
         XCTAssertTrue(harness.writtenMarkdown.isEmpty)
         XCTAssertTrue(harness.notices.isEmpty)
-        XCTAssertTrue(harness.errors.isEmpty)
+        XCTAssertEqual(harness.errors.count, 1)
     }
 
     func testSplitRenderFailureUsesSafeRendererDetailsAndWritesNothing() throws {
@@ -194,11 +209,11 @@ final class RenderCoordinatorTests: XCTestCase {
         )
         let coordinator = harness.makeCoordinator()
 
-        coordinator.saveClipboardAsSplitPNGs()
+        harness.startSplitRecovery(using: coordinator)
         harness.completeNextSplitRender(with: .failure(AppError.rendererTimedOut))
 
         XCTAssertFalse(coordinator.state.isRendering)
-        let report = try XCTUnwrap(harness.errors.first as? RendererErrorReport)
+        let report = try XCTUnwrap(harness.errors.last as? RendererErrorReport)
         XCTAssertEqual(report.failure.kind, .timeout)
         XCTAssertTrue(harness.splitExportWrites.isEmpty)
         XCTAssertTrue(harness.writtenImages.isEmpty)
@@ -214,13 +229,13 @@ final class RenderCoordinatorTests: XCTestCase {
         )
         let coordinator = harness.makeCoordinator()
 
-        coordinator.saveClipboardAsSplitPNGs()
+        harness.startSplitRecovery(using: coordinator)
         harness.completeNextSplitRender(with: .failure(AppError.contentTooLarge(
             width: 1_120,
             height: 80_000
         )))
 
-        let error = try XCTUnwrap(harness.errors.first as? AppError)
+        let error = try XCTUnwrap(harness.errors.last as? AppError)
         guard case let .splitExportContentTooLarge(width, height) = error else {
             return XCTFail("Expected splitExportContentTooLarge")
         }
@@ -241,12 +256,12 @@ final class RenderCoordinatorTests: XCTestCase {
         harness.splitExportWriteError = AppError.splitExportWriteFailed
         let coordinator = harness.makeCoordinator()
 
-        coordinator.saveClipboardAsSplitPNGs()
+        harness.startSplitRecovery(using: coordinator)
         harness.completeNextSplitRender(with: .success(try makeSplitResult()))
         await waitForRenderActionToFinish(coordinator)
 
-        XCTAssertEqual(harness.errors.count, 1)
-        guard case .splitExportWriteFailed = harness.errors[0] as? AppError else {
+        XCTAssertEqual(harness.errors.count, 2)
+        guard case .splitExportWriteFailed = harness.errors.last as? AppError else {
             return XCTFail("Expected splitExportWriteFailed")
         }
         XCTAssertTrue(harness.notices.isEmpty)
@@ -288,7 +303,7 @@ final class RenderCoordinatorTests: XCTestCase {
         )
         let coordinator = harness.makeCoordinator(diagnosticLogger: logger)
 
-        coordinator.saveClipboardAsSplitPNGs()
+        harness.startSplitRecovery(using: coordinator)
         harness.completeNextSplitRender(with: .success(try makeSplitResult()))
         await waitForRenderActionToFinish(coordinator)
         await logger.flush()
@@ -426,6 +441,7 @@ private final class RenderCoordinatorHarness {
     private(set) var confirmedActions: [ClipboardOverwriteAction] = []
     private(set) var notices: [RenderCoordinatorNotice] = []
     private(set) var errors: [Error] = []
+    var onErrorHook: ((Error) -> Void)?
     private(set) var previews: [LastRender] = []
     private(set) var states: [RenderCoordinatorState] = []
     private(set) var splitExportWrites: [(SplitRenderResult, URL)] = []
@@ -501,6 +517,7 @@ private final class RenderCoordinatorHarness {
             },
             onError: { [weak self] error in
                 self?.errors.append(error)
+                self?.onErrorHook?(error)
             },
             onPreviewRequested: { [weak self] lastRender in
                 self?.previews.append(lastRender)
@@ -511,6 +528,24 @@ private final class RenderCoordinatorHarness {
     func completeNextRender(with result: Result<NSImage, Error>) {
         let request = renderRequests.removeFirst()
         request.completion(result)
+    }
+
+    func startSplitRecovery(
+        using coordinator: RenderCoordinator,
+        beforeRecovery: @escaping () -> Void = {}
+    ) {
+        onErrorHook = { error in
+            guard let report = error as? RendererErrorReport,
+                  report.failure.supportsSplitExportRecovery else { return }
+            beforeRecovery()
+            coordinator.saveFailedRenderAsSplitPNGs()
+        }
+        coordinator.renderClipboard()
+        completeNextRender(with: .failure(AppError.contentTooLarge(
+            width: 1_120,
+            height: 20_000
+        )))
+        onErrorHook = nil
     }
 
     func completeNextSplitRender(with result: Result<SplitRenderResult, Error>) {

@@ -56,6 +56,12 @@ struct RendererFailure: LocalizedError, CustomNSError, Equatable, Sendable {
 
     var errorUserInfo: [String: Any] { [:] }
 
+    var supportsSplitExportRecovery: Bool {
+        guard kind == .sizeLimit, let width, let height else { return false }
+        return width <= MarkdownRenderer.maximumSnapshotWidth
+            && height > MarkdownRenderer.maximumSnapshotHeight
+    }
+
     func summary(localizationBundle: Bundle? = nil) -> String {
         switch kind {
         case .mermaidSyntax, .mermaidDiagramType:
@@ -162,9 +168,16 @@ struct RendererFailure: LocalizedError, CustomNSError, Equatable, Sendable {
                 bundle: localizationBundle
             )
         case .sizeLimit:
+            guard supportsSplitExportRecovery else {
+                return L10n.text(
+                    "renderer_error.hint_size_limit_shorten",
+                    defaultValue: "Choose a narrower Output Width, shorten wide tables or diagrams, then try again.",
+                    bundle: localizationBundle
+                )
+            }
             return L10n.text(
                 "renderer_error.hint_size_limit",
-                defaultValue: "If the content is too tall, choose Save Clipboard as Split PNGs from the md2png menu. Otherwise shorten the Markdown and try again.",
+                defaultValue: "Save the result as split PNGs, or shorten the Markdown and try again.",
                 bundle: localizationBundle
             )
         case .webKitRecovery:
