@@ -66,6 +66,8 @@
 "hud.png_copied" = "PNG copied — paste with Command-V";
 "hud.png_copied_again" = "PNG copied again — paste with Command-V";
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
+"hud.split_png_saved" = "Saved 1 split PNG";
+"hud.split_pngs_saved" = "Saved %ld split PNGs";
 "hud.launch_at_login_requires_approval" = "Allow md2png in Login Items to finish setup";
 
 "split_export.choose_folder_title" = "Choose a Folder for Split PNGs";
@@ -84,6 +86,7 @@
 "error.renderer_failed" = "Couldn’t render the Markdown. The clipboard is unchanged. Check the Markdown and try again.";
 "error.invalid_renderer_response" = "Couldn’t create the PNG. The clipboard is unchanged. Try rendering again.";
 "error.content_too_large" = "Couldn’t create a %1$ld × %2$ld PNG. The clipboard is unchanged. Shorten the Markdown and try again.";
+"error.split_export_content_too_large" = "Couldn’t split a %1$ld × %2$ld render within the safe export limit. The clipboard is unchanged. Shorten the Markdown and try again.";
 "error.renderer_png_encoding_failed" = "Couldn’t create the PNG. The clipboard is unchanged. Try rendering again.";
 "error.png_encoding_failed" = "Couldn’t prepare the PNG. Render it again, then retry.";
 "error.png_write_failed" = "Couldn’t save the PNG. Choose another location and try again.";
