@@ -251,6 +251,16 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     var previewHasHorizontalScroller: Bool { scrollView.hasHorizontalScroller }
     var previewScrollerStyle: NSScroller.Style { scrollView.scrollerStyle }
     var previewZoomStatus: String { zoomStatusButton.title }
+    var previewZoomAccessibilityLabel: String? { zoomStatusButton.accessibilityLabel() }
+    var previewZoomAccessibilityValue: String? {
+        zoomStatusButton.accessibilityValue() as? String
+    }
+    var previewZoomAccessibilityHelp: String? { zoomStatusButton.accessibilityHelp() }
+    var previewImageAccessibilityRole: NSAccessibility.Role? { imageView.accessibilityRole() }
+    var previewImageAccessibilityLabel: String? { imageView.accessibilityLabel() }
+    var previewImageAccessibilityValue: String? {
+        imageView.accessibilityValue() as? String
+    }
     var previewSuggestedPNGFilename: String { suggestedPNGFilename }
     var previewZoomStatusContainerSize: NSSize { zoomStatusContainer.frame.size }
     var previewToolbarStyle: NSWindow.ToolbarStyle? { window?.toolbarStyle }
@@ -317,6 +327,12 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
 
         imageView.imageScaling = .scaleAxesIndependently
         imageView.imageAlignment = .alignCenter
+        imageView.setAccessibilityElement(true)
+        imageView.setAccessibilityRole(.image)
+        imageView.setAccessibilityLabel(L10n.text(
+            "preview.rendered_image",
+            defaultValue: "Rendered image"
+        ))
         canvasView.addSubview(imageView)
 
         scrollView.frame = window.contentView!.bounds
@@ -351,6 +367,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
             temporaryImageStore.clear()
         }
         imageView.image = image
+        updateImageAccessibilityValue(image)
         suggestedPNGFilename = SuggestedPNGFilename.make(from: markdown)
         zoomMode = .fit
         updateWindowTitle(image: image, widthPreset: widthPreset)
@@ -404,6 +421,16 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
                 Int(pixelSize.height.rounded())
             )
         }
+    }
+
+    private func updateImageAccessibilityValue(_ image: NSImage) {
+        let pixelSize = RenderedImageExport.pixelSize(of: image)
+        imageView.setAccessibilityValue(L10n.format(
+            "preview.rendered_image_dimensions",
+            defaultValue: "%1$ld × %2$ld pixels",
+            Int(pixelSize.width.rounded()),
+            Int(pixelSize.height.rounded())
+        ))
     }
 
     private func resizeWindowToReflectImageWidth(_ image: NSImage) {
@@ -487,8 +514,13 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         )
         window?.toolbar?.selectedItemIdentifier = nil
         zoomStatusButton.setAccessibilityLabel(L10n.text(
-            "preview.actual_size",
-            defaultValue: "Actual Size"
+            "preview.zoom_level",
+            defaultValue: "Preview zoom"
+        ))
+        zoomStatusButton.setAccessibilityValue(zoomStatusButton.title)
+        zoomStatusButton.setAccessibilityHelp(L10n.text(
+            "preview.reset_actual_size",
+            defaultValue: "Reset to Actual Size"
         ))
     }
 

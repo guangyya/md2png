@@ -3,7 +3,9 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let diagnosticLogger: DiagnosticLogger
-    private let hud = HUDController()
+    private lazy var hud = HUDController { [weak self] message, priority in
+        self?.announce(message, priority: priority)
+    }
     private let rendererErrorDetailsPresenter = RendererErrorDetailsPresenter()
     private lazy var previewController = PreviewController(
         onCopied: { [weak self] changeCount in
@@ -120,7 +122,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private lazy var updateStatusPresenter = UpdateStatusPresenter(
         showHUD: { [weak self] message, symbol, style in
-            self?.hud.show(message, symbol: symbol, style: style)
+            self?.hud.show(
+                message,
+                symbol: symbol,
+                style: style,
+                announces: false
+            )
         },
         applyStatusItem: { [weak self] presentation in
             self?.statusMenuController?.applyStatusItem(presentation)
@@ -129,15 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.aboutController.window?.isVisible == true
         },
         announce: { [weak self] message in
-            guard let button = self?.statusMenuController?.button else { return }
-            NSAccessibility.post(
-                element: button,
-                notification: .announcementRequested,
-                userInfo: [
-                    .announcement: message,
-                    .priority: NSAccessibilityPriorityLevel.medium.rawValue
-                ]
-            )
+            self?.announce(message, priority: .medium)
         }
     )
 
@@ -632,6 +631,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             error.localizedDescription,
             symbol: "exclamationmark.triangle.fill",
             style: .error
+        )
+    }
+
+    private func announce(
+        _ message: String,
+        priority: NSAccessibilityPriorityLevel
+    ) {
+        guard let button = statusMenuController?.button else { return }
+        NSAccessibility.post(
+            element: button,
+            notification: .announcementRequested,
+            userInfo: [
+                .announcement: message,
+                .priority: priority.rawValue
+            ]
         )
     }
 
