@@ -10,6 +10,90 @@ final class RenderThemeTests: XCTestCase {
         XCTAssertEqual(RenderTheme.dark.rawValue, "dark")
     }
 
+    func testBundledManifestProvidesMetadataAndExistingLocalStylesheets() throws {
+        let registry = RenderThemeRegistry.bundled
+        let rendererDirectory = try XCTUnwrap(RendererResources.pageURL)
+            .deletingLastPathComponent()
+
+        XCTAssertEqual(registry.descriptors.map(\.appearance), [.light, .light, .dark])
+        for descriptor in registry.descriptors {
+            let stylesheetURL = rendererDirectory.appending(path: descriptor.stylesheet)
+            XCTAssertTrue(
+                FileManager.default.fileExists(atPath: stylesheetURL.path),
+                descriptor.stylesheet
+            )
+        }
+    }
+
+    func testBundledThemeStylesheetsContainRequiredTokensAndNoExternalLoads() throws {
+        let rendererDirectory = try XCTUnwrap(RendererResources.pageURL)
+            .deletingLastPathComponent()
+        let requiredTokens = [
+            "--background:",
+            "--text:",
+            "--code-surface:",
+            "--code-text:",
+            "--syntax-keyword:",
+            "--syntax-string:"
+        ]
+
+        for descriptor in RenderThemeRegistry.bundled.descriptors {
+            let stylesheet = try String(
+                contentsOf: rendererDirectory.appending(path: descriptor.stylesheet),
+                encoding: .utf8
+            )
+            for token in requiredTokens {
+                XCTAssertTrue(
+                    stylesheet.contains(token),
+                    "\(descriptor.theme.rawValue): \(token)"
+                )
+            }
+            XCTAssertFalse(stylesheet.localizedCaseInsensitiveContains("@import"))
+            XCTAssertFalse(stylesheet.localizedCaseInsensitiveContains("url("))
+            XCTAssertFalse(stylesheet.localizedCaseInsensitiveContains("http:"))
+            XCTAssertFalse(stylesheet.localizedCaseInsensitiveContains("https:"))
+        }
+    }
+
+    func testRendererPageUsesExternalStylesAndBlocksNetworkCapabilities() throws {
+        let html = try String(
+            contentsOf: XCTUnwrap(RendererResources.pageURL),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(html.contains("<style>"))
+        XCTAssertTrue(html.contains("href=\"renderer-base.css\""))
+        XCTAssertTrue(html.contains("connect-src 'none'"))
+        XCTAssertTrue(html.contains("object-src 'none'"))
+        XCTAssertTrue(html.contains("frame-src 'none'"))
+    }
+
+    func testRegistryRejectsUnsupportedOrUnsafeManifests() throws {
+        XCTAssertThrowsError(try RenderThemeRegistry(manifestData: Data("""
+        {"schemaVersion":2,"themes":[]}
+        """.utf8))) { error in
+            XCTAssertEqual(
+                error as? RenderThemeRegistry.RegistryError,
+                .unsupportedSchemaVersion(2)
+            )
+        }
+
+        XCTAssertThrowsError(try RenderThemeRegistry(manifestData: Data("""
+        {
+          "schemaVersion":1,
+          "themes":[{
+            "id":"cleanLight",
+            "localizationKey":"render_theme.clean_light",
+            "defaultTitle":"Clean Light",
+            "appearance":"light",
+            "stylesheet":"https://example.invalid/theme.css"
+          }]
+        }
+        """.utf8))) { error in
+            XCTAssertEqual(error as? RenderThemeRegistry.RegistryError, .invalidDescriptor)
+        }
+    }
+
     func testPreferenceDefaultsToCleanLightWithoutWritingASelection() throws {
         let (defaults, suiteName) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
