@@ -52,6 +52,8 @@
 "settings.launch_at_login_detail" = "Start md2png automatically when you log in.";
 "settings.launch_at_login_approval" = "Approval is required in Login Items.";
 "settings.launch_at_login_unavailable" = "This setting is unavailable on this Mac.";
+"settings.launch_at_login_on" = "On";
+"settings.launch_at_login_off" = "Off";
 "settings.open_system_settings" = "Open System Settings…";
 "settings.shortcuts_title" = "Keyboard Shortcuts";
 "settings.shortcuts_subtitle" = "Click a shortcut, then press a new key combination.";

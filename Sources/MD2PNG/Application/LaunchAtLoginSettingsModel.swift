@@ -48,6 +48,19 @@ final class LaunchAtLoginSettingsModel: ObservableObject {
         }
     }
 
+    func performPrimaryAction() {
+        switch status {
+        case .notRegistered, .notFound:
+            setEnabled(true)
+        case .enabled:
+            setEnabled(false)
+        case .requiresApproval:
+            controller.openSystemSettings()
+        case .unknown:
+            break
+        }
+    }
+
     func openSystemSettings() {
         controller.openSystemSettings()
     }

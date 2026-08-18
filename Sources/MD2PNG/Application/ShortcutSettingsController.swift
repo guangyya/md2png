@@ -4,7 +4,7 @@ import SwiftUI
 
 enum ShortcutSettingsLayout {
     static let windowSize = NSSize(width: 520, height: 390)
-    static let generalRowHeight: CGFloat = 72
+    static let generalRowHeight: CGFloat = 60
     static let rowHeight: CGFloat = 56
     static let feedbackHeight: CGFloat = 44
 }
@@ -16,6 +16,8 @@ struct ShortcutSettingsCopy {
     let launchAtLoginDetail: String
     let launchAtLoginApproval: String
     let launchAtLoginUnavailable: String
+    let launchAtLoginOn: String
+    let launchAtLoginOff: String
     let openSystemSettings: String
     let title: String
     let subtitle: String
@@ -58,6 +60,16 @@ struct ShortcutSettingsCopy {
         launchAtLoginUnavailable = L10n.text(
             "settings.launch_at_login_unavailable",
             defaultValue: "This setting is unavailable on this Mac.",
+            bundle: localizationBundle
+        )
+        launchAtLoginOn = L10n.text(
+            "settings.launch_at_login_on",
+            defaultValue: "On",
+            bundle: localizationBundle
+        )
+        launchAtLoginOff = L10n.text(
+            "settings.launch_at_login_off",
+            defaultValue: "Off",
             bundle: localizationBundle
         )
         openSystemSettings = L10n.text(
@@ -321,6 +333,10 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         launchAtLoginModel.setEnabled(isEnabled)
     }
 
+    func performLaunchAtLoginPrimaryActionForTesting() {
+        launchAtLoginModel.performPrimaryAction()
+    }
+
     func openLaunchAtLoginSystemSettingsForTesting() {
         launchAtLoginModel.openSystemSettings()
     }
@@ -328,6 +344,9 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
 }
 
 struct ShortcutSettingsContentView: View {
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @State private var isLaunchAtLoginHovering = false
+
     @ObservedObject var model: ShortcutSettingsModel
     @ObservedObject var launchAtLoginModel: LaunchAtLoginSettingsModel
     let copy: ShortcutSettingsCopy
@@ -365,44 +384,57 @@ struct ShortcutSettingsContentView: View {
             Text(copy.generalTitle)
                 .font(.headline)
 
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(copy.launchAtLogin)
-                        .font(.body.weight(.medium))
-                    Text(launchAtLoginDetail)
-                        .font(.caption)
-                        .foregroundStyle(launchAtLoginDetailColor)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if launchAtLoginModel.requiresApproval {
-                    Button(copy.openSystemSettings) {
-                        launchAtLoginModel.openSystemSettings()
+            Button {
+                launchAtLoginModel.performPrimaryAction()
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(copy.launchAtLogin)
+                            .font(.body.weight(.medium))
+                        Text(launchAtLoginDetail)
+                            .font(.caption)
+                            .foregroundStyle(launchAtLoginDetailColor)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .controlSize(.small)
-                    .accessibilityIdentifier("SettingsLaunchAtLoginOpenSystemSettings")
-                }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Toggle("", isOn: launchAtLoginBinding)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .disabled(!launchAtLoginModel.canChange)
-                    .accessibilityLabel(copy.launchAtLogin)
-                    .accessibilityIdentifier("SettingsLaunchAtLoginToggle")
-            }
-            .padding(.horizontal, 16)
-            .frame(height: ShortcutSettingsLayout.generalRowHeight)
-            .background {
-                AppWindowCardBackground()
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    AppInlineStatusLabel(
+                        title: launchAtLoginStatusText,
+                        systemImage: launchAtLoginStatusSymbol,
+                        color: launchAtLoginStatusColor
                     )
+                    .frame(minWidth: 80, alignment: .leading)
+                }
+                .padding(.horizontal, 16)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: ShortcutSettingsLayout.generalRowHeight,
+                    maxHeight: ShortcutSettingsLayout.generalRowHeight,
+                    alignment: .leading
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!launchAtLoginModel.canChange)
+            .background {
+                ZStack {
+                    AppWindowCardBackground()
+                    if isLaunchAtLoginHovering && launchAtLoginModel.canChange {
+                        Color.accentColor.opacity(0.06)
+                    }
+                }
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
             }
             .overlay {
                 AppWindowCardBorder()
             }
+            .onHover { isLaunchAtLoginHovering = $0 }
+            .accessibilityLabel(copy.launchAtLogin)
+            .accessibilityValue(launchAtLoginStatusText)
+            .accessibilityIdentifier("SettingsLaunchAtLoginToggle")
         }
     }
 
@@ -430,36 +462,27 @@ struct ShortcutSettingsContentView: View {
             .overlay {
                 AppWindowCardBorder()
             }
+
+            HStack {
+                Spacer()
+                Button(copy.restoreDefaults) {
+                    model.restoreDefaults()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("ShortcutSettingsRestoreDefaults")
+            }
         }
     }
 
     private var settingsFooter: some View {
-        HStack(alignment: .center, spacing: 10) {
-            feedbackView
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: ShortcutSettingsLayout.feedbackHeight,
-                    maxHeight: ShortcutSettingsLayout.feedbackHeight,
-                    alignment: .leading
-                )
-
-            Button {
-                model.restoreDefaults()
-            } label: {
-                Text(copy.restoreDefaults)
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .accessibilityIdentifier("ShortcutSettingsRestoreDefaults")
-        }
-    }
-
-    private var launchAtLoginBinding: Binding<Bool> {
-        Binding(
-            get: { launchAtLoginModel.isEnabled },
-            set: { launchAtLoginModel.setEnabled($0) }
-        )
+        feedbackView
+            .frame(
+                maxWidth: .infinity,
+                minHeight: ShortcutSettingsLayout.feedbackHeight,
+                maxHeight: ShortcutSettingsLayout.feedbackHeight,
+                alignment: .leading
+            )
     }
 
     private var launchAtLoginDetail: String {
@@ -480,6 +503,32 @@ struct ShortcutSettingsContentView: View {
         launchAtLoginModel.errorMessage != nil || launchAtLoginModel.requiresApproval
             ? .orange
             : .secondary
+    }
+
+    private var launchAtLoginStatusText: String {
+        switch launchAtLoginModel.status {
+        case .enabled:
+            copy.launchAtLoginOn
+        case .notRegistered, .notFound, .requiresApproval:
+            copy.launchAtLoginOff
+        case .unknown:
+            copy.unavailable
+        }
+    }
+
+    private var launchAtLoginStatusSymbol: String {
+        switch launchAtLoginModel.status {
+        case .enabled:
+            "checkmark.circle.fill"
+        case .notRegistered, .notFound, .requiresApproval:
+            "circle"
+        case .unknown:
+            "xmark.circle"
+        }
+    }
+
+    private var launchAtLoginStatusColor: Color {
+        launchAtLoginModel.status == .enabled ? .green : .secondary
     }
 
     private func shortcutRow(_ command: GlobalShortcutCommand) -> some View {
@@ -512,10 +561,45 @@ struct ShortcutSettingsContentView: View {
                 onCapture: { _ = model.capture($0, for: command) }
             )
             .frame(width: 132, height: 30)
+            .background(
+                Color.accentColor.opacity(shortcutControlFillOpacity(for: command)),
+                in: RoundedRectangle(cornerRadius: 7)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(
+                        Color.accentColor.opacity(
+                            shortcutControlBorderOpacity(for: command)
+                        ),
+                        lineWidth: shortcutControlBorderWidth(for: command)
+                    )
+            }
             .accessibilityIdentifier("ShortcutRecorder.\(command.rawValue)")
         }
         .padding(.horizontal, 16)
         .frame(height: ShortcutSettingsLayout.rowHeight)
+    }
+
+    private var shortcutControlStyle: AppShortcutControlContrastStyle {
+        AppShortcutControlContrastStyle(contrast: colorSchemeContrast)
+    }
+
+    private func shortcutControlFillOpacity(
+        for command: GlobalShortcutCommand
+    ) -> Double {
+        model.recordingCommand == command ? 0.18 : shortcutControlStyle.fillOpacity
+    }
+
+    private func shortcutControlBorderOpacity(
+        for command: GlobalShortcutCommand
+    ) -> Double {
+        model.recordingCommand == command ? 0.7 : shortcutControlStyle.borderOpacity
+    }
+
+    private func shortcutControlBorderWidth(
+        for command: GlobalShortcutCommand
+    ) -> CGFloat {
+        model.recordingCommand == command ? 1.4 : shortcutControlStyle.borderWidth
     }
 
     @ViewBuilder
@@ -581,7 +665,7 @@ final class ShortcutRecorderControl: NSButton {
         super.init(frame: .zero)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        bezelStyle = .rounded
+        isBordered = false
         controlSize = .regular
         font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
         focusRingType = .exterior

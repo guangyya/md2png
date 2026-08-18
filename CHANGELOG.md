@@ -13,6 +13,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   keeping its effective state synchronized after changes in Login Items.
 - Match Settings to Welcome with the same subtle window backdrop, lightweight
   section hierarchy, tinted cards, and material footer treatment.
+- Keep Settings controls consistent with Welcome, scope Restore Defaults to
+  Keyboard Shortcuts, and show the configured Render shortcut in the Welcome
+  workflow demo.
 
 ## [0.10.0] - 2026-08-18
 

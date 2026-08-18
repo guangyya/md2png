@@ -15,6 +15,8 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         XCTAssertEqual(english.windowTitle, "Settings")
         XCTAssertEqual(english.generalTitle, "General")
         XCTAssertEqual(english.launchAtLogin, "Launch at Login")
+        XCTAssertEqual(english.launchAtLoginOn, "On")
+        XCTAssertEqual(english.launchAtLoginOff, "Off")
         XCTAssertEqual(english.openSystemSettings, "Open System Settings…")
         XCTAssertEqual(english.title, "Keyboard Shortcuts")
         XCTAssertEqual(english.restoreDefaults, "Restore Defaults")
@@ -25,6 +27,8 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         XCTAssertEqual(chinese.windowTitle, "设置")
         XCTAssertEqual(chinese.generalTitle, "通用")
         XCTAssertEqual(chinese.launchAtLoginDetail, "登录时自动启动 md2png。")
+        XCTAssertEqual(chinese.launchAtLoginOn, "已开启")
+        XCTAssertEqual(chinese.launchAtLoginOff, "已关闭")
         XCTAssertEqual(chinese.recording, "请按快捷键…")
         XCTAssertEqual(
             chinese.feedbackText(.duplicate),
@@ -58,7 +62,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
             .registrationUnavailable([.render])
         )
         XCTAssertEqual(ShortcutSettingsLayout.rowHeight, 56)
-        XCTAssertEqual(ShortcutSettingsLayout.generalRowHeight, 72)
+        XCTAssertEqual(ShortcutSettingsLayout.generalRowHeight, 60)
         XCTAssertEqual(ShortcutSettingsLayout.feedbackHeight, 44)
         XCTAssertEqual(visibility, [true])
 
@@ -230,7 +234,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .notRegistered)
         XCTAssertFalse(controller.displayedLaunchAtLoginIsEnabled)
 
-        controller.setLaunchAtLoginForTesting(true)
+        controller.performLaunchAtLoginPrimaryActionForTesting()
 
         XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .requiresApproval)
         XCTAssertFalse(controller.displayedLaunchAtLoginIsEnabled)
@@ -242,11 +246,22 @@ final class ShortcutSettingsControllerTests: XCTestCase {
             contentView: try XCTUnwrap(controller.window?.contentView)
         )
 
+        controller.performLaunchAtLoginPrimaryActionForTesting()
+
+        XCTAssertEqual(
+            service.operations,
+            [.register, .openSystemSettings, .openSystemSettings]
+        )
+        XCTAssertEqual(changeCount, 1)
+
         controller.setLaunchAtLoginForTesting(false)
 
         XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .notRegistered)
         XCTAssertFalse(controller.displayedLaunchAtLoginIsEnabled)
-        XCTAssertEqual(service.operations, [.register, .openSystemSettings, .unregister])
+        XCTAssertEqual(
+            service.operations,
+            [.register, .openSystemSettings, .openSystemSettings, .unregister]
+        )
         XCTAssertEqual(changeCount, 2)
     }
 
@@ -287,6 +302,7 @@ final class ShortcutSettingsControllerTests: XCTestCase {
             onCapture: { capturedEvents.append($0) }
         )
         XCTAssertTrue(recorder.acceptsFirstResponder)
+        XCTAssertFalse(recorder.isBordered)
         XCTAssertEqual(recorder.accessibilityRole(), .button)
         XCTAssertEqual(recorder.accessibilityLabel(), "Render shortcut")
         XCTAssertEqual(recorder.accessibilityValue() as? String, "Type shortcut…")

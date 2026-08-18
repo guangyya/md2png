@@ -107,7 +107,11 @@ struct GlobalShortcut: Codable, Equatable, Hashable, Sendable {
     }
 
     var glyphs: String {
-        modifierPresentation.map(\.glyph).joined() + key.displayName
+        presentationKeys.joined()
+    }
+
+    var presentationKeys: [String] {
+        modifierPresentation.map(\.glyph) + [key.displayName]
     }
 
     var accessibilityName: String {

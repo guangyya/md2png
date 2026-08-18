@@ -11,6 +11,11 @@ final class GlobalShortcutTests: XCTestCase {
         XCTAssertEqual(configuration.showLastRender.key.keyCode, UInt32(kVK_ANSI_Z))
         XCTAssertEqual(configuration.render.glyphs, "⌃⌘X")
         XCTAssertEqual(configuration.showLastRender.glyphs, "⌃⌘Z")
+        XCTAssertEqual(configuration.render.presentationKeys, ["⌃", "⌘", "X"])
+        XCTAssertEqual(
+            configuration.showLastRender.presentationKeys,
+            ["⌃", "⌘", "Z"]
+        )
         XCTAssertEqual(configuration.render.accessibilityName, "Control-Command-X")
         XCTAssertEqual(
             configuration.showLastRender.accessibilityName,

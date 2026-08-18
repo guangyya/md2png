@@ -33,6 +33,10 @@ final class WelcomeTests: XCTestCase {
         }
 
         XCTAssertEqual(statuses.map(\.shortcutGlyphs), ["⌃⌘X", "⌃⌘Z"])
+        XCTAssertEqual(
+            statuses.map(\.shortcutKeys),
+            [["⌃", "⌘", "X"], ["⌃", "⌘", "Z"]]
+        )
         XCTAssertTrue(statuses[0].isRegistered)
         XCTAssertFalse(statuses[1].isRegistered)
         XCTAssertEqual(statuses.map(\.isVerified), [false, false])
@@ -509,6 +513,12 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(
             WelcomeCompletedJourneyStage.all.map(\.shortcutKeys),
             [["⌘", "C"], ["⌃", "⌘", "X"], ["⌘", "V"]]
+        )
+        XCTAssertEqual(
+            WelcomeCompletedJourneyStage.stages(
+                renderShortcutKeys: ["⌥", "⇧", "⌘", "Z"]
+            ).map(\.shortcutKeys),
+            [["⌘", "C"], ["⌥", "⇧", "⌘", "Z"], ["⌘", "V"]]
         )
 
         let copyPulse = WelcomeCardMotion(
