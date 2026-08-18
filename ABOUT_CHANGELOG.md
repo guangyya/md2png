@@ -5,6 +5,15 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Render with new High Contrast and Midnight Blue themes.
+
+### Changed
+
+- Load every bundled theme from validated local resources shared by the app and
+  renderer.
+
 ## [0.10.1] - 2026-08-18
 
 ### Changed
