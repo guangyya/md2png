@@ -59,6 +59,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onApply: { [weak self] configuration in
             self?.registerGlobalShortcuts(configuration: configuration) ?? []
         },
+        onRecordingBegan: { [weak self] in
+            // Carbon hot keys consume their matching event before the focused
+            // recorder can capture it, so suspend them for the recording session.
+            self?.globalHotKeyRegistrar.invalidate()
+        },
+        onRecordingCancelled: { [weak self] in
+            guard let self else { return }
+            self.registerGlobalShortcuts(configuration: self.globalShortcutConfiguration)
+        },
         onVisibilityChange: { [weak self] isVisible in
             self?.setShortcutSettingsWindowVisible(isVisible)
         }

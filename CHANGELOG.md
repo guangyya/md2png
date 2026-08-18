@@ -22,6 +22,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Defer the local WebKit renderer until the first render request, then reuse the
   same initialized renderer for later single-image and split-image work.
 
+### Fixed
+
+- Keep the Welcome Example guide's submenu on the familiar right side while
+  preserving a valid status-item anchor.
+- Capture assigned global shortcuts inside Settings without triggering their
+  actions, report conflicts, and keep Restore Defaults available.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added

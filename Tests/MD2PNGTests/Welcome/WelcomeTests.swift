@@ -618,32 +618,12 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(SampleGuideLayout.menuSections.flatMap { $0 }.count, 7)
     }
 
-    func testSampleGuidePlacementKeepsTheMainMenuNearestTheStatusItem() {
-        let visibleFrame = NSRect(x: 0, y: 24, width: 1_440, height: 876)
+    func testSampleGuidePlacementKeepsAValidAnchorAndOpensExamplesOnTheRight() {
         let buttonBounds = NSRect(x: 0, y: 0, width: 22, height: 22)
-        let leftPlacement = SampleGuidePlacement.resolve(
-            buttonBounds: buttonBounds,
-            buttonFrameInScreen: NSRect(x: 8, y: 878, width: 22, height: 22),
-            visibleFrame: visibleFrame
-        )
-        let rightPlacement = SampleGuidePlacement.resolve(
-            buttonBounds: buttonBounds,
-            buttonFrameInScreen: NSRect(x: 1_410, y: 878, width: 22, height: 22),
-            visibleFrame: visibleFrame
-        )
+        let placement = SampleGuidePlacement.resolve(buttonBounds: buttonBounds)
 
-        XCTAssertEqual(leftPlacement.examplesEdge, .trailing)
-        XCTAssertEqual(leftPlacement.positioningRect, buttonBounds)
-        XCTAssertEqual(rightPlacement.examplesEdge, .leading)
-        XCTAssertEqual(rightPlacement.positioningRect, buttonBounds)
-
-        let fallback = SampleGuidePlacement.resolve(
-            buttonBounds: buttonBounds,
-            buttonFrameInScreen: nil,
-            visibleFrame: nil
-        )
-        XCTAssertEqual(fallback.examplesEdge, .trailing)
-        XCTAssertEqual(fallback.positioningRect, buttonBounds)
+        XCTAssertEqual(placement.examplesEdge, .trailing)
+        XCTAssertEqual(placement.positioningRect, buttonBounds)
     }
 
     func testSampleGuideKeyboardPolicyTraversesActivatesAndDismisses() {

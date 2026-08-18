@@ -13,6 +13,7 @@ enum ShortcutSettingsFeedback: Equatable {
 @MainActor
 final class ShortcutSettingsModel: ObservableObject {
     typealias ApplyConfiguration = (GlobalShortcutConfiguration) -> Set<UInt32>
+    typealias RecordingLifecycleAction = () -> Void
 
     @Published private(set) var configuration: GlobalShortcutConfiguration
     @Published private(set) var failedRegistrationIDs: Set<UInt32>
@@ -20,12 +21,16 @@ final class ShortcutSettingsModel: ObservableObject {
     @Published private(set) var feedback: ShortcutSettingsFeedback?
 
     private let preference: GlobalShortcutPreference
+    private let onRecordingBegan: RecordingLifecycleAction
+    private let onRecordingCancelled: RecordingLifecycleAction
     private let applyConfiguration: ApplyConfiguration
 
     init(
         preference: GlobalShortcutPreference = GlobalShortcutPreference(),
         configuration: GlobalShortcutConfiguration? = nil,
         failedRegistrationIDs: Set<UInt32> = [],
+        onRecordingBegan: @escaping RecordingLifecycleAction = {},
+        onRecordingCancelled: @escaping RecordingLifecycleAction = {},
         applyConfiguration: @escaping ApplyConfiguration
     ) {
         let configuration = configuration ?? preference.configuration
@@ -33,11 +38,9 @@ final class ShortcutSettingsModel: ObservableObject {
         self.preference = preference
         self.configuration = configuration
         self.failedRegistrationIDs = failedRegistrationIDs
+        self.onRecordingBegan = onRecordingBegan
+        self.onRecordingCancelled = onRecordingCancelled
         self.applyConfiguration = applyConfiguration
-    }
-
-    var isUsingDefaults: Bool {
-        configuration == .default
     }
 
     func refresh(
@@ -45,20 +48,32 @@ final class ShortcutSettingsModel: ObservableObject {
         failedRegistrationIDs: Set<UInt32>
     ) {
         precondition(configuration.isValid)
+        let wasRecording = recordingCommand != nil
         self.configuration = configuration
         self.failedRegistrationIDs = failedRegistrationIDs
         recordingCommand = nil
         feedback = registrationFeedback(for: failedRegistrationIDs)
+        if wasRecording {
+            onRecordingCancelled()
+        }
     }
 
     func beginRecording(_ command: GlobalShortcutCommand) {
+        let wasRecording = recordingCommand != nil
         recordingCommand = command
         feedback = nil
+        if !wasRecording {
+            onRecordingBegan()
+        }
     }
 
     func cancelRecording() {
+        let wasRecording = recordingCommand != nil
         recordingCommand = nil
         feedback = nil
+        if wasRecording {
+            onRecordingCancelled()
+        }
     }
 
     @discardableResult
