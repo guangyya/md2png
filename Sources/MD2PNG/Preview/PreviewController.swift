@@ -147,7 +147,7 @@ final class PreviewZoomStatusView: NSView {
     override var intrinsicContentSize: NSSize { Self.preferredSize }
 }
 
-final class PreviewWindow: NSWindow {
+final class PreviewWindow: AppWindow {
     enum Command: Equatable {
         case close
         case copyAgain
@@ -284,6 +284,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         onCopied: @escaping (Int) -> Void = { _ in },
         onError: @escaping (Error) -> Void = { _ in },
         onVisibilityChange: @escaping (Bool) -> Void = { _ in },
+        onShowSettings: @escaping () -> Void = {},
         temporaryImageStore: PreviewTemporaryImageStore = PreviewTemporaryImageStore(),
         openFileInPreview: @escaping PreviewFileOpener = { url, completion in
             try PreviewWorkspaceOpener.open(url, completion: completion)
@@ -309,6 +310,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
+        window.showSettingsHandler = onShowSettings
         window.commandHandler = { [weak self] command in
             self?.perform(command)
         }

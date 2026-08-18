@@ -368,6 +368,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
     private let preference: WelcomePreference
     private let copy: WelcomeCopy
     private let onVisibilityChange: (Bool) -> Void
+    private let onShowSettings: () -> Void
     private let onTrySample: () -> Void
 #if DEBUG
     private(set) var launchAtLoginRefreshCountForTesting = 0
@@ -395,6 +396,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         launchAtLoginController: LaunchAtLoginController = LaunchAtLoginController(),
         onLaunchAtLoginError: @escaping (Error) -> Void = { _ in },
         onVisibilityChange: @escaping (Bool) -> Void = { _ in },
+        onShowSettings: @escaping () -> Void = {},
         visibleFrameProvider: @escaping @MainActor () -> NSRect? = WelcomeController.activeVisibleFrame,
         dynamicTypeSize: DynamicTypeSize? = nil,
         onTrySample: @escaping () -> Void
@@ -406,6 +408,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
             onError: onLaunchAtLoginError
         )
         self.onVisibilityChange = onVisibilityChange
+        self.onShowSettings = onShowSettings
         self.visibleFrameProvider = visibleFrameProvider
         self.dynamicTypeSize = dynamicTypeSize
         self.onTrySample = onTrySample
@@ -427,7 +430,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
         shortcutVerificationState.reset(shortcuts: shortcuts)
         launchAtLoginState.refresh()
         if window == nil {
-            let window = PreviewWindow(
+            let window = AppWindow(
                 contentRect: NSRect(
                     origin: .zero,
                     size: WelcomeLayout.preferredContentSize
@@ -438,6 +441,7 @@ final class WelcomeController: NSWindowController, NSWindowDelegate {
             )
             window.title = copy.windowTitle
             window.isReleasedWhenClosed = false
+            window.showSettingsHandler = onShowSettings
             window.level = .normal
             window.collectionBehavior.insert(.moveToActiveSpace)
             window.delegate = self

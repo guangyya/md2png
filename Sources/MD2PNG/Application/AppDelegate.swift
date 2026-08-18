@@ -22,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         },
         onVisibilityChange: { [weak self] isVisible in
             self?.setPreviewWindowVisible(isVisible)
+        },
+        onShowSettings: { [weak self] in
+            self?.showShortcutSettings()
         }
     )
     private lazy var updateController = UpdateController(
@@ -41,7 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private lazy var aboutController = AboutController(
         updateController: updateController,
-        diagnosticLogger: diagnosticLogger
+        diagnosticLogger: diagnosticLogger,
+        onShowSettings: { [weak self] in
+            self?.showShortcutSettings()
+        }
     )
     private let launchAtLoginController = LaunchAtLoginController()
     private let welcomePreference = WelcomePreference()
@@ -63,6 +69,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         },
         onVisibilityChange: { [weak self] isVisible in
             self?.setWelcomeWindowVisible(isVisible)
+        },
+        onShowSettings: { [weak self] in
+            self?.showShortcutSettings()
         },
         onTrySample: { [weak self] in self?.showSampleGuide() }
     )

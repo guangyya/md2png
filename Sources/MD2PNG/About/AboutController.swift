@@ -126,7 +126,8 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         updateController: UpdateController = UpdateController(),
         diagnosticLogger: DiagnosticLogger = .shared,
         diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies = .live(),
-        rendererSelfTestDependencies: AboutRendererSelfTestDependencies? = nil
+        rendererSelfTestDependencies: AboutRendererSelfTestDependencies? = nil,
+        onShowSettings: @escaping () -> Void = {}
     ) {
         self.updateController = updateController
         self.diagnosticLogger = diagnosticLogger
@@ -134,7 +135,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         self.rendererSelfTestDependencies = rendererSelfTestDependencies ?? .live(
             diagnosticLogger: diagnosticLogger
         )
-        let window = PreviewWindow(
+        let window = AppWindow(
             contentRect: NSRect(origin: .zero, size: AboutLayout.windowSize),
             styleMask: [.titled, .closable],
             backing: .buffered,
@@ -142,6 +143,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
         )
         window.title = L10n.text("about.window_title", defaultValue: "About md2png")
         window.isReleasedWhenClosed = false
+        window.showSettingsHandler = onShowSettings
         window.center()
         super.init(window: window)
         window.delegate = self
