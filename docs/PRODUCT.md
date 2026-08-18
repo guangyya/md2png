@@ -85,10 +85,12 @@ sending it.
 Compact wraps prose sooner, Standard preserves the original output sizing, and
 Wide gives dense tables and diagrams more room. The Preview window opened by
 Show Last Render reflects the selected output width within the current screen
-and identifies the preset and PNG pixel dimensions in its title. Dragging the
-image uses a local file promise and creates a PNG only at the explicit drop
-destination. Actual Size maps one PNG pixel to one display backing pixel, while
-zoom changes only the preview presentation.
+and identifies the preset and PNG pixel dimensions in its title. Starting a
+drag creates one generation-isolated PNG in the system temporary directory and
+offers both its file URL and PNG data to the receiving app. Cancelled unused
+exports are removed immediately; accepted exports remain readable until md2png
+quits. Actual Size maps one PNG pixel to one display backing pixel, while zoom
+changes only the preview presentation.
 
 These are real Retina outputs from the same
 [width comparison source](../Examples/width-presets.md). They live here instead

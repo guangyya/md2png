@@ -262,6 +262,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowPresentationCoordinator.refreshLaunchAtLoginIfVisible()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        windowPresentationCoordinator.prepareForApplicationTermination()
+    }
+
     func applicationShouldTerminate(
         _ sender: NSApplication
     ) -> NSApplication.TerminateReply {

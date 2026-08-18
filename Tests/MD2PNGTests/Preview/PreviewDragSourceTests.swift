@@ -1,96 +1,174 @@
 import AppKit
-import UniformTypeIdentifiers
 import XCTest
 @testable import MD2PNG
 
 final class PreviewDragSourceTests: XCTestCase {
     @MainActor
-    func testFilePromiseUsesSuggestedNameAndWritesTheCapturedPNG() throws {
-        let image = try makeImage(pixelsWide: 240, pixelsHigh: 160, color: .systemBlue)
-        let provider = try PreviewDragItemFactory.makeFilePromiseProvider(
-            image: image,
-            suggestedFilename: "Monthly Product Update.png",
-            onWriteError: {}
-        )
-        let promise = try XCTUnwrap(provider.userInfo as? PreviewPromisedPNG)
-        let directory = temporaryDirectory(named: "PreviewDragPromiseTests")
-        let output = directory.appendingPathComponent(promise.filename)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    func testExportWritesSuggestedPNGWithCapturedPixels() throws {
+        let parent = try temporaryDirectory(named: "PreviewDragExportTests")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let store = PreviewDragExportStore(parentDirectoryURL: parent)
 
-        XCTAssertEqual(provider.fileType, UTType.png.identifier)
-        XCTAssertTrue(provider.delegate === promise)
-        XCTAssertEqual(
-            promise.filePromiseProvider(provider, fileNameForType: provider.fileType),
-            "Monthly Product Update.png"
+        let export = try store.export(
+            image: try makeImage(pixelsWide: 240, pixelsHigh: 160, color: .systemBlue),
+            generationID: UUID(),
+            suggestedFilename: "Monthly Product Update.png"
         )
 
-        var writeError: Error?
-        promise.filePromiseProvider(provider, writePromiseTo: output) { writeError = $0 }
-
-        XCTAssertNil(writeError)
-        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: output)))
+        XCTAssertEqual(export.fileURL.lastPathComponent, "Monthly Product Update.png")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: export.fileURL.path))
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: export.fileURL)))
         XCTAssertEqual(bitmap.pixelsWide, 240)
         XCTAssertEqual(bitmap.pixelsHigh, 160)
     }
 
     @MainActor
-    func testPromisesRemainGenerationSpecificAcrossReplacementRenders() throws {
-        let firstProvider = try PreviewDragItemFactory.makeFilePromiseProvider(
+    func testPasteboardPublishesFileURLAndPNGForCompatibility() throws {
+        let parent = try temporaryDirectory(named: "PreviewDragPasteboardTests")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let store = PreviewDragExportStore(parentDirectoryURL: parent)
+        let export = try store.export(
             image: try makeImage(pixelsWide: 80, pixelsHigh: 60, color: .systemRed),
-            suggestedFilename: "First.png",
-            onWriteError: {}
+            generationID: UUID(),
+            suggestedFilename: "Compatibility.png"
         )
-        let secondProvider = try PreviewDragItemFactory.makeFilePromiseProvider(
-            image: try makeImage(pixelsWide: 320, pixelsHigh: 200, color: .systemGreen),
-            suggestedFilename: "Second.png",
-            onWriteError: {}
-        )
-        let firstPromise = try XCTUnwrap(firstProvider.userInfo as? PreviewPromisedPNG)
-        let secondPromise = try XCTUnwrap(secondProvider.userInfo as? PreviewPromisedPNG)
-        let directory = temporaryDirectory(named: "PreviewDragGenerationTests")
-        let firstURL = directory.appendingPathComponent(firstPromise.filename)
-        let secondURL = directory.appendingPathComponent(secondPromise.filename)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        firstPromise.filePromiseProvider(firstProvider, writePromiseTo: firstURL) { error in
-            XCTAssertNil(error)
-        }
-        secondPromise.filePromiseProvider(secondProvider, writePromiseTo: secondURL) { error in
-            XCTAssertNil(error)
-        }
+        let item = try PreviewDragItemFactory.makePasteboardItem(for: export)
 
-        let first = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: firstURL)))
-        let second = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: secondURL)))
-        XCTAssertEqual([first.pixelsWide, first.pixelsHigh], [80, 60])
-        XCTAssertEqual([second.pixelsWide, second.pixelsHigh], [320, 200])
+        XCTAssertTrue(item.types.contains(.fileURL))
+        XCTAssertTrue(item.types.contains(.png))
+        XCTAssertEqual(item.string(forType: .fileURL), export.fileURL.absoluteString)
+        XCTAssertEqual(item.data(forType: .png), export.pngData)
     }
 
     @MainActor
-    func testPromiseSanitizesFilenameAndReportsDestinationWriteFailure() async throws {
-        let image = try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemOrange)
-        let errorReported = expectation(description: "write failure reported")
-        let provider = try PreviewDragItemFactory.makeFilePromiseProvider(
-            image: image,
-            suggestedFilename: "../../Dragged report",
-            onWriteError: { errorReported.fulfill() }
+    func testSamePreviewGenerationReusesOneFileAndReplacementIsIndependent() throws {
+        let parent = try temporaryDirectory(named: "PreviewDragGenerationTests")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let store = PreviewDragExportStore(parentDirectoryURL: parent)
+        let firstGeneration = UUID()
+        let secondGeneration = UUID()
+
+        let first = try store.export(
+            image: try makeImage(pixelsWide: 80, pixelsHigh: 60, color: .systemRed),
+            generationID: firstGeneration,
+            suggestedFilename: "First.png"
         )
-        let promise = try XCTUnwrap(provider.userInfo as? PreviewPromisedPNG)
-        let missingParent = temporaryDirectory(named: "PreviewDragFailureTests")
-            .appendingPathComponent("missing", isDirectory: true)
-        let output = missingParent.appendingPathComponent("report.png")
-        var writeError: Error?
+        let repeated = try store.export(
+            image: try makeImage(pixelsWide: 20, pixelsHigh: 10, color: .black),
+            generationID: firstGeneration,
+            suggestedFilename: "Ignored replacement.png"
+        )
+        let second = try store.export(
+            image: try makeImage(pixelsWide: 320, pixelsHigh: 200, color: .systemGreen),
+            generationID: secondGeneration,
+            suggestedFilename: "Second.png"
+        )
 
-        promise.filePromiseProvider(provider, writePromiseTo: output) { writeError = $0 }
-        await fulfillment(of: [errorReported], timeout: 1)
+        XCTAssertEqual(repeated.id, first.id)
+        XCTAssertEqual(repeated.fileURL, first.fileURL)
+        XCTAssertNotEqual(second.id, first.id)
+        let firstBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: first.fileURL)))
+        let secondBitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: second.fileURL)))
+        XCTAssertEqual([firstBitmap.pixelsWide, firstBitmap.pixelsHigh], [80, 60])
+        XCTAssertEqual([secondBitmap.pixelsWide, secondBitmap.pixelsHigh], [320, 200])
+    }
 
-        XCTAssertEqual(promise.filename, "Dragged report.png")
-        guard let appError = writeError as? AppError,
-              case .pngWriteFailed = appError else {
-            return XCTFail("Expected pngWriteFailed, got \(String(describing: writeError))")
+    @MainActor
+    func testCancelledUnusedExportIsRemovedButAcceptedExportSurvives() throws {
+        let parent = try temporaryDirectory(named: "PreviewDragLifetimeTests")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let store = PreviewDragExportStore(parentDirectoryURL: parent)
+
+        let cancelled = try store.export(
+            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemOrange),
+            generationID: UUID(),
+            suggestedFilename: "Cancelled.png"
+        )
+        store.finishExport(cancelled.id, operation: [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: cancelled.fileURL.path))
+
+        let acceptedGeneration = UUID()
+        let accepted = try store.export(
+            image: try makeImage(pixelsWide: 50, pixelsHigh: 35, color: .systemPurple),
+            generationID: acceptedGeneration,
+            suggestedFilename: "Accepted.png"
+        )
+        store.finishExport(accepted.id, operation: .copy)
+        store.finishExport(accepted.id, operation: [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: accepted.fileURL.path))
+
+        store.clear()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: accepted.fileURL.path))
+    }
+
+    @MainActor
+    func testStaleDragCompletionCannotRemoveRegeneratedExport() throws {
+        let parent = try temporaryDirectory(named: "PreviewDragStaleCompletionTests")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let store = PreviewDragExportStore(parentDirectoryURL: parent)
+        let generationID = UUID()
+        let original = try store.export(
+            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemRed),
+            generationID: generationID,
+            suggestedFilename: "Original.png"
+        )
+        try FileManager.default.removeItem(at: original.fileURL)
+        let regenerated = try store.export(
+            image: try makeImage(pixelsWide: 50, pixelsHigh: 35, color: .systemBlue),
+            generationID: generationID,
+            suggestedFilename: "Regenerated.png"
+        )
+
+        store.finishExport(original.id, operation: [])
+
+        XCTAssertNotEqual(regenerated.id, original.id)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: regenerated.fileURL.path))
+    }
+
+    @MainActor
+    func testStoreDeinitRemovesAcceptedTemporaryFile() throws {
+        let parent = try temporaryDirectory(named: "PreviewDragDeinitTests")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        var fileURL: URL?
+
+        do {
+            let store = PreviewDragExportStore(parentDirectoryURL: parent)
+            let export = try store.export(
+                image: try makeImage(pixelsWide: 32, pixelsHigh: 24, color: .systemTeal),
+                generationID: UUID(),
+                suggestedFilename: "Session.png"
+            )
+            store.finishExport(export.id, operation: .copy)
+            fileURL = export.fileURL
+            XCTAssertTrue(FileManager.default.fileExists(atPath: export.fileURL.path))
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: output.path))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(fileURL).path))
+    }
+
+    @MainActor
+    func testInvalidParentReportsWriteFailureAndSanitizesFilename() throws {
+        XCTAssertEqual(
+            PreviewDragItemFactory.safeFilename(from: "../../Dragged report"),
+            "Dragged report.png"
+        )
+        let invalidParent = try temporaryDirectory(named: "PreviewDragFailureTests")
+            .appendingPathComponent("regular-file")
+        try Data("not a directory".utf8).write(to: invalidParent)
+        defer { try? FileManager.default.removeItem(at: invalidParent.deletingLastPathComponent()) }
+        let store = PreviewDragExportStore(parentDirectoryURL: invalidParent)
+
+        XCTAssertThrowsError(try store.export(
+            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemOrange),
+            generationID: UUID(),
+            suggestedFilename: "Dragged report"
+        )) { error in
+            guard let appError = error as? AppError,
+                  case .pngWriteFailed = appError else {
+                return XCTFail("Expected pngWriteFailed, got \(error)")
+            }
+        }
     }
 
     func testDraggingThumbnailIsBoundedCenteredAndPreservesAspectRatio() {
@@ -107,7 +185,7 @@ final class PreviewDragSourceTests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewControllerPromisesCurrentImageWithoutChangingTheClipboard() throws {
+    func testPreviewControllerExportsCurrentImageWithoutChangingTheClipboard() throws {
         _ = NSApplication.shared
         var copyCount = 0
         let controller = PreviewController(copyImage: { _ in
@@ -120,18 +198,19 @@ final class PreviewDragSourceTests: XCTestCase {
             markdown: "# Drag Export"
         )
 
-        let provider = try XCTUnwrap(controller.dragFilePromiseProviderForTesting())
-        let promise = try XCTUnwrap(provider.userInfo as? PreviewPromisedPNG)
+        let export = try XCTUnwrap(controller.dragExportForTesting())
 
-        XCTAssertEqual(promise.filename, "Drag Export.png")
+        XCTAssertEqual(export.fileURL.lastPathComponent, "Drag Export.png")
         XCTAssertEqual(copyCount, 0)
     }
 
-    private func temporaryDirectory(named prefix: String) -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent(
+    private func temporaryDirectory(named prefix: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
             "\(prefix)-\(UUID().uuidString)",
             isDirectory: true
         )
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 
     private func makeImage(

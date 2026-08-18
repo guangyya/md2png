@@ -179,8 +179,10 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 - Markdown and generated images are never uploaded.
 - Split PNG export is offered only as an explicit recovery action after a
   size-limit error, is Save-only, and never writes images to the clipboard.
-- Drag export uses a local file promise: no PNG file is created unless the user
-  completes a drop, and the receiver chooses the destination.
+- Drag export creates one generation-isolated PNG in the system temporary
+  directory only after the user starts dragging. An unused cancelled export is
+  removed immediately; an accepted export remains readable by the receiving app
+  until md2png quits, then is deleted. Dragging does not change the clipboard.
 - The latest successful Markdown source is retained only in memory for the Last
   Markdown actions and is discarded when md2png quits.
 - External Markdown images are replaced with a text placeholder instead of

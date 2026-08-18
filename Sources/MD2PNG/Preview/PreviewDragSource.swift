@@ -1,24 +1,33 @@
 import AppKit
-import UniformTypeIdentifiers
+
+struct PreviewDraggingItem {
+    let item: NSDraggingItem
+    let exportID: UUID
+}
 
 @MainActor
 final class PreviewDragImageView: NSImageView, NSDraggingSource {
-    typealias DraggingItemProvider = (NSEvent) throws -> NSDraggingItem?
+    typealias DraggingItemProvider = (NSEvent) throws -> PreviewDraggingItem?
 
     var draggingItemProvider: DraggingItemProvider?
+    var draggingSessionEnded: ((UUID, NSDragOperation) -> Void)?
     var draggingErrorHandler: ((Error) -> Void)?
-    private var dragIsActive = false
+    private var activeExportID: UUID?
 
     override func mouseDown(with event: NSEvent) {
-        dragIsActive = false
+        activeExportID = nil
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard !dragIsActive, let draggingItemProvider else { return }
+        guard activeExportID == nil, let draggingItemProvider else { return }
         do {
-            guard let item = try draggingItemProvider(event) else { return }
-            dragIsActive = true
-            let session = beginDraggingSession(with: [item], event: event, source: self)
+            guard let draggingItem = try draggingItemProvider(event) else { return }
+            activeExportID = draggingItem.exportID
+            let session = beginDraggingSession(
+                with: [draggingItem.item],
+                event: event,
+                source: self
+            )
             session.animatesToStartingPositionsOnCancelOrFail = true
         } catch {
             draggingErrorHandler?(error)
@@ -41,7 +50,9 @@ final class PreviewDragImageView: NSImageView, NSDraggingSource {
         endedAt screenPoint: NSPoint,
         operation: NSDragOperation
     ) {
-        dragIsActive = false
+        guard let exportID = activeExportID else { return }
+        activeExportID = nil
+        draggingSessionEnded?(exportID, operation)
     }
 
     func ignoreModifierKeys(for session: NSDraggingSession) -> Bool {
@@ -49,49 +60,148 @@ final class PreviewDragImageView: NSImageView, NSDraggingSource {
     }
 }
 
+struct PreviewDragExport {
+    let id: UUID
+    let fileURL: URL
+    let pngData: Data
+}
+
+@MainActor
+final class PreviewDragExportStore {
+    private struct Record {
+        let exportID: UUID
+        let fileURL: URL
+        let directoryURL: URL
+        var hasAcceptedDrop = false
+    }
+
+    private let fileManager: FileManager
+    private let rootDirectoryURL: URL
+    private var recordsByGeneration: [UUID: Record] = [:]
+    private var generationByExportID: [UUID: UUID] = [:]
+
+    init(
+        parentDirectoryURL: URL = FileManager.default.temporaryDirectory,
+        fileManager: FileManager = .default
+    ) {
+        self.fileManager = fileManager
+        rootDirectoryURL = parentDirectoryURL.appendingPathComponent(
+            "md2png-preview-drag-\(UUID().uuidString)",
+            isDirectory: true
+        )
+    }
+
+    isolated deinit {
+        try? fileManager.removeItem(at: rootDirectoryURL)
+    }
+
+    func export(
+        image: NSImage,
+        generationID: UUID,
+        suggestedFilename: String
+    ) throws -> PreviewDragExport {
+        if let record = recordsByGeneration[generationID],
+           fileManager.fileExists(atPath: record.fileURL.path),
+           let pngData = try? Data(contentsOf: record.fileURL) {
+            return PreviewDragExport(
+                id: record.exportID,
+                fileURL: record.fileURL,
+                pngData: pngData
+            )
+        }
+        if let replacedRecord = recordsByGeneration.removeValue(forKey: generationID) {
+            generationByExportID.removeValue(forKey: replacedRecord.exportID)
+            try? fileManager.removeItem(at: replacedRecord.directoryURL)
+        }
+
+        let pngData = try RenderedImageExport.pngData(for: image)
+        let exportID = UUID()
+        let directoryURL = rootDirectoryURL.appendingPathComponent(
+            exportID.uuidString,
+            isDirectory: true
+        )
+        let fileURL = directoryURL.appendingPathComponent(
+            PreviewDragItemFactory.safeFilename(from: suggestedFilename),
+            isDirectory: false
+        )
+
+        do {
+            try fileManager.createDirectory(
+                at: directoryURL,
+                withIntermediateDirectories: true
+            )
+            try pngData.write(to: fileURL, options: .atomic)
+        } catch {
+            try? fileManager.removeItem(at: directoryURL)
+            throw AppError.pngWriteFailed
+        }
+
+        let export = PreviewDragExport(
+            id: exportID,
+            fileURL: fileURL,
+            pngData: pngData
+        )
+        recordsByGeneration[generationID] = Record(
+            exportID: export.id,
+            fileURL: export.fileURL,
+            directoryURL: directoryURL
+        )
+        generationByExportID[exportID] = generationID
+        return export
+    }
+
+    func finishExport(_ exportID: UUID, operation: NSDragOperation) {
+        guard let generationID = generationByExportID[exportID],
+              var record = recordsByGeneration[generationID] else { return }
+        guard record.exportID == exportID else {
+            generationByExportID.removeValue(forKey: exportID)
+            return
+        }
+        if !operation.isEmpty {
+            record.hasAcceptedDrop = true
+            recordsByGeneration[generationID] = record
+        } else if !record.hasAcceptedDrop {
+            removeRecord(generationID: generationID, record: record)
+        }
+    }
+
+    func clear() {
+        recordsByGeneration.removeAll()
+        generationByExportID.removeAll()
+        try? fileManager.removeItem(at: rootDirectoryURL)
+    }
+
+    private func removeRecord(generationID: UUID, record: Record) {
+        recordsByGeneration.removeValue(forKey: generationID)
+        generationByExportID.removeValue(forKey: record.exportID)
+        try? fileManager.removeItem(at: record.directoryURL)
+    }
+}
+
 enum PreviewDragItemFactory {
     static let maximumThumbnailDimension: CGFloat = 180
 
-    @MainActor
-    static func makeFilePromiseProvider(
-        image: NSImage,
-        suggestedFilename: String,
-        onWriteError: @escaping @MainActor () -> Void
-    ) throws -> NSFilePromiseProvider {
-        let promise = PreviewPromisedPNG(
-            pngData: try RenderedImageExport.pngData(for: image),
-            suggestedFilename: suggestedFilename,
-            onWriteError: onWriteError
-        )
-        let provider = NSFilePromiseProvider(
-            fileType: UTType.png.identifier,
-            delegate: promise
-        )
-        // NSFilePromiseProvider keeps its delegate weakly. Retaining the immutable
-        // generation payload in userInfo lets an accepted drop finish even if a
-        // newer render replaces the image while the receiver writes the file.
-        provider.userInfo = promise
-        return provider
+    static func makePasteboardItem(for export: PreviewDragExport) throws -> NSPasteboardItem {
+        let item = NSPasteboardItem()
+        guard item.setString(export.fileURL.absoluteString, forType: .fileURL),
+              item.setData(export.pngData, forType: .png) else {
+            throw AppError.pngWriteFailed
+        }
+        return item
     }
 
     @MainActor
     static func makeDraggingItem(
+        export: PreviewDragExport,
         image: NSImage,
-        suggestedFilename: String,
-        location: NSPoint,
-        onWriteError: @escaping @MainActor () -> Void
-    ) throws -> NSDraggingItem {
-        let provider = try makeFilePromiseProvider(
-            image: image,
-            suggestedFilename: suggestedFilename,
-            onWriteError: onWriteError
-        )
-        let item = NSDraggingItem(pasteboardWriter: provider)
+        location: NSPoint
+    ) throws -> PreviewDraggingItem {
+        let item = NSDraggingItem(pasteboardWriter: try makePasteboardItem(for: export))
         item.setDraggingFrame(
             draggingFrame(imageSize: image.size, centeredAt: location),
             contents: image
         )
-        return item
+        return PreviewDraggingItem(item: item, exportID: export.id)
     }
 
     static func draggingFrame(
@@ -121,62 +231,8 @@ enum PreviewDragItemFactory {
             height: size.height
         )
     }
-}
 
-final class PreviewPromisedPNG: NSObject, NSFilePromiseProviderDelegate {
-    let filename: String
-    private let pngData: Data
-    private let onWriteError: @MainActor () -> Void
-    private let writeQueue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.name = "io.github.guangyya.md2png.preview-file-promise"
-        queue.maxConcurrentOperationCount = 1
-        queue.qualityOfService = .userInitiated
-        return queue
-    }()
-
-    init(
-        pngData: Data,
-        suggestedFilename: String,
-        onWriteError: @escaping @MainActor () -> Void
-    ) {
-        self.pngData = pngData
-        filename = Self.safeFilename(from: suggestedFilename)
-        self.onWriteError = onWriteError
-    }
-
-    @MainActor
-    func filePromiseProvider(
-        _ filePromiseProvider: NSFilePromiseProvider,
-        fileNameForType fileType: String
-    ) -> String {
-        filename
-    }
-
-    nonisolated func filePromiseProvider(
-        _ filePromiseProvider: NSFilePromiseProvider,
-        writePromiseTo url: URL,
-        completionHandler: @escaping (Error?) -> Void
-    ) {
-        do {
-            try pngData.write(to: url, options: .atomic)
-            completionHandler(nil)
-        } catch {
-            completionHandler(AppError.pngWriteFailed)
-            Task { @MainActor [onWriteError] in
-                onWriteError()
-            }
-        }
-    }
-
-    @MainActor
-    func operationQueue(
-        for filePromiseProvider: NSFilePromiseProvider
-    ) -> OperationQueue {
-        writeQueue
-    }
-
-    private static func safeFilename(from suggestedFilename: String) -> String {
+    static func safeFilename(from suggestedFilename: String) -> String {
         let basename = (suggestedFilename as NSString).lastPathComponent
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !basename.isEmpty, basename != ".", basename != ".." else {

@@ -10,7 +10,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Drag the rendered image from the Preview window into Finder or another
-  compatible app as an explicitly created PNG file.
+  compatible app as an explicitly created PNG file, including receivers that
+  require an existing file URL instead of an AppKit file promise.
 
 ### Changed
 

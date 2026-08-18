@@ -219,10 +219,12 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     private let onError: (Error) -> Void
     private let onVisibilityChange: (Bool) -> Void
     private let temporaryImageStore: PreviewTemporaryImageStore
+    private let dragExportStore: PreviewDragExportStore
     private let openFileInPreview: PreviewFileOpener
     private var zoomMode: PreviewZoomMode = .fit
     private var currentZoomFactor: CGFloat = 1
     private var suggestedPNGFilename = "md2png-render.png"
+    private var dragGenerationID = UUID()
 
     private static let zoomSteps: [CGFloat] = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4]
     private enum ToolbarIdentifier {
@@ -280,8 +282,8 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     func zoomOutForTesting() { zoomOut(nil) }
     func clickZoomStatusForTesting() { zoomStatusButton.performClick(nil) }
     func openInPreviewForTesting() { openInPreview(nil) }
-    func dragFilePromiseProviderForTesting() throws -> NSFilePromiseProvider? {
-        try makeDragFilePromiseProvider()
+    func dragExportForTesting() throws -> PreviewDragExport? {
+        try makeDragExport()
     }
     func renderedImageSnapshot() -> NSBitmapImageRep? {
         imageView.displayIfNeeded()
@@ -300,6 +302,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         onVisibilityChange: @escaping (Bool) -> Void = { _ in },
         onShowSettings: @escaping () -> Void = {},
         temporaryImageStore: PreviewTemporaryImageStore = PreviewTemporaryImageStore(),
+        dragExportStore: PreviewDragExportStore = PreviewDragExportStore(),
         openFileInPreview: @escaping PreviewFileOpener = { url, completion in
             try PreviewWorkspaceOpener.open(url, completion: completion)
         }
@@ -309,6 +312,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         self.onError = onError
         self.onVisibilityChange = onVisibilityChange
         self.temporaryImageStore = temporaryImageStore
+        self.dragExportStore = dragExportStore
         self.openFileInPreview = openFileInPreview
         let window = PreviewWindow(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 640),
@@ -351,6 +355,9 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         imageView.draggingErrorHandler = { [weak self] error in
             self?.onError(error)
         }
+        imageView.draggingSessionEnded = { [weak self] exportID, operation in
+            self?.dragExportStore.finishExport(exportID, operation: operation)
+        }
         canvasView.addSubview(imageView)
 
         scrollView.frame = window.contentView!.bounds
@@ -384,6 +391,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         if imageView.image !== image {
             temporaryImageStore.clear()
         }
+        dragGenerationID = UUID()
         imageView.image = image
         updateImageAccessibilityValue(image)
         suggestedPNGFilename = SuggestedPNGFilename.make(from: markdown)
@@ -451,27 +459,32 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         ))
     }
 
-    private func makeDragFilePromiseProvider() throws -> NSFilePromiseProvider? {
+    private func makeDragExport() throws -> PreviewDragExport? {
         guard let image = imageView.image else { return nil }
-        return try PreviewDragItemFactory.makeFilePromiseProvider(
+        return try dragExportStore.export(
             image: image,
-            suggestedFilename: suggestedPNGFilename,
-            onWriteError: { [weak self] in
-                self?.onError(AppError.pngWriteFailed)
-            }
+            generationID: dragGenerationID,
+            suggestedFilename: suggestedPNGFilename
         )
     }
 
-    private func makeDraggingItem(at location: NSPoint) throws -> NSDraggingItem? {
+    private func makeDraggingItem(at location: NSPoint) throws -> PreviewDraggingItem? {
         guard let image = imageView.image else { return nil }
-        return try PreviewDragItemFactory.makeDraggingItem(
+        let export = try dragExportStore.export(
             image: image,
-            suggestedFilename: suggestedPNGFilename,
-            location: location,
-            onWriteError: { [weak self] in
-                self?.onError(AppError.pngWriteFailed)
-            }
+            generationID: dragGenerationID,
+            suggestedFilename: suggestedPNGFilename
         )
+        do {
+            return try PreviewDragItemFactory.makeDraggingItem(
+                export: export,
+                image: image,
+                location: location
+            )
+        } catch {
+            dragExportStore.finishExport(export.id, operation: [])
+            throw error
+        }
     }
 
     private func resizeWindowToReflectImageWidth(_ image: NSImage) {
