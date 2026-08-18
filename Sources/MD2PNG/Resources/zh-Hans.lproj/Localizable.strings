@@ -135,9 +135,9 @@
 "error.launch_at_login_unavailable" = "无法更改“登录时启动”。请打开“系统设置”，手动修改“登录项”。";
 "error.launch_at_login_failed" = "无法更改“登录时启动”。请重新打开 md2png 后重试。";
 
-"preview.window_title" = "上次渲染";
-"preview.window_title_with_dimensions" = "上次渲染 — %1$ld × %2$ld px";
-"preview.window_title_with_width" = "上次渲染 — %1$@ · %2$ld × %3$ld px";
+"preview.window_title" = "预览";
+"preview.window_title_with_dimensions" = "预览 — %1$ld × %2$ld px";
+"preview.window_title_with_width" = "预览 — %1$@ · %2$ld × %3$ld px";
 "preview.copy_again" = "再次复制";
 "preview.save_png" = "保存 PNG…";
 "preview.open_in_preview" = "在“预览”中打开";
@@ -150,6 +150,7 @@
 "preview.reset_actual_size" = "重置为实际大小";
 "preview.rendered_image" = "渲染后的图像";
 "preview.rendered_image_dimensions" = "%1$ld × %2$ld 像素";
+"preview.drag_help" = "拖动即可将此 PNG 导出到其他应用或文件夹。";
 
 "welcome.window_title" = "欢迎使用 md2png";
 "welcome.title" = "把 Markdown 变成精美 PNG";

@@ -55,8 +55,8 @@ sending it.
   and at accessibility text sizes, and a menu command to reopen it. Bundled
   examples open their preview after rendering.
 - Compact clipboard preview, non-activating HUD, and an in-memory preview of the
-  latest successful render with explicit copy, save, Preview, fit, actual-size,
-  and zoom controls.
+  latest successful render with explicit drag, copy, save, Preview, fit,
+  actual-size, and zoom controls.
 - In-memory access to re-render or restore the latest successful Markdown,
   guarded by clipboard ownership checks and explicit replacement confirmation.
 - Short, long, formatting, code, checklist, table, flowchart, sequence, and
@@ -83,10 +83,12 @@ sending it.
 ## Width presets
 
 Compact wraps prose sooner, Standard preserves the original output sizing, and
-Wide gives dense tables and diagrams more room. The Last Render window reflects
-the selected output width within the current screen and identifies the preset
-and PNG pixel dimensions in its title. Actual Size maps one PNG pixel to one
-display backing pixel, while zoom changes only the preview presentation.
+Wide gives dense tables and diagrams more room. The Preview window opened by
+Show Last Render reflects the selected output width within the current screen
+and identifies the preset and PNG pixel dimensions in its title. Dragging the
+image uses a local file promise and creates a PNG only at the explicit drop
+destination. Actual Size maps one PNG pixel to one display backing pixel, while
+zoom changes only the preview presentation.
 
 These are real Retina outputs from the same
 [width comparison source](../Examples/width-presets.md). They live here instead

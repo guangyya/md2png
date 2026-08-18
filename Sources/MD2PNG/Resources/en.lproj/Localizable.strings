@@ -135,9 +135,9 @@
 "error.launch_at_login_unavailable" = "Couldn’t change Launch at Login. Open System Settings and update Login Items manually.";
 "error.launch_at_login_failed" = "Couldn’t change Launch at Login. Reopen md2png and try again.";
 
-"preview.window_title" = "Last Render";
-"preview.window_title_with_dimensions" = "Last Render — %1$ld × %2$ld px";
-"preview.window_title_with_width" = "Last Render — %1$@ · %2$ld × %3$ld px";
+"preview.window_title" = "Preview";
+"preview.window_title_with_dimensions" = "Preview — %1$ld × %2$ld px";
+"preview.window_title_with_width" = "Preview — %1$@ · %2$ld × %3$ld px";
 "preview.copy_again" = "Copy Again";
 "preview.save_png" = "Save PNG…";
 "preview.open_in_preview" = "Open in Preview";
@@ -150,6 +150,7 @@
 "preview.reset_actual_size" = "Reset to Actual Size";
 "preview.rendered_image" = "Rendered image";
 "preview.rendered_image_dimensions" = "%1$ld × %2$ld pixels";
+"preview.drag_help" = "Drag to export this PNG to another app or folder.";
 
 "welcome.window_title" = "Welcome to md2png";
 "welcome.title" = "Turn Markdown into a polished PNG";

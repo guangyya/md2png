@@ -152,7 +152,7 @@ final class PreviewLayoutTests: XCTestCase {
             controller.window?.title,
             L10n.format(
                 "preview.window_title_with_width",
-                defaultValue: "Last Render — %@ · %ld × %ld px",
+                defaultValue: "Preview — %@ · %ld × %ld px",
                 RenderWidthPreset.compact.menuTitle,
                 720,
                 1_120
@@ -185,6 +185,13 @@ final class PreviewLayoutTests: XCTestCase {
                 defaultValue: "%1$ld × %2$ld pixels",
                 720,
                 1_120
+            )
+        )
+        XCTAssertEqual(
+            controller.previewImageAccessibilityHelp,
+            L10n.text(
+                "preview.drag_help",
+                defaultValue: "Drag to export this PNG to another app or folder."
             )
         )
         XCTAssertEqual(

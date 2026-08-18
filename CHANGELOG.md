@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Drag the rendered image from the Preview window into Finder or another
+  compatible app as an explicitly created PNG file.
+
+### Changed
+
+- Rename the Last Render window to Preview while keeping **Show Last Render** as
+  the menu command that reopens the latest in-memory result.
+
 ## [0.11.0] - 2026-08-18
 
 ### Added

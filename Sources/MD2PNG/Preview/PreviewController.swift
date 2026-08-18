@@ -207,7 +207,7 @@ final class PreviewWindow: AppWindow {
 @MainActor
 final class PreviewController: NSWindowController, NSWindowDelegate,
     NSToolbarDelegate, NSToolbarItemValidation {
-    private let imageView = NSImageView()
+    private let imageView = PreviewDragImageView()
     private let canvasView = PreviewCanvasView()
     private let scrollView = NSScrollView()
     private let zoomStatusButton = NSButton()
@@ -261,6 +261,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     var previewImageAccessibilityValue: String? {
         imageView.accessibilityValue() as? String
     }
+    var previewImageAccessibilityHelp: String? { imageView.accessibilityHelp() }
     var previewSuggestedPNGFilename: String { suggestedPNGFilename }
     var previewZoomStatusContainerSize: NSSize { zoomStatusContainer.frame.size }
     var previewToolbarStyle: NSWindow.ToolbarStyle? { window?.toolbarStyle }
@@ -279,6 +280,9 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
     func zoomOutForTesting() { zoomOut(nil) }
     func clickZoomStatusForTesting() { zoomStatusButton.performClick(nil) }
     func openInPreviewForTesting() { openInPreview(nil) }
+    func dragFilePromiseProviderForTesting() throws -> NSFilePromiseProvider? {
+        try makeDragFilePromiseProvider()
+    }
     func renderedImageSnapshot() -> NSBitmapImageRep? {
         imageView.displayIfNeeded()
         guard let bitmap = imageView.bitmapImageRepForCachingDisplay(in: imageView.bounds) else {
@@ -314,7 +318,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         )
         window.title = L10n.text(
             "preview.window_title",
-            defaultValue: "Last Render"
+            defaultValue: "Preview"
         )
         window.center()
         window.isReleasedWhenClosed = false
@@ -333,6 +337,20 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
             "preview.rendered_image",
             defaultValue: "Rendered image"
         ))
+        let dragHelp = L10n.text(
+            "preview.drag_help",
+            defaultValue: "Drag to export this PNG to another app or folder."
+        )
+        imageView.setAccessibilityHelp(dragHelp)
+        imageView.toolTip = dragHelp
+        imageView.draggingItemProvider = { [weak self, weak imageView] event in
+            guard let self, let imageView else { return nil }
+            let location = imageView.convert(event.locationInWindow, from: nil)
+            return try self.makeDraggingItem(at: location)
+        }
+        imageView.draggingErrorHandler = { [weak self] error in
+            self?.onError(error)
+        }
         canvasView.addSubview(imageView)
 
         scrollView.frame = window.contentView!.bounds
@@ -408,7 +426,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         if let widthPreset {
             window?.title = L10n.format(
                 "preview.window_title_with_width",
-                defaultValue: "Last Render — %1$@ · %2$ld × %3$ld px",
+                defaultValue: "Preview — %1$@ · %2$ld × %3$ld px",
                 widthPreset.menuTitle,
                 Int(pixelSize.width.rounded()),
                 Int(pixelSize.height.rounded())
@@ -416,7 +434,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
         } else {
             window?.title = L10n.format(
                 "preview.window_title_with_dimensions",
-                defaultValue: "Last Render — %1$ld × %2$ld px",
+                defaultValue: "Preview — %1$ld × %2$ld px",
                 Int(pixelSize.width.rounded()),
                 Int(pixelSize.height.rounded())
             )
@@ -431,6 +449,29 @@ final class PreviewController: NSWindowController, NSWindowDelegate,
             Int(pixelSize.width.rounded()),
             Int(pixelSize.height.rounded())
         ))
+    }
+
+    private func makeDragFilePromiseProvider() throws -> NSFilePromiseProvider? {
+        guard let image = imageView.image else { return nil }
+        return try PreviewDragItemFactory.makeFilePromiseProvider(
+            image: image,
+            suggestedFilename: suggestedPNGFilename,
+            onWriteError: { [weak self] in
+                self?.onError(AppError.pngWriteFailed)
+            }
+        )
+    }
+
+    private func makeDraggingItem(at location: NSPoint) throws -> NSDraggingItem? {
+        guard let image = imageView.image else { return nil }
+        return try PreviewDragItemFactory.makeDraggingItem(
+            image: image,
+            suggestedFilename: suggestedPNGFilename,
+            location: location,
+            onWriteError: { [weak self] in
+                self?.onError(AppError.pngWriteFailed)
+            }
+        )
     }
 
     private func resizeWindowToReflectImageWidth(_ image: NSImage) {
