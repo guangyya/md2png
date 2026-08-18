@@ -686,7 +686,7 @@ private struct WelcomeView: View {
             height: contentSize.height
         )
         .background {
-            WelcomeBackdrop()
+            AppWindowBackdrop()
         }
     }
 }
@@ -893,20 +893,6 @@ struct WelcomeFooterLayoutMarker: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         nsView.identifier = identifier
-    }
-}
-
-private struct WelcomeBackdrop: View {
-    var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: Color.cyan.opacity(0.055), location: 0),
-                .init(color: Color(nsColor: .windowBackgroundColor), location: 0.42),
-                .init(color: Color.purple.opacity(0.05), location: 1)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
 
