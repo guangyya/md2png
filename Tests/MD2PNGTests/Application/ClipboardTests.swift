@@ -253,6 +253,7 @@ final class ClipboardTests: XCTestCase {
         XCTAssertNotNil(AppError.rendererPNGEncodingFailed.errorDescription)
         XCTAssertNotNil(AppError.pngEncodingFailed.errorDescription)
         XCTAssertNotNil(AppError.pngWriteFailed.errorDescription)
+        XCTAssertNotNil(AppError.splitExportWriteFailed.errorDescription)
         XCTAssertNotNil(AppError.previewOpenFailed.errorDescription)
         XCTAssertNotNil(AppError.clipboardWriteFailed.errorDescription)
         XCTAssertNotNil(AppError.exampleUnavailable("Short Example").errorDescription)

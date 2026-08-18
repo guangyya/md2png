@@ -68,6 +68,10 @@
 "hud.markdown_restored" = "Markdown restored — paste with Command-V";
 "hud.launch_at_login_requires_approval" = "Allow md2png in Login Items to finish setup";
 
+"split_export.choose_folder_title" = "Choose a Folder for Split PNGs";
+"split_export.choose_folder_message" = "md2png will create a new “%@” folder containing numbered PNG files. Nothing will be copied to the clipboard.";
+"split_export.choose_folder_action" = "Choose Folder";
+
 "confirmation.clipboard_changed.title" = "Clipboard Changed";
 "confirmation.clipboard_changed.rerender" = "Another app changed the clipboard. Replace it with a new PNG rendered from the last Markdown?";
 "confirmation.clipboard_changed.restore" = "Another app changed the clipboard. Replace it with the last Markdown?";
@@ -83,6 +87,7 @@
 "error.renderer_png_encoding_failed" = "Couldn’t create the PNG. The clipboard is unchanged. Try rendering again.";
 "error.png_encoding_failed" = "Couldn’t prepare the PNG. Render it again, then retry.";
 "error.png_write_failed" = "Couldn’t save the PNG. Choose another location and try again.";
+"error.split_export_write_failed" = "Couldn’t save the split PNGs. Choose another folder and try again.";
 "error.preview_open_failed" = "Couldn’t open the PNG in Preview. Save it, then open it manually.";
 "error.clipboard_write_failed" = "Couldn’t update the clipboard. Copy the Markdown again, then retry.";
 "error.example_unavailable" = "Couldn’t load %@. Choose another Example and try again.";
