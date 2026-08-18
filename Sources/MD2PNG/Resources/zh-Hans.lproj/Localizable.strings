@@ -52,6 +52,8 @@
 "settings.launch_at_login_detail" = "登录时自动启动 md2png。";
 "settings.launch_at_login_approval" = "需要在“登录项”中批准。";
 "settings.launch_at_login_unavailable" = "此 Mac 无法使用这项设置。";
+"settings.launch_at_login_on" = "已开启";
+"settings.launch_at_login_off" = "已关闭";
 "settings.open_system_settings" = "打开系统设置…";
 "settings.shortcuts_title" = "键盘快捷键";
 "settings.shortcuts_subtitle" = "点击快捷键，然后按下新的组合键。";

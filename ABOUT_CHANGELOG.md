@@ -9,6 +9,8 @@ for the complete project history and release details.
 
 - Manage Launch at Login from Settings → General instead of the status menu.
 - Match the Settings visual style to Welcome.
+- Keep shortcut controls consistent and show the configured Render shortcut in
+  the Welcome workflow demo.
 
 ## [0.10.0] - 2026-08-18
 

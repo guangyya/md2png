@@ -34,3 +34,34 @@ struct AppWindowCardBorder: View {
             .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
     }
 }
+
+struct AppInlineStatusLabel: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(color)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+struct AppShortcutControlContrastStyle: Equatable {
+    let fillOpacity: Double
+    let borderOpacity: Double
+    let borderWidth: CGFloat
+
+    init(contrast: ColorSchemeContrast) {
+        if contrast == .increased {
+            fillOpacity = 0.14
+            borderOpacity = 0.62
+            borderWidth = 1.2
+        } else {
+            fillOpacity = 0.08
+            borderOpacity = 0.24
+            borderWidth = 0.6
+        }
+    }
+}

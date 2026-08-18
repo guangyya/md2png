@@ -23,6 +23,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
     let id: UInt32
     let title: String
     let shortcutGlyphs: String
+    let shortcutKeys: [String]
     let shortcutAccessibilityName: String
     let isRegistered: Bool
     fileprivate(set) var isVerified: Bool
@@ -35,6 +36,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         id = registration.id
         title = registration.commandTitle
         shortcutGlyphs = registration.shortcutGlyphs
+        shortcutKeys = registration.shortcut.presentationKeys
         shortcutAccessibilityName = registration.shortcutAccessibilityName
         isRegistered = !failedRegistrationIDs.contains(registration.id)
         isVerified = false
@@ -45,6 +47,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         id: UInt32,
         title: String,
         shortcutGlyphs: String,
+        shortcutKeys: [String]? = nil,
         shortcutAccessibilityName: String,
         isRegistered: Bool,
         isVerified: Bool = false
@@ -52,6 +55,7 @@ struct WelcomeShortcutStatus: Identifiable, Equatable {
         self.id = id
         self.title = title
         self.shortcutGlyphs = shortcutGlyphs
+        self.shortcutKeys = shortcutKeys ?? shortcutGlyphs.map(String.init)
         self.shortcutAccessibilityName = shortcutAccessibilityName
         self.isRegistered = isRegistered
         self.isVerified = isRegistered && isVerified
@@ -637,7 +641,10 @@ private struct WelcomeView: View {
                         }
                     }
 
-                    WelcomeWorkflowDemo(copy: copy)
+                    WelcomeWorkflowDemo(
+                        copy: copy,
+                        renderShortcutKeys: renderShortcutKeys
+                    )
 
                     VStack(alignment: .leading, spacing: 7) {
                         Text(copy.shortcutsTitle)
@@ -689,6 +696,12 @@ private struct WelcomeView: View {
             AppWindowBackdrop()
         }
     }
+
+    private var renderShortcutKeys: [String] {
+        shortcutVerificationState.shortcuts.first {
+            $0.id == GlobalShortcutCommand.render.rawValue
+        }?.shortcutKeys ?? GlobalShortcut.defaultRender.presentationKeys
+    }
 }
 
 private struct WelcomeLaunchAtLoginRow: View {
@@ -710,14 +723,15 @@ private struct WelcomeLaunchAtLoginRow: View {
 
                 Spacer()
 
-                Label(statusText, systemImage: statusSymbol)
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(statusColor)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(
-                        minWidth: WelcomeLayout.statusColumnMinimumWidth,
-                        alignment: .leading
-                    )
+                AppInlineStatusLabel(
+                    title: statusText,
+                    systemImage: statusSymbol,
+                    color: statusColor
+                )
+                .frame(
+                    minWidth: WelcomeLayout.statusColumnMinimumWidth,
+                    alignment: .leading
+                )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -922,18 +936,16 @@ struct WelcomeShortcutRowContrastStyle: Equatable {
     let feedbackRowBorderWidth: CGFloat
 
     init(contrast: ColorSchemeContrast) {
+        let shortcutStyle = AppShortcutControlContrastStyle(contrast: contrast)
+        shortcutFillOpacity = shortcutStyle.fillOpacity
+        shortcutBorderOpacity = shortcutStyle.borderOpacity
+        shortcutBorderWidth = shortcutStyle.borderWidth
         if contrast == .increased {
-            shortcutFillOpacity = 0.14
-            shortcutBorderOpacity = 0.62
-            shortcutBorderWidth = 1.2
             idleRowBorderOpacity = 0.45
             idleRowBorderWidth = 1.1
             feedbackRowBorderOpacity = 1
             feedbackRowBorderWidth = 2
         } else {
-            shortcutFillOpacity = 0.08
-            shortcutBorderOpacity = 0.24
-            shortcutBorderWidth = 0.6
             idleRowBorderOpacity = 0.1
             idleRowBorderWidth = 0.5
             feedbackRowBorderOpacity = 0.75
@@ -1011,14 +1023,15 @@ private struct WelcomeShortcutRow: View {
                 }
                 .accessibilityLabel(shortcut.shortcutAccessibilityName)
 
-            Label(statusText, systemImage: statusSymbol)
-                .font(.callout.weight(.medium))
-                .foregroundStyle(statusColor)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(
-                    minWidth: WelcomeLayout.statusColumnMinimumWidth,
-                    alignment: .leading
-                )
+            AppInlineStatusLabel(
+                title: statusText,
+                systemImage: statusSymbol,
+                color: statusColor
+            )
+            .frame(
+                minWidth: WelcomeLayout.statusColumnMinimumWidth,
+                alignment: .leading
+            )
                 .symbolEffect(.bounce, value: motion.bounceValue)
         }
         .padding(.horizontal, 10)

@@ -77,23 +77,29 @@ struct WelcomeCompletedJourneyStage: Equatable, Identifiable {
     var id: Int { phase.rawValue }
     var progress: WelcomeAnimationProgress { WelcomeAnimationProgress(phase: phase) }
 
-    static let all = [
-        WelcomeCompletedJourneyStage(
-            phase: .copy,
-            cardOffset: -WelcomeWorkflowLayout.stageOffset,
-            shortcutKeys: ["⌘", "C"]
-        ),
-        WelcomeCompletedJourneyStage(
-            phase: .render,
-            cardOffset: 0,
-            shortcutKeys: ["⌃", "⌘", "X"]
-        ),
-        WelcomeCompletedJourneyStage(
-            phase: .paste,
-            cardOffset: WelcomeWorkflowLayout.stageOffset,
-            shortcutKeys: ["⌘", "V"]
-        )
-    ]
+    static let all = stages(
+        renderShortcutKeys: GlobalShortcut.defaultRender.presentationKeys
+    )
+
+    static func stages(renderShortcutKeys: [String]) -> [Self] {
+        [
+            WelcomeCompletedJourneyStage(
+                phase: .copy,
+                cardOffset: -WelcomeWorkflowLayout.stageOffset,
+                shortcutKeys: ["⌘", "C"]
+            ),
+            WelcomeCompletedJourneyStage(
+                phase: .render,
+                cardOffset: 0,
+                shortcutKeys: renderShortcutKeys
+            ),
+            WelcomeCompletedJourneyStage(
+                phase: .paste,
+                cardOffset: WelcomeWorkflowLayout.stageOffset,
+                shortcutKeys: ["⌘", "V"]
+            )
+        ]
+    }
 }
 
 struct WelcomeCardMotion: Equatable {
@@ -155,6 +161,7 @@ struct WelcomeWorkflowDemo: View {
     @State private var copyEmphasis: CGFloat = 0
 
     let copy: WelcomeCopy
+    let renderShortcutKeys: [String]
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -163,7 +170,8 @@ struct WelcomeWorkflowDemo: View {
                 progress: reduceMotion
                     ? .reducedMotion
                     : WelcomeAnimationProgress(phase: phase),
-                copyEmphasis: reduceMotion ? 0 : copyEmphasis
+                copyEmphasis: reduceMotion ? 0 : copyEmphasis,
+                renderShortcutKeys: renderShortcutKeys
             )
             .padding(.horizontal, 13)
             .padding(.vertical, 11)
@@ -325,6 +333,7 @@ private struct WelcomeWorkflowScene: View {
     let copy: WelcomeCopy
     let progress: WelcomeAnimationProgress
     let copyEmphasis: CGFloat
+    let renderShortcutKeys: [String]
 
     var body: some View {
         VStack(spacing: 7) {
@@ -355,7 +364,11 @@ private struct WelcomeWorkflowScene: View {
             }
             .frame(maxWidth: .infinity)
 
-            WelcomeTransformTrack(progress: progress, copyEmphasis: copyEmphasis)
+            WelcomeTransformTrack(
+                progress: progress,
+                copyEmphasis: copyEmphasis,
+                renderShortcutKeys: renderShortcutKeys
+            )
 
             Group {
                 if progress.showsCompletedJourney {
@@ -434,6 +447,13 @@ private struct WelcomeStageLabel: View {
 private struct WelcomeTransformTrack: View {
     let progress: WelcomeAnimationProgress
     let copyEmphasis: CGFloat
+    let renderShortcutKeys: [String]
+
+    private var stages: [WelcomeCompletedJourneyStage] {
+        WelcomeCompletedJourneyStage.stages(
+            renderShortcutKeys: renderShortcutKeys
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -450,7 +470,7 @@ private struct WelcomeTransformTrack: View {
             }
             .frame(width: 358)
 
-            ForEach(WelcomeCompletedJourneyStage.all) { stage in
+            ForEach(stages) { stage in
                 WelcomeTransformCard(progress: stage.progress, isSettled: true)
                     .offset(x: stage.cardOffset)
                     .opacity(progress.showsCompletedJourney ? 1 : 0)
@@ -461,7 +481,7 @@ private struct WelcomeTransformTrack: View {
                 .offset(x: WelcomeWorkflowLayout.stageOffset * progress.cardTravel)
                 .opacity(progress.showsCompletedJourney ? 0 : 1)
 
-            ForEach(WelcomeCompletedJourneyStage.all) { stage in
+            ForEach(stages) { stage in
                 let shortcutOpacity = progress.shortcutOpacity(for: stage.phase)
                 WelcomeShortcutBadge(
                     keys: stage.shortcutKeys,
