@@ -11,6 +11,7 @@ enum AppError: LocalizedError {
     case rendererPNGEncodingFailed
     case pngEncodingFailed
     case pngWriteFailed
+    case splitExportWriteFailed
     case previewOpenFailed
     case clipboardWriteFailed
     case exampleUnavailable(String)
@@ -81,6 +82,12 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.png_write_failed",
                 defaultValue: "Couldn’t save the PNG. Choose another location and try again.",
+                bundle: localizationBundle
+            )
+        case .splitExportWriteFailed:
+            return L10n.text(
+                "error.split_export_write_failed",
+                defaultValue: "Couldn’t save the split PNGs. Choose another folder and try again.",
                 bundle: localizationBundle
             )
         case .previewOpenFailed:
