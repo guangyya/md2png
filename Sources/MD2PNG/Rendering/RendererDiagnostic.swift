@@ -60,6 +60,7 @@ struct RendererFailure: LocalizedError, CustomNSError, Equatable, Sendable {
         guard kind == .sizeLimit, let width, let height else { return false }
         return width <= MarkdownRenderer.maximumSnapshotWidth
             && height > MarkdownRenderer.maximumSnapshotHeight
+            && height <= MarkdownRenderer.maximumSplitSnapshotArea / width
     }
 
     func summary(localizationBundle: Bundle? = nil) -> String {

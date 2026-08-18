@@ -155,6 +155,13 @@ final class RendererDiagnosticTests: XCTestCase {
             wideFailure.suggestion(localizationBundle: english)
                 .contains("narrower Output Width")
         )
+
+        let extremelyTallFailure = RendererFailure(
+            kind: .sizeLimit,
+            width: 1_120,
+            height: 80_000
+        )
+        XCTAssertFalse(extremelyTallFailure.supportsSplitExportRecovery)
     }
 
     @MainActor
