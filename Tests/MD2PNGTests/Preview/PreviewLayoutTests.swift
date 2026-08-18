@@ -161,6 +161,47 @@ final class PreviewLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testPreviewExposesRenderedImageAndZoomToAccessibility() throws {
+        _ = NSApplication.shared
+        let image = try makeImage(
+            pixelsWide: 720,
+            pixelsHigh: 1_120,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+        let controller = PreviewController()
+        controller.show(image: image)
+        defer { controller.close() }
+
+        XCTAssertEqual(controller.previewImageAccessibilityRole, .image)
+        XCTAssertEqual(
+            controller.previewImageAccessibilityLabel,
+            L10n.text("preview.rendered_image", defaultValue: "Rendered image")
+        )
+        XCTAssertEqual(
+            controller.previewImageAccessibilityValue,
+            L10n.format(
+                "preview.rendered_image_dimensions",
+                defaultValue: "%1$ld × %2$ld pixels",
+                720,
+                1_120
+            )
+        )
+        XCTAssertEqual(
+            controller.previewZoomAccessibilityLabel,
+            L10n.text("preview.zoom_level", defaultValue: "Preview zoom")
+        )
+        XCTAssertEqual(
+            controller.previewZoomAccessibilityValue,
+            controller.previewZoomStatus
+        )
+        XCTAssertEqual(
+            controller.previewZoomAccessibilityHelp,
+            L10n.text("preview.reset_actual_size", defaultValue: "Reset to Actual Size")
+        )
+    }
+
+    @MainActor
     func testPreviewProvidesActionsAndResetsNewImagesToFit() throws {
         _ = NSApplication.shared
         let first = try makeImage(

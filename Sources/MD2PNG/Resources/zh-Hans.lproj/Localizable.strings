@@ -133,6 +133,9 @@
 "preview.zoom_out" = "缩小";
 "preview.zoom_level" = "预览缩放";
 "preview.zoom_percent" = "%ld%%";
+"preview.reset_actual_size" = "重置为实际大小";
+"preview.rendered_image" = "渲染后的图像";
+"preview.rendered_image_dimensions" = "%1$ld × %2$ld 像素";
 
 "welcome.window_title" = "欢迎使用 md2png";
 "welcome.title" = "把 Markdown 变成精美 PNG";

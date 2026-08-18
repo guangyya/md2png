@@ -48,6 +48,24 @@ final class FeatureTests: XCTestCase {
             "将剪贴板渲染为图片"
         )
         XCTAssertEqual(
+            L10n.text(
+                "preview.reset_actual_size",
+                defaultValue: "fallback",
+                bundle: english
+            ),
+            "Reset to Actual Size"
+        )
+        XCTAssertEqual(
+            L10n.format(
+                "preview.rendered_image_dimensions",
+                defaultValue: "fallback",
+                bundle: chinese,
+                720,
+                1_120
+            ),
+            "720 × 1120 像素"
+        )
+        XCTAssertEqual(
             Clipboard.menuPreview(
                 text: nil,
                 hasImage: true,
@@ -126,6 +144,31 @@ final class FeatureTests: XCTestCase {
         XCTAssertEqual(origin.x + long.width / 2, visibleFrame.midX, accuracy: 0.01)
         XCTAssertGreaterThan(origin.y, visibleFrame.minY)
         XCTAssertLessThan(origin.y + long.height, visibleFrame.maxY)
+    }
+
+    @MainActor
+    func testHUDAnnouncesFeedbackOnceWithSeverityAndCanSuppressDuplicates() {
+        _ = NSApplication.shared
+        var announcements: [(message: String, priority: NSAccessibilityPriorityLevel)] = []
+        let hud = HUDController { message, priority in
+            announcements.append((message, priority))
+        }
+        defer { hud.dismiss() }
+
+        hud.show("PNG copied", symbol: "checkmark.circle.fill")
+        hud.show(
+            "Render failed",
+            symbol: "exclamationmark.triangle.fill",
+            style: .error
+        )
+        hud.show(
+            "Update ready",
+            symbol: "arrow.down.circle.fill",
+            announces: false
+        )
+
+        XCTAssertEqual(announcements.map(\.message), ["PNG copied", "Render failed"])
+        XCTAssertEqual(announcements.map(\.priority), [.medium, .high])
     }
 
     func testProjectAndReleaseLinksUseInjectedHTTPSRepository() throws {

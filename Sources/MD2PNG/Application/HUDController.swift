@@ -59,10 +59,22 @@ enum HUDLayout {
 
 @MainActor
 final class HUDController {
+    typealias AnnouncementHandler = (String, NSAccessibilityPriorityLevel) -> Void
+
     private var panel: NSPanel?
     private var dismissWorkItem: DispatchWorkItem?
+    private let announce: AnnouncementHandler
 
-    func show(_ message: String, symbol: String, style: HUDStyle = .success) {
+    init(announce: @escaping AnnouncementHandler = { _, _ in }) {
+        self.announce = announce
+    }
+
+    func show(
+        _ message: String,
+        symbol: String,
+        style: HUDStyle = .success,
+        announces: Bool = true
+    ) {
         dismissWorkItem?.cancel()
         panel?.orderOut(nil)
 
@@ -130,6 +142,9 @@ final class HUDController {
         }
         panel.orderFrontRegardless()
         self.panel = panel
+        if announces {
+            announce(message, style == .error ? .high : .medium)
+        }
 
         let workItem = DispatchWorkItem { [weak self, weak panel] in
             panel?.orderOut(nil)
@@ -137,5 +152,12 @@ final class HUDController {
         }
         dismissWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + style.displayDuration, execute: workItem)
+    }
+
+    func dismiss() {
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+        panel?.orderOut(nil)
+        panel = nil
     }
 }
