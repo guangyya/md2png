@@ -13,6 +13,9 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         )
 
         XCTAssertEqual(english.windowTitle, "Settings")
+        XCTAssertEqual(english.generalTitle, "General")
+        XCTAssertEqual(english.launchAtLogin, "Launch at Login")
+        XCTAssertEqual(english.openSystemSettings, "Open System Settings…")
         XCTAssertEqual(english.title, "Keyboard Shortcuts")
         XCTAssertEqual(english.restoreDefaults, "Restore Defaults")
         XCTAssertEqual(
@@ -20,6 +23,8 @@ final class ShortcutSettingsControllerTests: XCTestCase {
             "Render couldn’t be registered. Its menu command still works."
         )
         XCTAssertEqual(chinese.windowTitle, "设置")
+        XCTAssertEqual(chinese.generalTitle, "通用")
+        XCTAssertEqual(chinese.launchAtLoginDetail, "登录时自动启动 md2png。")
         XCTAssertEqual(chinese.recording, "请按快捷键…")
         XCTAssertEqual(
             chinese.feedbackText(.duplicate),
@@ -31,7 +36,11 @@ final class ShortcutSettingsControllerTests: XCTestCase {
     func testSettingsWindowUsesStableNativeHostingLayoutAndVisibility() throws {
         _ = NSApplication.shared
         var visibility: [Bool] = []
+        let launchAtLoginService = SettingsLaunchAtLoginServiceStub(status: .notRegistered)
         let controller = ShortcutSettingsController(
+            launchAtLoginController: LaunchAtLoginController(
+                service: launchAtLoginService
+            ),
             onApply: { _ in [] },
             onVisibilityChange: { visibility.append($0) }
         )
@@ -49,8 +58,14 @@ final class ShortcutSettingsControllerTests: XCTestCase {
             .registrationUnavailable([.render])
         )
         XCTAssertEqual(ShortcutSettingsLayout.rowHeight, 56)
+        XCTAssertEqual(ShortcutSettingsLayout.generalRowHeight, 72)
         XCTAssertEqual(ShortcutSettingsLayout.feedbackHeight, 44)
         XCTAssertEqual(visibility, [true])
+
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_SETTINGS_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(controller.window?.contentView)
+        )
 
         controller.close()
 
@@ -198,6 +213,64 @@ final class ShortcutSettingsControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsControlsLaunchAtLoginAndOpensRequiredApproval() throws {
+        _ = NSApplication.shared
+        let service = SettingsLaunchAtLoginServiceStub(status: .notRegistered)
+        service.statusAfterRegister = .requiresApproval
+        service.statusAfterUnregister = .notRegistered
+        var changeCount = 0
+        let controller = ShortcutSettingsController(
+            launchAtLoginController: LaunchAtLoginController(service: service),
+            onApply: { _ in [] },
+            onLaunchAtLoginChange: { changeCount += 1 }
+        )
+        controller.show(configuration: .default, failedRegistrationIDs: [])
+        defer { controller.close() }
+
+        XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .notRegistered)
+        XCTAssertFalse(controller.displayedLaunchAtLoginIsEnabled)
+
+        controller.setLaunchAtLoginForTesting(true)
+
+        XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .requiresApproval)
+        XCTAssertFalse(controller.displayedLaunchAtLoginIsEnabled)
+        XCTAssertEqual(service.operations, [.register, .openSystemSettings])
+        XCTAssertEqual(changeCount, 1)
+
+        writeSnapshotIfRequested(
+            environmentKey: "MD2PNG_SETTINGS_APPROVAL_SNAPSHOT_PATH",
+            contentView: try XCTUnwrap(controller.window?.contentView)
+        )
+
+        controller.setLaunchAtLoginForTesting(false)
+
+        XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .notRegistered)
+        XCTAssertFalse(controller.displayedLaunchAtLoginIsEnabled)
+        XCTAssertEqual(service.operations, [.register, .openSystemSettings, .unregister])
+        XCTAssertEqual(changeCount, 2)
+    }
+
+    @MainActor
+    func testSettingsReportsLaunchAtLoginFailureInline() {
+        _ = NSApplication.shared
+        let service = SettingsLaunchAtLoginServiceStub(status: .notRegistered)
+        service.operationError = CocoaError(.fileWriteNoPermission)
+        let controller = ShortcutSettingsController(
+            launchAtLoginController: LaunchAtLoginController(service: service),
+            onApply: { _ in [] }
+        )
+        controller.show(configuration: .default, failedRegistrationIDs: [])
+        defer { controller.close() }
+
+        controller.setLaunchAtLoginForTesting(true)
+
+        XCTAssertEqual(controller.displayedLaunchAtLoginStatus, .notRegistered)
+        XCTAssertNotNil(controller.displayedLaunchAtLoginError)
+        XCTAssertFalse(controller.displayedLaunchAtLoginError?.contains("permission") == true)
+        XCTAssertEqual(service.operations, [.register])
+    }
+
+    @MainActor
     func testRecorderCancelsWithEscapeAndCapturesCommandEquivalent() throws {
         _ = NSApplication.shared
         let recorder = ShortcutRecorderControl()
@@ -270,5 +343,61 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         let suiteName = "MD2PNGShortcutSettingsControllerTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         return (GlobalShortcutPreference(defaults: defaults), defaults, suiteName)
+    }
+
+    @MainActor
+    private func writeSnapshotIfRequested(
+        environmentKey: String,
+        contentView: NSView
+    ) {
+        guard let outputPath = ProcessInfo.processInfo.environment[environmentKey],
+              !outputPath.isEmpty else {
+            return
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        contentView.layoutSubtreeIfNeeded()
+        contentView.displayIfNeeded()
+        guard let bitmap = contentView.bitmapImageRepForCachingDisplay(
+            in: contentView.bounds
+        ) else { return }
+        contentView.cacheDisplay(in: contentView.bounds, to: bitmap)
+        if let png = bitmap.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: outputPath))
+        }
+    }
+}
+
+@MainActor
+private final class SettingsLaunchAtLoginServiceStub: LaunchAtLoginServicing {
+    enum Operation: Equatable {
+        case register
+        case unregister
+        case openSystemSettings
+    }
+
+    var status: LaunchAtLoginStatus
+    var statusAfterRegister: LaunchAtLoginStatus?
+    var statusAfterUnregister: LaunchAtLoginStatus?
+    var operationError: Error?
+    private(set) var operations: [Operation] = []
+
+    init(status: LaunchAtLoginStatus) {
+        self.status = status
+    }
+
+    func register() throws {
+        operations.append(.register)
+        if let operationError { throw operationError }
+        if let statusAfterRegister { status = statusAfterRegister }
+    }
+
+    func unregister() throws {
+        operations.append(.unregister)
+        if let operationError { throw operationError }
+        if let statusAfterUnregister { status = statusAfterUnregister }
+    }
+
+    func openSystemSettings() {
+        operations.append(.openSystemSettings)
     }
 }

@@ -3,13 +3,20 @@ import Carbon
 import SwiftUI
 
 enum ShortcutSettingsLayout {
-    static let windowSize = NSSize(width: 520, height: 326)
+    static let windowSize = NSSize(width: 520, height: 448)
+    static let generalRowHeight: CGFloat = 72
     static let rowHeight: CGFloat = 56
     static let feedbackHeight: CGFloat = 44
 }
 
 struct ShortcutSettingsCopy {
     let windowTitle: String
+    let generalTitle: String
+    let launchAtLogin: String
+    let launchAtLoginDetail: String
+    let launchAtLoginApproval: String
+    let launchAtLoginUnavailable: String
+    let openSystemSettings: String
     let title: String
     let subtitle: String
     let render: String
@@ -26,6 +33,36 @@ struct ShortcutSettingsCopy {
         windowTitle = L10n.text(
             "settings.window_title",
             defaultValue: "Settings",
+            bundle: localizationBundle
+        )
+        generalTitle = L10n.text(
+            "settings.general_title",
+            defaultValue: "General",
+            bundle: localizationBundle
+        )
+        launchAtLogin = L10n.text(
+            "settings.launch_at_login",
+            defaultValue: "Launch at Login",
+            bundle: localizationBundle
+        )
+        launchAtLoginDetail = L10n.text(
+            "settings.launch_at_login_detail",
+            defaultValue: "Start md2png automatically when you log in.",
+            bundle: localizationBundle
+        )
+        launchAtLoginApproval = L10n.text(
+            "settings.launch_at_login_approval",
+            defaultValue: "Approval is required in Login Items.",
+            bundle: localizationBundle
+        )
+        launchAtLoginUnavailable = L10n.text(
+            "settings.launch_at_login_unavailable",
+            defaultValue: "This setting is unavailable on this Mac.",
+            bundle: localizationBundle
+        )
+        openSystemSettings = L10n.text(
+            "settings.open_system_settings",
+            defaultValue: "Open System Settings…",
             bundle: localizationBundle
         )
         title = L10n.text(
@@ -148,6 +185,7 @@ struct ShortcutSettingsCopy {
 final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
     private let copy: ShortcutSettingsCopy
     private let contentModel: ShortcutSettingsModel
+    private let launchAtLoginModel: LaunchAtLoginSettingsModel
     private let onVisibilityChange: (Bool) -> Void
 
 #if DEBUG
@@ -160,6 +198,15 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
     var displayedRecordingCommand: GlobalShortcutCommand? {
         contentModel.recordingCommand
     }
+    var displayedLaunchAtLoginStatus: LaunchAtLoginStatus {
+        launchAtLoginModel.status
+    }
+    var displayedLaunchAtLoginIsEnabled: Bool {
+        launchAtLoginModel.isEnabled
+    }
+    var displayedLaunchAtLoginError: String? {
+        launchAtLoginModel.errorMessage
+    }
     var displayedContentSize: NSSize {
         window?.contentView?.bounds.size ?? .zero
     }
@@ -170,10 +217,12 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
 
     init(
         preference: GlobalShortcutPreference = GlobalShortcutPreference(),
+        launchAtLoginController: LaunchAtLoginController = LaunchAtLoginController(),
         localizationBundle: Bundle? = nil,
         onApply: @escaping ShortcutSettingsModel.ApplyConfiguration,
         onRecordingBegan: @escaping ShortcutSettingsModel.RecordingLifecycleAction = {},
         onRecordingCancelled: @escaping ShortcutSettingsModel.RecordingLifecycleAction = {},
+        onLaunchAtLoginChange: @escaping () -> Void = {},
         onVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) {
         copy = ShortcutSettingsCopy(localizationBundle: localizationBundle)
@@ -182,6 +231,10 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
             onRecordingBegan: onRecordingBegan,
             onRecordingCancelled: onRecordingCancelled,
             applyConfiguration: onApply
+        )
+        launchAtLoginModel = LaunchAtLoginSettingsModel(
+            controller: launchAtLoginController,
+            onStatusChange: onLaunchAtLoginChange
         )
         self.onVisibilityChange = onVisibilityChange
         let window = AppWindow(
@@ -199,6 +252,7 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         window.contentViewController = NSHostingController(
             rootView: ShortcutSettingsContentView(
                 model: contentModel,
+                launchAtLoginModel: launchAtLoginModel,
                 copy: copy
             )
         )
@@ -218,6 +272,7 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
             configuration: configuration,
             failedRegistrationIDs: failedRegistrationIDs
         )
+        launchAtLoginModel.refresh()
         if window?.isVisible != true {
             onVisibilityChange(true)
         }
@@ -235,6 +290,10 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         contentModel.cancelRecording()
         onVisibilityChange(false)
+    }
+
+    func refreshLaunchAtLogin() {
+        launchAtLoginModel.refresh()
     }
 
 #if DEBUG
@@ -257,36 +316,26 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
     func cancelRecordingForTesting() {
         contentModel.cancelRecording()
     }
+
+    func setLaunchAtLoginForTesting(_ isEnabled: Bool) {
+        launchAtLoginModel.setEnabled(isEnabled)
+    }
+
+    func openLaunchAtLoginSystemSettingsForTesting() {
+        launchAtLoginModel.openSystemSettings()
+    }
 #endif
 }
 
 struct ShortcutSettingsContentView: View {
     @ObservedObject var model: ShortcutSettingsModel
+    @ObservedObject var launchAtLoginModel: LaunchAtLoginSettingsModel
     let copy: ShortcutSettingsCopy
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(copy.title)
-                    .font(.title2.weight(.semibold))
-                Text(copy.subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(spacing: 0) {
-                shortcutRow(.render)
-                Divider().padding(.leading, 16)
-                shortcutRow(.showLastRender)
-            }
-            .background(
-                Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.75)
-            }
+            generalSection
+            shortcutSection
 
             feedbackView
                 .frame(
@@ -314,6 +363,105 @@ struct ShortcutSettingsContentView: View {
             height: ShortcutSettingsLayout.windowSize.height,
             alignment: .topLeading
         )
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var generalSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(copy.generalTitle)
+                .font(.title2.weight(.semibold))
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(copy.launchAtLogin)
+                        .font(.body.weight(.medium))
+                    Text(launchAtLoginDetail)
+                        .font(.caption)
+                        .foregroundStyle(launchAtLoginDetailColor)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if launchAtLoginModel.requiresApproval {
+                    Button(copy.openSystemSettings) {
+                        launchAtLoginModel.openSystemSettings()
+                    }
+                    .controlSize(.small)
+                    .accessibilityIdentifier("SettingsLaunchAtLoginOpenSystemSettings")
+                }
+
+                Toggle("", isOn: launchAtLoginBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(!launchAtLoginModel.canChange)
+                    .accessibilityLabel(copy.launchAtLogin)
+                    .accessibilityIdentifier("SettingsLaunchAtLoginToggle")
+            }
+            .padding(.horizontal, 16)
+            .frame(height: ShortcutSettingsLayout.generalRowHeight)
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.75)
+            }
+        }
+    }
+
+    private var shortcutSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(copy.title)
+                    .font(.title2.weight(.semibold))
+                Text(copy.subtitle)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 0) {
+                shortcutRow(.render)
+                Divider().padding(.leading, 16)
+                shortcutRow(.showLastRender)
+            }
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.75)
+            }
+        }
+    }
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchAtLoginModel.isEnabled },
+            set: { launchAtLoginModel.setEnabled($0) }
+        )
+    }
+
+    private var launchAtLoginDetail: String {
+        if let errorMessage = launchAtLoginModel.errorMessage {
+            return errorMessage
+        }
+        switch launchAtLoginModel.status {
+        case .requiresApproval:
+            return copy.launchAtLoginApproval
+        case .unknown:
+            return copy.launchAtLoginUnavailable
+        case .notRegistered, .enabled, .notFound:
+            return copy.launchAtLoginDetail
+        }
+    }
+
+    private var launchAtLoginDetailColor: Color {
+        launchAtLoginModel.errorMessage != nil || launchAtLoginModel.requiresApproval
+            ? .orange
+            : .secondary
     }
 
     private func shortcutRow(_ command: GlobalShortcutCommand) -> some View {

@@ -7,6 +7,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Move Launch at Login from the status menu into Settings → General, while
+  keeping its effective state synchronized after changes in Login Items.
+
 ## [0.10.0] - 2026-08-18
 
 ### Added

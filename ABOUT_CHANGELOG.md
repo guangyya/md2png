@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Changed
+
+- Manage Launch at Login from Settings → General instead of the status menu.
+
 ## [0.10.0] - 2026-08-18
 
 ### Added

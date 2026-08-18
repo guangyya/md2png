@@ -10,7 +10,7 @@ final class StatusMenuPresentationTests: XCTestCase {
             [.renderClipboard, .showLastRender],
             [.rerenderLastMarkdown, .restoreLastMarkdown],
             [.theme, .outputWidth, .examples],
-            [.launchAtLogin, .settings, .showWelcome, .about],
+            [.settings, .showWelcome, .about],
             [.quit]
         ])
 
@@ -68,7 +68,6 @@ final class StatusMenuPresentationTests: XCTestCase {
         delegate.prepareWelcomeSampleGuidePathForTesting()
         defer { delegate.cleanUpWelcomeSampleGuidePathForTesting() }
         let clipboardRefreshCount = delegate.clipboardMenuRefreshCountForTesting
-        let welcomeRefreshCount = delegate.welcomeLaunchAtLoginRefreshCountForTesting
         let expectedClipboardState = Clipboard.menuState(includeLabel: false)
 
         delegate.triggerWelcomeSampleGuideForTesting()
@@ -81,15 +80,7 @@ final class StatusMenuPresentationTests: XCTestCase {
         XCTAssertFalse(state.canRerenderLastMarkdown)
         XCTAssertFalse(state.canRestoreLastMarkdown)
         XCTAssertFalse(state.canShowLastRender)
-        XCTAssertEqual(
-            state.canUseLaunchAtLogin,
-            state.launchAtLoginAction != .unavailable
-        )
         XCTAssertEqual(delegate.clipboardMenuRefreshCountForTesting, clipboardRefreshCount)
-        XCTAssertEqual(
-            delegate.welcomeLaunchAtLoginRefreshCountForTesting,
-            welcomeRefreshCount
-        )
     }
 
     func testRenderingAndUpdateInstallationKeepPreviewAndAppCommandsAvailable() {
@@ -132,17 +123,9 @@ final class StatusMenuPresentationTests: XCTestCase {
 
         XCTAssertEqual(englishCopy.rerenderLastMarkdown, "Re-render Last Markdown")
         XCTAssertEqual(englishCopy.theme, "Theme")
-        XCTAssertEqual(
-            englishCopy.launchAtLoginTitle(for: .allowInSystemSettings),
-            "Allow Launch at Login…"
-        )
         XCTAssertEqual(chineseCopy.rerenderLastMarkdown, "重新渲染上次的 Markdown")
         XCTAssertEqual(chineseCopy.theme, "主题")
         XCTAssertEqual(chineseCopy.settings, "设置…")
-        XCTAssertEqual(
-            chineseCopy.launchAtLoginTitle(for: .unavailable),
-            "登录时启动不可用"
-        )
     }
 
     @MainActor
@@ -249,7 +232,6 @@ final class StatusMenuPresentationTests: XCTestCase {
             renderExample: { _ in },
             selectWidthPreset: { _ in },
             selectTheme: { _ in },
-            performLaunchAtLoginAction: {},
             showSettings: {},
             showWelcome: {},
             showAbout: {},

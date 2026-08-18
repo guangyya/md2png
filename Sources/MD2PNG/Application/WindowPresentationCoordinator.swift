@@ -97,6 +97,7 @@ final class WindowPresentationCoordinator {
     )
     private lazy var shortcutSettingsController = ShortcutSettingsController(
         preference: globalShortcutPreference,
+        launchAtLoginController: launchAtLoginController,
         onApply: { [weak self] configuration in
             self?.actions.applyShortcuts(configuration) ?? []
         },
@@ -105,6 +106,9 @@ final class WindowPresentationCoordinator {
         },
         onRecordingCancelled: { [weak self] in
             self?.actions.restoreShortcuts()
+        },
+        onLaunchAtLoginChange: { [weak self] in
+            self?.refreshWelcomeLaunchAtLoginIfVisible()
         },
         onVisibilityChange: { [weak self] isVisible in
             self?.setVisible(isVisible, surface: .settings)
@@ -191,9 +195,13 @@ final class WindowPresentationCoordinator {
         welcomeController.refreshShortcuts(shortcuts)
     }
 
-    func refreshWelcomeLaunchAtLoginIfVisible() {
-        guard isVisible(.welcome) else { return }
-        welcomeController.refreshLaunchAtLogin()
+    func refreshLaunchAtLoginIfVisible() {
+        if isVisible(.welcome) {
+            welcomeController.refreshLaunchAtLogin()
+        }
+        if isVisible(.settings) {
+            shortcutSettingsController.refreshLaunchAtLogin()
+        }
     }
 
     func isVisible(_ surface: AppWindowSurface) -> Bool {
@@ -204,11 +212,12 @@ final class WindowPresentationCoordinator {
         activationCoordinator.setVisible(isVisible, surface: surface)
     }
 
-#if DEBUG
-    var welcomeLaunchAtLoginRefreshCountForTesting: Int {
-        welcomeController.launchAtLoginRefreshCountForTesting
+    private func refreshWelcomeLaunchAtLoginIfVisible() {
+        guard isVisible(.welcome) else { return }
+        welcomeController.refreshLaunchAtLogin()
     }
 
+#if DEBUG
     func setVisibleForTesting(_ isVisible: Bool, surface: AppWindowSurface) {
         setVisible(isVisible, surface: surface)
     }

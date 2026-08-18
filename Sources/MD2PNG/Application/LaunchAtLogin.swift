@@ -124,6 +124,30 @@ final class LaunchAtLoginController {
     }
 
     @discardableResult
+    func setEnabled(_ isEnabled: Bool) throws -> LaunchAtLoginStatus {
+        switch (isEnabled, status) {
+        case (true, .notRegistered), (true, .notFound):
+            do {
+                try service.register()
+            } catch {
+                throw LaunchAtLoginError.changeFailed
+            }
+        case (false, .enabled), (false, .requiresApproval):
+            do {
+                try service.unregister()
+            } catch {
+                throw LaunchAtLoginError.changeFailed
+            }
+        case (_, .unknown):
+            throw LaunchAtLoginError.unavailable
+        case (true, .enabled), (true, .requiresApproval),
+             (false, .notRegistered), (false, .notFound):
+            break
+        }
+        return status
+    }
+
+    @discardableResult
     func performPrimaryAction() throws -> LaunchAtLoginActionResult {
         switch status {
         case .notRegistered, .notFound:
