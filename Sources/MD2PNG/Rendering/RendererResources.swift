@@ -12,4 +12,10 @@ enum RendererResources {
         packagedPageURL(resourcesURL: Bundle.main.resourceURL)
             ?? PackageResources.bundle.url(forResource: "renderer", withExtension: "html")
     }
+
+    static var themeManifestURL: URL? {
+        pageURL?
+            .deletingLastPathComponent()
+            .appending(path: "Themes/manifest.json")
+    }
 }

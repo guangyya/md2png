@@ -24,7 +24,12 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             resources: [
-                .process("Resources")
+                .process("Resources/en.lproj"),
+                .process("Resources/zh-Hans.lproj"),
+                .process("Resources/renderer.html"),
+                .process("Resources/renderer-base.css"),
+                .process("Resources/renderer.bundle.js"),
+                .copy("Resources/Themes")
             ],
             linkerSettings: [
                 .linkedFramework("AppKit"),

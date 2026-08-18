@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Move renderer layout rules and each bundled palette into versioned local theme
+  resources, with one manifest shared by the native menu and Web renderer.
+
+### Security
+
+- Apply a restrictive renderer content security policy and validate bundled
+  theme metadata and stylesheet paths before use.
+
 ## [0.10.1] - 2026-08-18
 
 ### Changed
