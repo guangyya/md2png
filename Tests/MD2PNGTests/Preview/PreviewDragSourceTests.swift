@@ -10,7 +10,7 @@ final class PreviewDragSourceTests: XCTestCase {
         let store = PreviewDragExportStore(parentDirectoryURL: parent)
 
         let export = try store.export(
-            image: try makeImage(pixelsWide: 240, pixelsHigh: 160, color: .systemBlue),
+            image: try makeImage(pixelsWide: 240, pixelsHigh: 160, color: .blue),
             generationID: UUID(),
             suggestedFilename: "Monthly Product Update.png"
         )
@@ -28,7 +28,7 @@ final class PreviewDragSourceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: parent) }
         let store = PreviewDragExportStore(parentDirectoryURL: parent)
         let export = try store.export(
-            image: try makeImage(pixelsWide: 80, pixelsHigh: 60, color: .systemRed),
+            image: try makeImage(pixelsWide: 80, pixelsHigh: 60, color: .red),
             generationID: UUID(),
             suggestedFilename: "Compatibility.png"
         )
@@ -50,7 +50,7 @@ final class PreviewDragSourceTests: XCTestCase {
         let secondGeneration = UUID()
 
         let first = try store.export(
-            image: try makeImage(pixelsWide: 80, pixelsHigh: 60, color: .systemRed),
+            image: try makeImage(pixelsWide: 80, pixelsHigh: 60, color: .red),
             generationID: firstGeneration,
             suggestedFilename: "First.png"
         )
@@ -60,7 +60,7 @@ final class PreviewDragSourceTests: XCTestCase {
             suggestedFilename: "Ignored replacement.png"
         )
         let second = try store.export(
-            image: try makeImage(pixelsWide: 320, pixelsHigh: 200, color: .systemGreen),
+            image: try makeImage(pixelsWide: 320, pixelsHigh: 200, color: .green),
             generationID: secondGeneration,
             suggestedFilename: "Second.png"
         )
@@ -81,7 +81,7 @@ final class PreviewDragSourceTests: XCTestCase {
         let store = PreviewDragExportStore(parentDirectoryURL: parent)
 
         let cancelled = try store.export(
-            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemOrange),
+            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .orange),
             generationID: UUID(),
             suggestedFilename: "Cancelled.png"
         )
@@ -90,7 +90,7 @@ final class PreviewDragSourceTests: XCTestCase {
 
         let acceptedGeneration = UUID()
         let accepted = try store.export(
-            image: try makeImage(pixelsWide: 50, pixelsHigh: 35, color: .systemPurple),
+            image: try makeImage(pixelsWide: 50, pixelsHigh: 35, color: .purple),
             generationID: acceptedGeneration,
             suggestedFilename: "Accepted.png"
         )
@@ -109,13 +109,13 @@ final class PreviewDragSourceTests: XCTestCase {
         let store = PreviewDragExportStore(parentDirectoryURL: parent)
         let generationID = UUID()
         let original = try store.export(
-            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemRed),
+            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .red),
             generationID: generationID,
             suggestedFilename: "Original.png"
         )
         try FileManager.default.removeItem(at: original.fileURL)
         let regenerated = try store.export(
-            image: try makeImage(pixelsWide: 50, pixelsHigh: 35, color: .systemBlue),
+            image: try makeImage(pixelsWide: 50, pixelsHigh: 35, color: .blue),
             generationID: generationID,
             suggestedFilename: "Regenerated.png"
         )
@@ -135,7 +135,7 @@ final class PreviewDragSourceTests: XCTestCase {
         do {
             let store = PreviewDragExportStore(parentDirectoryURL: parent)
             let export = try store.export(
-                image: try makeImage(pixelsWide: 32, pixelsHigh: 24, color: .systemTeal),
+                image: try makeImage(pixelsWide: 32, pixelsHigh: 24, color: .cyan),
                 generationID: UUID(),
                 suggestedFilename: "Session.png"
             )
@@ -160,7 +160,7 @@ final class PreviewDragSourceTests: XCTestCase {
         let store = PreviewDragExportStore(parentDirectoryURL: invalidParent)
 
         XCTAssertThrowsError(try store.export(
-            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .systemOrange),
+            image: try makeImage(pixelsWide: 40, pixelsHigh: 30, color: .orange),
             generationID: UUID(),
             suggestedFilename: "Dragged report"
         )) { error in
@@ -194,7 +194,7 @@ final class PreviewDragSourceTests: XCTestCase {
         })
         defer { controller.close() }
         controller.show(
-            image: try makeImage(pixelsWide: 120, pixelsHigh: 90, color: .systemPurple),
+            image: try makeImage(pixelsWide: 120, pixelsHigh: 90, color: .purple),
             markdown: "# Drag Export"
         )
 
@@ -213,11 +213,13 @@ final class PreviewDragSourceTests: XCTestCase {
         return url
     }
 
+    @MainActor
     private func makeImage(
         pixelsWide: Int,
         pixelsHigh: Int,
         color: NSColor
     ) throws -> NSImage {
+        _ = NSApplication.shared
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: pixelsWide,
