@@ -73,17 +73,50 @@ final class GlobalShortcutCaptureTests: XCTestCase {
         let (preference, defaults, suiteName) = try makePreference()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var applied: [GlobalShortcutConfiguration] = []
-        let model = ShortcutSettingsModel(preference: preference) {
+        var recordingLifecycle: [String] = []
+        let model = ShortcutSettingsModel(
+            preference: preference,
+            onRecordingBegan: { recordingLifecycle.append("began") },
+            onRecordingCancelled: { recordingLifecycle.append("cancelled") }
+        ) {
             applied.append($0)
             return []
         }
 
+        model.beginRecording(.showLastRender)
+
         XCTAssertFalse(model.setShortcut(.defaultRender, for: .showLastRender))
 
         XCTAssertEqual(model.configuration, .default)
+        XCTAssertEqual(model.recordingCommand, .showLastRender)
         XCTAssertEqual(model.feedback, .duplicate)
+        XCTAssertEqual(recordingLifecycle, ["began"])
         XCTAssertTrue(applied.isEmpty)
         XCTAssertNil(defaults.object(forKey: GlobalShortcutPreference.defaultsKey))
+
+        model.cancelRecording()
+
+        XCTAssertEqual(recordingLifecycle, ["began", "cancelled"])
+    }
+
+    @MainActor
+    func testSettingsModelAcceptsTheCurrentShortcutWithoutCancellingItsAction() {
+        var applied: [GlobalShortcutConfiguration] = []
+        var recordingLifecycle: [String] = []
+        let model = ShortcutSettingsModel(
+            onRecordingBegan: { recordingLifecycle.append("began") },
+            onRecordingCancelled: { recordingLifecycle.append("cancelled") }
+        ) {
+            applied.append($0)
+            return []
+        }
+
+        model.beginRecording(.render)
+
+        XCTAssertTrue(model.setShortcut(.defaultRender, for: .render))
+        XCTAssertNil(model.recordingCommand)
+        XCTAssertEqual(applied, [.default])
+        XCTAssertEqual(recordingLifecycle, ["began"])
     }
 
     @MainActor

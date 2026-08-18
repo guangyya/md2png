@@ -88,6 +88,74 @@ final class ShortcutSettingsControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsSuspendsGlobalActionsWhileRecordingAndReportsConflict() throws {
+        _ = NSApplication.shared
+        let (preference, defaults, suiteName) = try makePreference()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var recordingLifecycle: [String] = []
+        var applied: [GlobalShortcutConfiguration] = []
+        let controller = ShortcutSettingsController(
+            preference: preference,
+            onApply: {
+                applied.append($0)
+                return []
+            },
+            onRecordingBegan: { recordingLifecycle.append("suspended") },
+            onRecordingCancelled: { recordingLifecycle.append("restored") }
+        )
+        controller.show(configuration: .default, failedRegistrationIDs: [])
+        defer { controller.close() }
+        let conflictingEvent = try makeEvent(
+            keyCode: UInt16(kVK_ANSI_X),
+            characters: "x",
+            modifiers: [.control, .command]
+        )
+
+        controller.beginRecordingForTesting(.showLastRender)
+        XCTAssertFalse(controller.captureForTesting(
+            conflictingEvent,
+            command: .showLastRender
+        ))
+
+        XCTAssertEqual(recordingLifecycle, ["suspended"])
+        XCTAssertEqual(controller.displayedRecordingCommand, .showLastRender)
+        XCTAssertEqual(controller.displayedFeedback, .duplicate)
+        XCTAssertTrue(applied.isEmpty)
+
+        controller.cancelRecordingForTesting()
+
+        XCTAssertEqual(recordingLifecycle, ["suspended", "restored"])
+    }
+
+    @MainActor
+    func testSettingsCanCaptureTheCurrentlyAssignedShortcut() throws {
+        _ = NSApplication.shared
+        var recordingBeganCount = 0
+        var applied: [GlobalShortcutConfiguration] = []
+        let controller = ShortcutSettingsController(
+            onApply: {
+                applied.append($0)
+                return []
+            },
+            onRecordingBegan: { recordingBeganCount += 1 }
+        )
+        controller.show(configuration: .default, failedRegistrationIDs: [])
+        defer { controller.close() }
+        let currentEvent = try makeEvent(
+            keyCode: UInt16(kVK_ANSI_X),
+            characters: "x",
+            modifiers: [.control, .command]
+        )
+
+        controller.beginRecordingForTesting(.render)
+
+        XCTAssertTrue(controller.captureForTesting(currentEvent, command: .render))
+        XCTAssertEqual(recordingBeganCount, 1)
+        XCTAssertNil(controller.displayedRecordingCommand)
+        XCTAssertEqual(applied, [.default])
+    }
+
+    @MainActor
     func testSettingsRestoreDefaultsRemovesPreferenceAndReappliesDefaults() throws {
         _ = NSApplication.shared
         let (preference, defaults, suiteName) = try makePreference()
@@ -115,6 +183,18 @@ final class ShortcutSettingsControllerTests: XCTestCase {
         XCTAssertEqual(controller.displayedFeedback, .restoredDefaults)
         XCTAssertEqual(applied, [.default])
         XCTAssertNil(defaults.object(forKey: GlobalShortcutPreference.defaultsKey))
+    }
+
+    @MainActor
+    func testRestoringAlreadySelectedDefaultsStillReportsCompletion() {
+        _ = NSApplication.shared
+        let controller = ShortcutSettingsController(onApply: { _ in [] })
+        controller.show(configuration: .default, failedRegistrationIDs: [])
+        defer { controller.close() }
+
+        controller.restoreDefaultsForTesting()
+
+        XCTAssertEqual(controller.displayedFeedback, .restoredDefaults)
     }
 
     @MainActor

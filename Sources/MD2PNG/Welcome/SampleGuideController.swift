@@ -101,21 +101,11 @@ struct SampleGuidePlacement: Equatable {
     let examplesEdge: SampleGuideExamplesEdge
 
     static func resolve(
-        buttonBounds: NSRect,
-        buttonFrameInScreen: NSRect?,
-        visibleFrame: NSRect?
+        buttonBounds: NSRect
     ) -> SampleGuidePlacement {
-        guard let buttonFrameInScreen, let visibleFrame else {
-            return SampleGuidePlacement(
-                positioningRect: buttonBounds,
-                examplesEdge: .trailing
-            )
-        }
         return SampleGuidePlacement(
             positioningRect: buttonBounds,
-            examplesEdge: buttonFrameInScreen.midX < visibleFrame.midX
-                ? .trailing
-                : .leading
+            examplesEdge: .trailing
         )
     }
 }
@@ -329,7 +319,6 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
     private let onChoose: (ExampleKind) -> Void
     private let copy: SampleGuideCopy
     private let visibleFrameProvider: (NSStatusBarButton) -> NSRect?
-    private let buttonFrameProvider: (NSStatusBarButton) -> NSRect?
     private weak var highlightedButton: NSButton?
     private var acceptsSelection = false
     private var pendingSelection: ExampleKind?
@@ -345,17 +334,12 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         visibleFrameProvider: @escaping (NSStatusBarButton) -> NSRect? = {
             $0.window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         },
-        buttonFrameProvider: @escaping (NSStatusBarButton) -> NSRect? = {
-            guard let window = $0.window else { return nil }
-            return window.convertToScreen($0.convert($0.bounds, to: nil))
-        },
         onChoose: @escaping (ExampleKind) -> Void
     ) {
         self.popover = popover
         self.onChoose = onChoose
         copy = SampleGuideCopy(localizationBundle: localizationBundle)
         self.visibleFrameProvider = visibleFrameProvider
-        self.buttonFrameProvider = buttonFrameProvider
         super.init()
         popover.behavior = .transient
         popover.animates = true
@@ -372,9 +356,7 @@ final class SampleGuideController: NSObject, NSPopoverDelegate {
         let visibleFrame = visibleFrameProvider(button)
         let contentSize = SampleGuideLayout.contentSize(visibleFrame: visibleFrame)
         let placement = SampleGuidePlacement.resolve(
-            buttonBounds: button.bounds,
-            buttonFrameInScreen: buttonFrameProvider(button),
-            visibleFrame: visibleFrame
+            buttonBounds: button.bounds
         )
         popover.contentSize = contentSize
 

@@ -157,6 +157,9 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
     var displayedFeedback: ShortcutSettingsFeedback? {
         contentModel.feedback
     }
+    var displayedRecordingCommand: GlobalShortcutCommand? {
+        contentModel.recordingCommand
+    }
     var displayedContentSize: NSSize {
         window?.contentView?.bounds.size ?? .zero
     }
@@ -169,11 +172,15 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
         preference: GlobalShortcutPreference = GlobalShortcutPreference(),
         localizationBundle: Bundle? = nil,
         onApply: @escaping ShortcutSettingsModel.ApplyConfiguration,
+        onRecordingBegan: @escaping ShortcutSettingsModel.RecordingLifecycleAction = {},
+        onRecordingCancelled: @escaping ShortcutSettingsModel.RecordingLifecycleAction = {},
         onVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) {
         copy = ShortcutSettingsCopy(localizationBundle: localizationBundle)
         contentModel = ShortcutSettingsModel(
             preference: preference,
+            onRecordingBegan: onRecordingBegan,
+            onRecordingCancelled: onRecordingCancelled,
             applyConfiguration: onApply
         )
         self.onVisibilityChange = onVisibilityChange
@@ -242,6 +249,14 @@ final class ShortcutSettingsController: NSWindowController, NSWindowDelegate {
     func restoreDefaultsForTesting() {
         contentModel.restoreDefaults()
     }
+
+    func beginRecordingForTesting(_ command: GlobalShortcutCommand) {
+        contentModel.beginRecording(command)
+    }
+
+    func cancelRecordingForTesting() {
+        contentModel.cancelRecording()
+    }
 #endif
 }
 
@@ -289,7 +304,6 @@ struct ShortcutSettingsContentView: View {
                         .foregroundStyle(.primary)
                 }
                 .buttonStyle(.bordered)
-                .disabled(model.isUsingDefaults && model.failedRegistrationIDs.isEmpty)
                 .accessibilityIdentifier("ShortcutSettingsRestoreDefaults")
                 Spacer()
             }

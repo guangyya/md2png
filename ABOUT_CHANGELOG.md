@@ -14,6 +14,13 @@ for the complete project history and release details.
 
 - Start without loading the renderer until the first render request.
 
+### Fixed
+
+- Open the Welcome Example list on the right without breaking its status-item
+  anchor.
+- Record shortcuts in Settings without activating them, show conflicts, and keep
+  Restore Defaults available.
+
 ## [0.9.0] - 2026-08-17
 
 ### Added
