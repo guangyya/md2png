@@ -11,6 +11,7 @@ for the complete project history and release details.
 - Match the Settings visual style to Welcome.
 - Keep shortcut controls consistent and show the configured Render shortcut in
   the Welcome workflow demo.
+- Reuse a project-level visual theme across Settings and Welcome.
 
 ### Fixed
 

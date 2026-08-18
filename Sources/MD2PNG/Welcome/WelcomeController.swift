@@ -588,7 +588,7 @@ private struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.contentGroups) {
                     HStack(alignment: .top, spacing: 13) {
                         Image(nsImage: NSApp.applicationIconImage)
                             .resizable()
@@ -646,14 +646,11 @@ private struct WelcomeView: View {
                         renderShortcutKeys: renderShortcutKeys
                     )
 
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(copy.shortcutsTitle)
-                            .font(.headline)
-
-                        Text(copy.shortcutVerificationHelp)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+                        AppSectionHeading(
+                            title: copy.shortcutsTitle,
+                            subtitle: copy.shortcutVerificationHelp
+                        )
 
                         ForEach(shortcutVerificationState.shortcuts) { shortcut in
                             WelcomeShortcutRow(shortcut: shortcut, copy: copy)
@@ -667,9 +664,9 @@ private struct WelcomeView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 14)
+                .padding(.horizontal, AppTheme.Spacing.windowHorizontal)
+                .padding(.top, AppTheme.Spacing.windowTop)
+                .padding(.bottom, AppTheme.Spacing.windowBottom)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
 
             }
@@ -740,23 +737,10 @@ private struct WelcomeLaunchAtLoginRow: View {
         }
         .buttonStyle(.plain)
         .disabled(!state.presentation.canPerformAction)
-        .background(
-            LinearGradient(
-                colors: [
-                    isHovering && state.presentation.canPerformAction
-                        ? Color.accentColor.opacity(0.12)
-                        : Color(nsColor: .controlBackgroundColor).opacity(0.72),
-                    Color.accentColor.opacity(0.045)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            ),
-            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .appCardStyle(
+            isHighlighted: isHovering && state.presentation.canPerformAction,
+            highlightStyle: .leadingGradient
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.accentColor.opacity(0.1), lineWidth: 0.5)
-        }
         .onHover { isHovering = $0 }
         .help(actionHelp)
         .accessibilityHint(actionHelp)
@@ -827,11 +811,11 @@ private struct WelcomeFooter: View {
                 copy: copy,
                 state: launchAtLoginState
             )
-            .padding(.horizontal, 22)
+            .padding(.horizontal, AppTheme.Spacing.footerHorizontal)
             .padding(.vertical, 10)
 
             Divider()
-                .padding(.leading, 22)
+                .padding(.leading, AppTheme.Spacing.footerHorizontal)
 
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: 10) {
@@ -850,10 +834,10 @@ private struct WelcomeFooter: View {
                     }
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 11)
+            .padding(.horizontal, AppTheme.Spacing.footerHorizontal)
+            .padding(.vertical, AppTheme.Spacing.footerVertical)
         }
-        .background(.regularMaterial)
+        .appWindowFooterStyle()
     }
 
     private var footerNotes: some View {
@@ -927,19 +911,12 @@ struct WelcomeShortcutFeedbackMotion: Equatable {
 }
 
 struct WelcomeShortcutRowContrastStyle: Equatable {
-    let shortcutFillOpacity: Double
-    let shortcutBorderOpacity: Double
-    let shortcutBorderWidth: CGFloat
     let idleRowBorderOpacity: Double
     let idleRowBorderWidth: CGFloat
     let feedbackRowBorderOpacity: Double
     let feedbackRowBorderWidth: CGFloat
 
     init(contrast: ColorSchemeContrast) {
-        let shortcutStyle = AppShortcutControlContrastStyle(contrast: contrast)
-        shortcutFillOpacity = shortcutStyle.fillOpacity
-        shortcutBorderOpacity = shortcutStyle.borderOpacity
-        shortcutBorderWidth = shortcutStyle.borderWidth
         if contrast == .increased {
             idleRowBorderOpacity = 0.45
             idleRowBorderWidth = 1.1
@@ -1010,17 +987,7 @@ private struct WelcomeShortcutRow: View {
                 .font(.system(.body, design: .rounded).weight(.medium))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(
-                    Color.accentColor.opacity(contrast.shortcutFillOpacity),
-                    in: RoundedRectangle(cornerRadius: 7)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(
-                            Color.accentColor.opacity(contrast.shortcutBorderOpacity),
-                            lineWidth: contrast.shortcutBorderWidth
-                        )
-                }
+                .appShortcutControlStyle()
                 .accessibilityLabel(shortcut.shortcutAccessibilityName)
 
             AppInlineStatusLabel(
@@ -1032,7 +999,7 @@ private struct WelcomeShortcutRow: View {
                 minWidth: WelcomeLayout.statusColumnMinimumWidth,
                 alignment: .leading
             )
-                .symbolEffect(.bounce, value: motion.bounceValue)
+            .symbolEffect(.bounce, value: motion.bounceValue)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -1041,26 +1008,27 @@ private struct WelcomeShortcutRow: View {
                 colors: [
                     isShowingVerificationFeedback
                         ? Color.green.opacity(0.24)
-                        : Color(nsColor: .controlBackgroundColor).opacity(0.72),
+                        : Color(nsColor: .controlBackgroundColor).opacity(
+                            AppTheme.Opacity.cardControlBackground
+                        ),
                     isShowingVerificationFeedback
                         ? Color.green.opacity(0.12)
-                        : Color.accentColor.opacity(0.045)
+                        : Color.accentColor.opacity(AppTheme.Opacity.cardAccent)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
             ),
-            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            in: AppTheme.Shape.card
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(
-                    isShowingVerificationFeedback
-                        ? Color.green.opacity(contrast.feedbackRowBorderOpacity)
-                        : Color.accentColor.opacity(contrast.idleRowBorderOpacity),
-                    lineWidth: isShowingVerificationFeedback
-                        ? contrast.feedbackRowBorderWidth
-                        : contrast.idleRowBorderWidth
-                )
+            AppTheme.Shape.card.stroke(
+                isShowingVerificationFeedback
+                    ? Color.green.opacity(contrast.feedbackRowBorderOpacity)
+                    : Color.accentColor.opacity(contrast.idleRowBorderOpacity),
+                lineWidth: isShowingVerificationFeedback
+                    ? contrast.feedbackRowBorderWidth
+                    : contrast.idleRowBorderWidth
+            )
         }
         .scaleEffect(motion.scale)
         .animation(
