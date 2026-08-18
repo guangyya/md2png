@@ -910,11 +910,72 @@ private struct WelcomeBackdrop: View {
     }
 }
 
+struct WelcomeShortcutFeedbackMotion: Equatable {
+    let bounceValue: Int
+    let scale: CGFloat
+    let animationDuration: TimeInterval?
+
+    init(
+        reduceMotion: Bool,
+        isShowingFeedback: Bool,
+        verificationCount: Int
+    ) {
+        bounceValue = reduceMotion ? 0 : verificationCount
+        scale = reduceMotion ? 1 : (isShowingFeedback ? 1.012 : 1)
+        animationDuration = reduceMotion ? nil : 0.12
+    }
+}
+
+struct WelcomeShortcutRowContrastStyle: Equatable {
+    let shortcutFillOpacity: Double
+    let shortcutBorderOpacity: Double
+    let shortcutBorderWidth: CGFloat
+    let idleRowBorderOpacity: Double
+    let idleRowBorderWidth: CGFloat
+    let feedbackRowBorderOpacity: Double
+    let feedbackRowBorderWidth: CGFloat
+
+    init(contrast: ColorSchemeContrast) {
+        if contrast == .increased {
+            shortcutFillOpacity = 0.14
+            shortcutBorderOpacity = 0.62
+            shortcutBorderWidth = 1.2
+            idleRowBorderOpacity = 0.45
+            idleRowBorderWidth = 1.1
+            feedbackRowBorderOpacity = 1
+            feedbackRowBorderWidth = 2
+        } else {
+            shortcutFillOpacity = 0.08
+            shortcutBorderOpacity = 0.24
+            shortcutBorderWidth = 0.6
+            idleRowBorderOpacity = 0.1
+            idleRowBorderWidth = 0.5
+            feedbackRowBorderOpacity = 0.75
+            feedbackRowBorderWidth = 1.4
+        }
+    }
+}
+
 private struct WelcomeShortcutRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     let shortcut: WelcomeShortcutStatus
     let copy: WelcomeCopy
     @State private var isShowingVerificationFeedback = false
     @State private var verificationFeedbackTask: Task<Void, Never>?
+
+    private var motion: WelcomeShortcutFeedbackMotion {
+        WelcomeShortcutFeedbackMotion(
+            reduceMotion: reduceMotion,
+            isShowingFeedback: isShowingVerificationFeedback,
+            verificationCount: shortcut.verificationCount
+        )
+    }
+
+    private var contrast: WelcomeShortcutRowContrastStyle {
+        WelcomeShortcutRowContrastStyle(contrast: colorSchemeContrast)
+    }
 
     private var statusText: String {
         if !shortcut.isRegistered {
@@ -952,12 +1013,15 @@ private struct WelcomeShortcutRow: View {
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(
-                    Color.accentColor.opacity(0.08),
+                    Color.accentColor.opacity(contrast.shortcutFillOpacity),
                     in: RoundedRectangle(cornerRadius: 7)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 7)
-                        .stroke(Color.accentColor.opacity(0.24), lineWidth: 0.6)
+                        .stroke(
+                            Color.accentColor.opacity(contrast.shortcutBorderOpacity),
+                            lineWidth: contrast.shortcutBorderWidth
+                        )
                 }
                 .accessibilityLabel(shortcut.shortcutAccessibilityName)
 
@@ -969,7 +1033,7 @@ private struct WelcomeShortcutRow: View {
                     minWidth: WelcomeLayout.statusColumnMinimumWidth,
                     alignment: .leading
                 )
-                .symbolEffect(.bounce, value: shortcut.verificationCount)
+                .symbolEffect(.bounce, value: motion.bounceValue)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -992,13 +1056,18 @@ private struct WelcomeShortcutRow: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(
                     isShowingVerificationFeedback
-                        ? Color.green.opacity(0.75)
-                        : Color.accentColor.opacity(0.1),
-                    lineWidth: isShowingVerificationFeedback ? 1.4 : 0.5
+                        ? Color.green.opacity(contrast.feedbackRowBorderOpacity)
+                        : Color.accentColor.opacity(contrast.idleRowBorderOpacity),
+                    lineWidth: isShowingVerificationFeedback
+                        ? contrast.feedbackRowBorderWidth
+                        : contrast.idleRowBorderWidth
                 )
         }
-        .scaleEffect(isShowingVerificationFeedback ? 1.012 : 1)
-        .animation(.easeOut(duration: 0.12), value: isShowingVerificationFeedback)
+        .scaleEffect(motion.scale)
+        .animation(
+            motion.animationDuration.map { Animation.easeOut(duration: $0) },
+            value: isShowingVerificationFeedback
+        )
         .onChange(of: shortcut.verificationCount) { _, verificationCount in
             guard verificationCount > 0 else { return }
             verificationFeedbackTask?.cancel()
