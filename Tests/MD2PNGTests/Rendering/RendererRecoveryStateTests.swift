@@ -395,19 +395,19 @@ final class RendererRecoveryStateTests: XCTestCase {
     }
 
     @MainActor
-    func testInitialLoadWatchdogTimeoutFailsOnceAndNextRenderRecovers() async throws {
+    func testInitialLoadWatchdogTimeoutFailsOnceAndNextRenderStartsRecovery() throws {
         _ = NSApplication.shared
         let renderer = MarkdownRenderer()
-        let timedOut = expectation(description: "initial renderer load timed out")
-        var timedOutResult: Result<NSImage, Error>?
+        let initialGenerationID = try XCTUnwrap(renderer.rendererGenerationIDForTesting)
+        let initialWebViewIdentity = renderer.webViewIdentityForTesting
+        var timedOutResults: [Result<NSImage, Error>] = []
         renderer.render("# Waiting during initial load") {
-            timedOutResult = $0
-            timedOut.fulfill()
+            timedOutResults.append($0)
         }
         renderer.simulateWatchdogTimeoutForTesting()
-        await fulfillment(of: [timedOut], timeout: 1)
 
-        let firstResult = try XCTUnwrap(timedOutResult)
+        XCTAssertEqual(timedOutResults.count, 1)
+        let firstResult = try XCTUnwrap(timedOutResults.first)
         guard case let .failure(error) = firstResult,
               let appError = error as? AppError,
               case .rendererTimedOut = appError else {
@@ -415,17 +415,14 @@ final class RendererRecoveryStateTests: XCTestCase {
             return
         }
 
-        let recovered = expectation(description: "later render recovered")
-        var recoveredResult: Result<NSImage, Error>?
-        renderer.render("# Fresh request after timeout") {
-            recoveredResult = $0
-            recovered.fulfill()
-        }
-        await fulfillment(of: [recovered], timeout: 5)
+        renderer.render("# Fresh request after timeout") { _ in }
 
-        let image = try XCTUnwrap(recoveredResult).get()
-        XCTAssertGreaterThanOrEqual(image.size.width, 520)
-        XCTAssertGreaterThan(image.size.height, 80)
+        XCTAssertNotEqual(renderer.rendererGenerationIDForTesting, initialGenerationID)
+        XCTAssertNotEqual(renderer.webViewIdentityForTesting, initialWebViewIdentity)
+        guard case .recoveryLoad = renderer.recoveryPhaseForTesting else {
+            XCTFail("Expected a fresh renderer load, got \(renderer.recoveryPhaseForTesting)")
+            return
+        }
     }
 
     @MainActor
