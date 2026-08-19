@@ -236,6 +236,10 @@ final class RenderCoordinator {
     }
 
     var canBeginUpdateInstall: Bool {
+        canStartRenderAction
+    }
+
+    var canStartRenderAction: Bool {
         !isRendering && !isUpdateInstallPending && !isPresentingClipboardConfirmation
     }
 
@@ -267,6 +271,11 @@ final class RenderCoordinator {
             )
             onError(error)
         }
+    }
+
+    func renderMarkdownFile(_ markdown: String) {
+        guard canStartRenderAction else { return }
+        render(markdown)
     }
 
     func saveFailedRenderAsSplitPNGs() {
@@ -387,10 +396,6 @@ final class RenderCoordinator {
 
     func recordOwnedClipboardWrite(changeCount: Int) {
         lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
-    }
-
-    private var canStartRenderAction: Bool {
-        !isRendering && !isUpdateInstallPending && !isPresentingClipboardConfirmation
     }
 
     private var lastRender: LastRender? {

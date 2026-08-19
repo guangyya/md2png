@@ -90,6 +90,7 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` by default (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
+| Render Markdown File… | — | Reads one explicitly selected UTF-8 `.md`, `.markdown`, or `.txt` file and writes PNG/TIFF to the clipboard only after a successful render |
 | Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result in Preview with drag, copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
@@ -179,6 +180,9 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 
 - Rendering happens in a non-persistent local `WKWebView` using bundled assets.
 - Markdown and generated images are never uploaded.
+- **Render Markdown File…** reads only the file selected for that action, keeps
+  no recent-file access or history, and leaves the clipboard unchanged if
+  selection, reading, or rendering fails.
 - Split PNG export is offered only as an explicit recovery action after a
   size-limit error, is Save-only, and never writes images to the clipboard.
 - Drag export creates one generation-isolated PNG in the system temporary

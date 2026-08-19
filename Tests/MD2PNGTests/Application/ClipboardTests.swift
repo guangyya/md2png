@@ -244,6 +244,10 @@ final class ClipboardTests: XCTestCase {
 
     func testUserFacingErrorsHaveDescriptions() {
         XCTAssertNotNil(AppError.emptyClipboard.errorDescription)
+        XCTAssertNotNil(AppError.unsupportedMarkdownFileType.errorDescription)
+        XCTAssertNotNil(AppError.markdownFileReadFailed.errorDescription)
+        XCTAssertNotNil(AppError.markdownFileInvalidEncoding.errorDescription)
+        XCTAssertNotNil(AppError.emptyMarkdownFile.errorDescription)
         XCTAssertNotNil(AppError.rendererUnavailable.errorDescription)
         XCTAssertNotNil(AppError.rendererRecoveryFailed.errorDescription)
         XCTAssertNotNil(AppError.rendererTimedOut.errorDescription)

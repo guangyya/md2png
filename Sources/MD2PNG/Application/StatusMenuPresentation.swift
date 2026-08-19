@@ -2,6 +2,7 @@ import Foundation
 
 enum StatusMenuCommand: String, CaseIterable, Hashable {
     case renderClipboard
+    case renderMarkdownFile
     case showLastRender
     case rerenderLastMarkdown
     case restoreLastMarkdown
@@ -18,7 +19,7 @@ enum StatusMenuLayout {
     // Keep the primary render and preview commands together, then move
     // progressively from recovery and rendering choices to infrequent commands.
     static let sections: [[StatusMenuCommand]] = [
-        [.renderClipboard, .showLastRender],
+        [.renderClipboard, .renderMarkdownFile, .showLastRender],
         [.rerenderLastMarkdown, .restoreLastMarkdown],
         [.theme, .outputWidth, .examples],
         [.settings, .showWelcome, .about],
@@ -53,6 +54,8 @@ struct StatusMenuPresentation: Equatable {
             let isEnabled = switch command {
             case .renderClipboard:
                 state.clipboardContainsMarkdown && !blocksRenderingChanges
+            case .renderMarkdownFile:
+                !blocksRenderingChanges
             case .showLastRender:
                 state.hasLastRender
             case .rerenderLastMarkdown, .restoreLastMarkdown:
@@ -85,6 +88,12 @@ struct StatusMenuPresentation: Equatable {
             L10n.text(
                 "menu.render",
                 defaultValue: "Render Clipboard as Image",
+                bundle: localizationBundle
+            )
+        case .renderMarkdownFile:
+            L10n.text(
+                "menu.render_markdown_file",
+                defaultValue: "Render Markdown File…",
                 bundle: localizationBundle
             )
         case .showLastRender:

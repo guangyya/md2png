@@ -248,6 +248,8 @@ private struct SampleMainMenu: View {
                 trailing: "⌃⌘X",
                 isDisabled: !menuState.canRenderClipboard
             )
+        case .renderMarkdownFile:
+            GuideMenuRow(title: copy.renderMarkdownFile)
         case .showLastRender:
             GuideMenuRow(
                 title: copy.showLastRender,

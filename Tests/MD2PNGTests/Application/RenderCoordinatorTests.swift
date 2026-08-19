@@ -33,6 +33,46 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(preview.markdown, "# First")
     }
 
+    func testMarkdownFileUsesTheExistingRenderClipboardAndHistoryFlow() throws {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Clipboard stays unread"
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.renderMarkdownFile("# File source\n")
+
+        XCTAssertEqual(harness.clipboardReadCount, 0)
+        XCTAssertEqual(harness.renderRequests.map(\.markdown), ["# File source\n"])
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+
+        let image = NSImage(size: NSSize(width: 640, height: 480))
+        harness.completeNextRender(with: .success(image))
+
+        XCTAssertEqual(harness.writtenImages.count, 1)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertEqual(harness.notices, [.imageCopied])
+        coordinator.showLastRender()
+        let preview = try XCTUnwrap(harness.previews.last)
+        XCTAssertTrue(preview.image === image)
+        XCTAssertEqual(preview.markdown, "# File source\n")
+    }
+
+    func testMarkdownFileRenderFailureLeavesClipboardAndHistoryUntouched() {
+        let harness = RenderCoordinatorHarness()
+        let initialChangeCount = harness.clipboardChangeCount
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.renderMarkdownFile("# Invalid file source")
+        harness.completeNextRender(with: .failure(TestFailure.renderer))
+
+        XCTAssertEqual(harness.clipboardReadCount, 0)
+        XCTAssertEqual(harness.clipboardChangeCount, initialChangeCount)
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertFalse(coordinator.state.hasLastRender)
+        XCTAssertFalse(coordinator.state.hasLastSource)
+    }
+
     func testRoundedRenderWritesAndPreviewsTheStyledImage() throws {
         let harness = RenderCoordinatorHarness()
         harness.clipboardMarkdown = "# Rounded"
@@ -167,6 +207,7 @@ final class RenderCoordinatorTests: XCTestCase {
         coordinator.selectWidthPreset(.compact)
         coordinator.selectTheme(.warmPaper)
         coordinator.renderClipboard()
+        coordinator.renderMarkdownFile("# File source")
         coordinator.saveFailedRenderAsSplitPNGs()
 
         XCTAssertTrue(coordinator.state.isUpdateInstallPending)
@@ -475,6 +516,7 @@ private final class RenderCoordinatorHarness {
 
     var clipboardMarkdown = ""
     var clipboardChangeCount = 10
+    private(set) var clipboardReadCount = 0
     var confirmationResult = true
     var splitExportDestinationURL: URL?
     var splitExportWriteError: Error?
@@ -518,7 +560,8 @@ private final class RenderCoordinatorHarness {
                     ))
                 },
                 readClipboardMarkdown: { [weak self] in
-                    self?.clipboardMarkdown ?? ""
+                    self?.clipboardReadCount += 1
+                    return self?.clipboardMarkdown ?? ""
                 },
                 clipboardChangeCount: { [weak self] in
                     self?.clipboardChangeCount ?? 0

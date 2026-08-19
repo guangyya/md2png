@@ -54,7 +54,7 @@ enum SampleGuideLayout {
     static let screenInset: CGFloat = 12
     static let menuMinimumWidth: CGFloat = 252
     static let menuSections: [[StatusMenuCommand]] = [
-        [.renderClipboard, .showLastRender],
+        [.renderClipboard, .renderMarkdownFile, .showLastRender],
         [.theme, .outputWidth, .examples],
         [.about, .quit]
     ]
@@ -155,6 +155,7 @@ struct SampleGuideCopy {
     let title: String
     let clipboard: String
     let render: String
+    let renderMarkdownFile: String
     let rerenderLastMarkdown: String
     let restoreLastMarkdown: String
     let showLastRender: String
@@ -181,6 +182,10 @@ struct SampleGuideCopy {
         )
         render = StatusMenuPresentation.title(
             for: .renderClipboard,
+            localizationBundle: localizationBundle
+        )
+        renderMarkdownFile = StatusMenuPresentation.title(
+            for: .renderMarkdownFile,
             localizationBundle: localizationBundle
         )
         rerenderLastMarkdown = StatusMenuPresentation.title(
