@@ -44,6 +44,28 @@ enum RenderedImageStyler {
     }
 
     @MainActor
+    static func hasTransparentCorners(_ image: NSImage) -> Bool {
+        guard let bitmap = highestBitmapRepresentation(of: image),
+              bitmap.hasAlpha,
+              !bitmap.isPlanar,
+              bitmap.samplesPerPixel > 1 else { return false }
+        let alphaIndex = bitmap.bitmapFormat.contains(.alphaFirst)
+            ? 0
+            : bitmap.samplesPerPixel - 1
+        var samples = [Int](repeating: 0, count: bitmap.samplesPerPixel)
+        let corners = [
+            (0, 0),
+            (bitmap.pixelsWide - 1, 0),
+            (0, bitmap.pixelsHigh - 1),
+            (bitmap.pixelsWide - 1, bitmap.pixelsHigh - 1)
+        ]
+        return corners.allSatisfy { x, y in
+            bitmap.getPixel(&samples, atX: x, y: y)
+            return samples[alphaIndex] == 0
+        }
+    }
+
+    @MainActor
     static func apply(
         _ style: RenderCornerStyle,
         to image: NSImage
@@ -70,11 +92,7 @@ enum RenderedImageStyler {
     private static func mutableBitmapPreservingPixels(
         from image: NSImage
     ) -> NSBitmapImageRep? {
-        let source = image.representations
-            .compactMap({ $0 as? NSBitmapImageRep })
-            .max(by: {
-                $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh
-            })
+        let source = highestBitmapRepresentation(of: image)
         if let source,
            source.hasAlpha,
            !source.isPlanar,
@@ -110,6 +128,16 @@ enum RenderedImageStyler {
         )
         guard let copiedImage = context.makeImage() else { return nil }
         return NSBitmapImageRep(cgImage: copiedImage)
+    }
+
+    private static func highestBitmapRepresentation(
+        of image: NSImage
+    ) -> NSBitmapImageRep? {
+        image.representations
+            .compactMap({ $0 as? NSBitmapImageRep })
+            .max(by: {
+                $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh
+            })
     }
 
     private static func applyRoundedAlphaMask(

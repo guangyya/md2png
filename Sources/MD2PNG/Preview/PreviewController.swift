@@ -39,6 +39,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
     var previewDrawsCanvasBackground: Bool { scrollView.drawsBackground }
     var previewCanvasBackgroundColor: NSColor { scrollView.backgroundColor }
     var previewCanvasImageFrame: NSRect { canvasView.imageFrame }
+    var previewCanvasImageCornerRadius: CGFloat { canvasView.imageCornerRadius }
     var visibleDocumentOrigin: NSPoint { scrollView.contentView.bounds.origin }
     var displayedImage: NSImage? { imageView.image }
     var displayedImageVisibleRect: NSRect { imageView.visibleRect }
@@ -314,14 +315,23 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
     ) {
         guard let image = imageView.image else { return }
         let oldAnchor = preserveAnchor ? visibleImageAnchor() : nil
+        let imagePixelSize = RenderedImageExport.pixelSize(of: image)
         let layout = PreviewLayout.calculate(
-            imagePixelSize: RenderedImageExport.pixelSize(of: image),
+            imagePixelSize: imagePixelSize,
             backingScaleFactor: window?.backingScaleFactor ?? 1,
             viewportSize: scrollView.contentSize,
             zoomMode: zoomMode
         )
         canvasView.frame = NSRect(origin: .zero, size: layout.canvasSize)
         canvasView.imageFrame = layout.imageFrame
+        if RenderedImageStyler.hasTransparentCorners(image) {
+            let pixelWidth = max(1, imagePixelSize.width)
+            canvasView.imageCornerRadius = RenderedImageStyler
+                .roundedCornerRadius(for: imagePixelSize)
+                * layout.imageFrame.width / pixelWidth
+        } else {
+            canvasView.imageCornerRadius = 0
+        }
         imageView.frame = layout.imageFrame
         currentZoomFactor = layout.zoomFactor
         toolbarController.updateZoomStatus(currentZoomFactor)
