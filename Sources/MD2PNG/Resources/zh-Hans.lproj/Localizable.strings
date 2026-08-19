@@ -57,6 +57,9 @@
 "settings.launch_at_login_on" = "已开启";
 "settings.launch_at_login_off" = "已关闭";
 "settings.open_system_settings" = "打开系统设置…";
+"settings.output_title" = "PNG 输出";
+"settings.rounded_corners" = "圆角";
+"settings.rounded_corners_detail" = "为新生成的 PNG 添加透明圆角。";
 "settings.shortcuts_title" = "键盘快捷键";
 "settings.shortcuts_subtitle" = "点击快捷键，然后按下新的组合键。";
 "settings.recording" = "请按快捷键…";

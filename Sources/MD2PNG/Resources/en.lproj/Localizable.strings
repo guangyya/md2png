@@ -57,6 +57,9 @@
 "settings.launch_at_login_on" = "On";
 "settings.launch_at_login_off" = "Off";
 "settings.open_system_settings" = "Open System Settings…";
+"settings.output_title" = "PNG Output";
+"settings.rounded_corners" = "Rounded Corners";
+"settings.rounded_corners_detail" = "Make the corners of newly rendered PNGs transparent.";
 "settings.shortcuts_title" = "Keyboard Shortcuts";
 "settings.shortcuts_subtitle" = "Click a shortcut, then press a new key combination.";
 "settings.recording" = "Type shortcut…";

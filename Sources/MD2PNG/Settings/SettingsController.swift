@@ -3,7 +3,7 @@ import Carbon
 import SwiftUI
 
 enum SettingsLayout {
-    static let windowSize = NSSize(width: 520, height: 390)
+    static let windowSize = NSSize(width: 520, height: 486)
     static let generalRowHeight: CGFloat = 60
     static let rowHeight: CGFloat = 56
     static let feedbackHeight: CGFloat = 44
@@ -19,6 +19,9 @@ struct SettingsCopy {
     let launchAtLoginOn: String
     let launchAtLoginOff: String
     let openSystemSettings: String
+    let outputTitle: String
+    let roundedCorners: String
+    let roundedCornersDetail: String
     let title: String
     let subtitle: String
     let render: String
@@ -75,6 +78,21 @@ struct SettingsCopy {
         openSystemSettings = L10n.text(
             "settings.open_system_settings",
             defaultValue: "Open System Settings…",
+            bundle: localizationBundle
+        )
+        outputTitle = L10n.text(
+            "settings.output_title",
+            defaultValue: "PNG Output",
+            bundle: localizationBundle
+        )
+        roundedCorners = L10n.text(
+            "settings.rounded_corners",
+            defaultValue: "Rounded Corners",
+            bundle: localizationBundle
+        )
+        roundedCornersDetail = L10n.text(
+            "settings.rounded_corners_detail",
+            defaultValue: "Make the corners of newly rendered PNGs transparent.",
             bundle: localizationBundle
         )
         title = L10n.text(
@@ -198,6 +216,7 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
     private let copy: SettingsCopy
     private let contentModel: ShortcutSettingsModel
     private let launchAtLoginModel: LaunchAtLoginSettingsModel
+    private let renderCornerModel: RenderCornerSettingsModel
     private let onVisibilityChange: (Bool) -> Void
 
 #if DEBUG
@@ -219,6 +238,9 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
     var displayedLaunchAtLoginError: String? {
         launchAtLoginModel.errorMessage
     }
+    var displayedRoundedCornersEnabled: Bool {
+        renderCornerModel.isEnabled
+    }
     var displayedContentSize: NSSize {
         window?.contentView?.bounds.size ?? .zero
     }
@@ -230,6 +252,7 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
     init(
         preference: GlobalShortcutPreference = GlobalShortcutPreference(),
         launchAtLoginController: LaunchAtLoginController = LaunchAtLoginController(),
+        renderCornerPreference: RenderCornerPreference = RenderCornerPreference(),
         localizationBundle: Bundle? = nil,
         onApply: @escaping ShortcutSettingsModel.ApplyConfiguration,
         onRecordingBegan: @escaping ShortcutSettingsModel.RecordingLifecycleAction = {},
@@ -248,6 +271,9 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
             controller: launchAtLoginController,
             onStatusChange: onLaunchAtLoginChange
         )
+        renderCornerModel = RenderCornerSettingsModel(
+            preference: renderCornerPreference
+        )
         self.onVisibilityChange = onVisibilityChange
         let window = AppWindow(
             contentRect: NSRect(origin: .zero, size: SettingsLayout.windowSize),
@@ -265,6 +291,7 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
             rootView: SettingsContentView(
                 model: contentModel,
                 launchAtLoginModel: launchAtLoginModel,
+                renderCornerModel: renderCornerModel,
                 copy: copy
             )
         )
@@ -285,6 +312,7 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
             failedRegistrationIDs: failedRegistrationIDs
         )
         launchAtLoginModel.refresh()
+        renderCornerModel.refresh()
         if window?.isVisible != true {
             onVisibilityChange(true)
         }
@@ -333,6 +361,10 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
         launchAtLoginModel.setEnabled(isEnabled)
     }
 
+    func setRoundedCornersForTesting(_ isEnabled: Bool) {
+        renderCornerModel.setEnabled(isEnabled)
+    }
+
     func performLaunchAtLoginPrimaryActionForTesting() {
         launchAtLoginModel.performPrimaryAction()
     }
@@ -345,15 +377,18 @@ final class SettingsController: NSWindowController, NSWindowDelegate {
 
 struct SettingsContentView: View {
     @State private var isLaunchAtLoginHovering = false
+    @State private var isRoundedCornersHovering = false
 
     @ObservedObject var model: ShortcutSettingsModel
     @ObservedObject var launchAtLoginModel: LaunchAtLoginSettingsModel
+    @ObservedObject var renderCornerModel: RenderCornerSettingsModel
     let copy: SettingsCopy
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.contentGroups) {
                 generalSection
+                outputSection
                 shortcutSection
             }
             .padding(.horizontal, AppTheme.Spacing.windowHorizontal)
@@ -375,6 +410,59 @@ struct SettingsContentView: View {
         )
         .background {
             AppWindowBackdrop()
+        }
+    }
+
+    private var outputSection: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+            Text(copy.outputTitle)
+                .font(.headline)
+
+            Button {
+                renderCornerModel.toggle()
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(copy.roundedCorners)
+                            .font(.body.weight(.medium))
+                        Text(copy.roundedCornersDetail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    AppInlineStatusLabel(
+                        title: renderCornerModel.isEnabled
+                            ? copy.launchAtLoginOn
+                            : copy.launchAtLoginOff,
+                        systemImage: renderCornerModel.isEnabled
+                            ? "checkmark.circle.fill"
+                            : "circle",
+                        color: renderCornerModel.isEnabled ? .green : .secondary
+                    )
+                    .frame(minWidth: 80, alignment: .leading)
+                }
+                .padding(.horizontal, 16)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: SettingsLayout.generalRowHeight,
+                    maxHeight: SettingsLayout.generalRowHeight,
+                    alignment: .leading
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .appCardStyle(isHighlighted: isRoundedCornersHovering)
+            .onHover { isRoundedCornersHovering = $0 }
+            .accessibilityLabel(copy.roundedCorners)
+            .accessibilityValue(
+                renderCornerModel.isEnabled
+                    ? copy.launchAtLoginOn
+                    : copy.launchAtLoginOff
+            )
+            .accessibilityIdentifier("SettingsRoundedCornersToggle")
         }
     }
 

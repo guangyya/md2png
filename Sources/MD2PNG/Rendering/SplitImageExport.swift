@@ -62,7 +62,8 @@ enum SplitImageExportWriter {
     @MainActor
     static func write(
         _ result: SplitRenderResult,
-        to destinationDirectoryURL: URL
+        to destinationDirectoryURL: URL,
+        cornerStyle: RenderCornerStyle = .square
     ) async throws {
         let directoryName = destinationDirectoryURL.lastPathComponent
         let names = SplitImageExportNaming.fileNames(
@@ -70,9 +71,13 @@ enum SplitImageExportWriter {
             count: result.parts.count
         )
         let files = try zip(names, result.parts).map { name, part in
-            PreparedFile(
+            let outputImage = try RenderedImageStyler.apply(
+                cornerStyle,
+                to: part.image
+            )
+            return PreparedFile(
                 name: name,
-                data: try RenderedImageExport.pngData(for: part.image)
+                data: try RenderedImageExport.pngData(for: outputImage)
             )
         }
         do {

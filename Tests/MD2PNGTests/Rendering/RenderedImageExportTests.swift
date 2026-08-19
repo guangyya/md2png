@@ -3,6 +3,49 @@ import XCTest
 @testable import MD2PNG
 
 final class RenderedImageExportTests: XCTestCase {
+    func testCornerPreferenceDefaultsSafelyAndPersistsSelection() throws {
+        let suiteName = "RenderCornerPreferenceTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preference = RenderCornerPreference(defaults: defaults)
+
+        XCTAssertEqual(preference.selectedStyle, .square)
+        preference.select(.rounded)
+        XCTAssertEqual(preference.selectedStyle, .rounded)
+
+        defaults.set("unsupported", forKey: RenderCornerPreference.defaultsKey)
+        XCTAssertEqual(preference.selectedStyle, .square)
+    }
+
+    @MainActor
+    func testSquareStyleReturnsTheOriginalImageWithoutReprocessing() throws {
+        let image = try makeRetinaImage(
+            pointSize: NSSize(width: 32, height: 24),
+            pixelSize: NSSize(width: 64, height: 48)
+        )
+
+        XCTAssertTrue(try RenderedImageStyler.apply(.square, to: image) === image)
+    }
+
+    @MainActor
+    func testRoundedStylePreservesDimensionsAndMakesOnlyCornersTransparent() throws {
+        let image = try makeRetinaImage(
+            pointSize: NSSize(width: 32, height: 24),
+            pixelSize: NSSize(width: 64, height: 48),
+            fillColor: .systemRed
+        )
+
+        let styled = try RenderedImageStyler.apply(.rounded, to: image)
+        let exported = try XCTUnwrap(NSBitmapImageRep(
+            data: RenderedImageExport.pngData(for: styled)
+        ))
+
+        XCTAssertEqual(RenderedImageExport.pixelSize(of: styled), NSSize(width: 64, height: 48))
+        XCTAssertEqual(styled.size, image.size)
+        XCTAssertLessThan(try XCTUnwrap(exported.colorAt(x: 0, y: 0)).alphaComponent, 0.05)
+        XCTAssertGreaterThan(try XCTUnwrap(exported.colorAt(x: 32, y: 24)).alphaComponent, 0.95)
+    }
+
     func testPNGExportPreservesTheHighestResolutionRepresentation() throws {
         let image = try makeRetinaImage(
             pointSize: NSSize(width: 120, height: 80),
@@ -157,7 +200,11 @@ final class RenderedImageExportTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: directoryURL.path))
     }
 
-    private func makeRetinaImage(pointSize: NSSize, pixelSize: NSSize) throws -> NSImage {
+    private func makeRetinaImage(
+        pointSize: NSSize,
+        pixelSize: NSSize,
+        fillColor: NSColor? = nil
+    ) throws -> NSImage {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: Int(pixelSize.width),
@@ -171,6 +218,15 @@ final class RenderedImageExportTests: XCTestCase {
             bitsPerPixel: 0
         ))
         bitmap.size = pointSize
+        if let fillColor {
+            let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = context
+            fillColor.setFill()
+            NSRect(origin: .zero, size: pixelSize).fill()
+            context.flushGraphics()
+            NSGraphicsContext.restoreGraphicsState()
+        }
         let image = NSImage(size: pointSize)
         image.addRepresentation(bitmap)
         return image

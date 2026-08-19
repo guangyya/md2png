@@ -74,6 +74,7 @@ final class RenderCoordinator {
             rendererFactory: (() -> any MarkdownRendering)? = nil,
             widthPreference: RenderWidthPreference = RenderWidthPreference(),
             themePreference: RenderThemePreference = RenderThemePreference(),
+            cornerPreference: RenderCornerPreference = RenderCornerPreference(),
             diagnosticLogger: DiagnosticLogger = .shared
         ) -> Dependencies {
             let renderer = LazyMarkdownRenderer(factory: rendererFactory ?? {
@@ -115,7 +116,8 @@ final class RenderCoordinator {
                 writeSplitExport: { result, destinationDirectoryURL in
                     try await SplitImageExportWriter.write(
                         result,
-                        to: destinationDirectoryURL
+                        to: destinationDirectoryURL,
+                        cornerStyle: cornerPreference.selectedStyle
                     )
                 }
             )
@@ -129,6 +131,7 @@ final class RenderCoordinator {
     private let onError: (Error) -> Void
     private let onPreviewRequested: (LastRender) -> Void
     private let diagnosticLogger: DiagnosticLogger
+    private let renderCornerStyle: () -> RenderCornerStyle
     private lazy var splitImageExportController = SplitImageExportController(
         dependencies: SplitImageExportController.Dependencies(
             chooseDestination: dependencies.chooseSplitExportDestination,
@@ -166,6 +169,7 @@ final class RenderCoordinator {
         dependencies: Dependencies,
         selectedWidthPreset: RenderWidthPreset = .standard,
         selectedTheme: RenderTheme = .cleanLight,
+        renderCornerStyle: @escaping () -> RenderCornerStyle = { .square },
         diagnosticLogger: DiagnosticLogger = .disabled,
         confirmClipboardOverwrite: @escaping (ClipboardOverwriteAction) -> Bool,
         onStateChange: @escaping (RenderCoordinatorState) -> Void,
@@ -176,6 +180,7 @@ final class RenderCoordinator {
         self.dependencies = dependencies
         self.selectedWidthPreset = selectedWidthPreset
         self.selectedTheme = selectedTheme
+        self.renderCornerStyle = renderCornerStyle
         self.diagnosticLogger = diagnosticLogger
         self.confirmClipboardOverwrite = confirmClipboardOverwrite
         self.onStateChange = onStateChange
@@ -194,14 +199,17 @@ final class RenderCoordinator {
     ) {
         let widthPreference = RenderWidthPreference()
         let themePreference = RenderThemePreference()
+        let cornerPreference = RenderCornerPreference()
         self.init(
             dependencies: .live(
                 widthPreference: widthPreference,
                 themePreference: themePreference,
+                cornerPreference: cornerPreference,
                 diagnosticLogger: diagnosticLogger
             ),
             selectedWidthPreset: widthPreference.selectedPreset,
             selectedTheme: themePreference.selectedTheme,
+            renderCornerStyle: { cornerPreference.selectedStyle },
             diagnosticLogger: diagnosticLogger,
             confirmClipboardOverwrite: confirmClipboardOverwrite,
             onStateChange: onStateChange,
@@ -424,9 +432,13 @@ final class RenderCoordinator {
             switch result {
             case let .success(image):
                 do {
-                    let changeCount = try self.dependencies.writeImage(image)
-                    let dimensions = Self.pixelDimensions(for: image)
-                    self.lastImage = image
+                    let outputImage = try RenderedImageStyler.apply(
+                        self.renderCornerStyle(),
+                        to: image
+                    )
+                    let changeCount = try self.dependencies.writeImage(outputImage)
+                    let dimensions = Self.pixelDimensions(for: outputImage)
+                    self.lastImage = outputImage
                     self.lastRenderWidthPreset = requestedWidthPreset
                     self.lastSource.recordSuccessfulRender(
                         markdown: markdown,

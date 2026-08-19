@@ -18,6 +18,8 @@ final class SettingsControllerTests: XCTestCase {
         XCTAssertEqual(english.launchAtLoginOn, "On")
         XCTAssertEqual(english.launchAtLoginOff, "Off")
         XCTAssertEqual(english.openSystemSettings, "Open System Settings…")
+        XCTAssertEqual(english.outputTitle, "PNG Output")
+        XCTAssertEqual(english.roundedCorners, "Rounded Corners")
         XCTAssertEqual(english.title, "Keyboard Shortcuts")
         XCTAssertEqual(english.restoreDefaults, "Restore Defaults")
         XCTAssertEqual(
@@ -29,6 +31,8 @@ final class SettingsControllerTests: XCTestCase {
         XCTAssertEqual(chinese.launchAtLoginDetail, "登录时自动启动 md2png。")
         XCTAssertEqual(chinese.launchAtLoginOn, "已开启")
         XCTAssertEqual(chinese.launchAtLoginOff, "已关闭")
+        XCTAssertEqual(chinese.outputTitle, "PNG 输出")
+        XCTAssertEqual(chinese.roundedCorners, "圆角")
         XCTAssertEqual(chinese.recording, "请按快捷键…")
         XCTAssertEqual(
             chinese.feedbackText(.duplicate),
@@ -104,6 +108,29 @@ final class SettingsControllerTests: XCTestCase {
         XCTAssertEqual(preference.configuration, expected)
         XCTAssertEqual(expected.render.key.keyCode, UInt32(kVK_ANSI_K))
         XCTAssertEqual(expected.render.modifiers, [.option, .command])
+    }
+
+    @MainActor
+    func testRoundedCornerSettingDefaultsOffAndPersistsImmediately() throws {
+        _ = NSApplication.shared
+        let suiteName = "SettingsRoundedCornerTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preference = RenderCornerPreference(defaults: defaults)
+        let controller = SettingsController(
+            renderCornerPreference: preference,
+            onApply: { _ in [] }
+        )
+        controller.show(configuration: .default, failedRegistrationIDs: [])
+        defer { controller.close() }
+
+        XCTAssertFalse(controller.displayedRoundedCornersEnabled)
+        XCTAssertEqual(preference.selectedStyle, .square)
+
+        controller.setRoundedCornersForTesting(true)
+
+        XCTAssertTrue(controller.displayedRoundedCornersEnabled)
+        XCTAssertEqual(preference.selectedStyle, .rounded)
     }
 
     @MainActor
