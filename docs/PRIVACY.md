@@ -11,7 +11,8 @@ The app accesses the clipboard only in response to visible user actions:
 |---|---|
 | Open the menu | Reads a short plain-text preview in memory |
 | Render Clipboard as Image | Reads non-empty plain text; writes PNG and TIFF only after a successful render |
-| Render Markdown File… | Reads one explicitly selected UTF-8 Markdown or plain-text file; writes PNG and TIFF only after a successful render and does not read the clipboard |
+| Render Markdown File… | Reads one explicitly selected UTF-8 Markdown or plain-text file; unsupported extensions are disabled, and PNG/TIFF is written only after a successful render without reading the clipboard |
+| Finder Open With | Reads one explicitly opened `.md` or `.markdown` file, uses the same local renderer, and opens Preview only after success |
 | Save as Split PNGs after a size-limit error | Uses the unchanged non-empty source from the failed render; writes numbered PNG files only to the folder explicitly selected by the user and does not write to the clipboard |
 | Re-render Last Markdown | Reads the latest successful source from app memory; writes PNG and TIFF only after a successful render and any required clipboard confirmation |
 | Restore Last Markdown | Writes the latest successful source after any required clipboard confirmation |
@@ -19,9 +20,9 @@ The app accesses the clipboard only in response to visible user actions:
 | Copy Version Info | Writes app version, source commit, build type, macOS version, and architecture as plain text |
 
 If **Render Clipboard as Image** fails, the source Markdown remains on the
-clipboard. If **Render Markdown File…** is cancelled or its selected file cannot
-be read, decoded, or rendered, the clipboard is unchanged. The app keeps no
-recent-file list, persistent access bookmark, file path, or directory monitor.
+clipboard. If **Render Markdown File…** is cancelled, or a picker/Finder file
+cannot be read, decoded, or rendered, the clipboard is unchanged. The app keeps
+no recent-file list, persistent access bookmark, file path, or directory monitor.
 If a bundled Example fails, that explicitly selected sample remains on the
 clipboard instead. Clipboard contents are managed by macOS and can still be
 read by other applications according to macOS clipboard behavior.

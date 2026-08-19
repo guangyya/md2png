@@ -273,9 +273,12 @@ final class RenderCoordinator {
         }
     }
 
-    func renderMarkdownFile(_ markdown: String) {
+    func renderMarkdownFile(
+        _ markdown: String,
+        showsPreviewOnSuccess: Bool = false
+    ) {
         guard canStartRenderAction else { return }
-        render(markdown)
+        render(markdown, showsPreviewOnSuccess: showsPreviewOnSuccess)
     }
 
     func saveFailedRenderAsSplitPNGs() {

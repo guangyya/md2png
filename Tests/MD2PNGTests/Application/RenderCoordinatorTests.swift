@@ -57,6 +57,26 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(preview.markdown, "# File source\n")
     }
 
+    func testFinderOpenedMarkdownFileShowsPreviewAfterSuccessfulRender() throws {
+        let harness = RenderCoordinatorHarness()
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.renderMarkdownFile(
+            "# Finder source\n",
+            showsPreviewOnSuccess: true
+        )
+        XCTAssertTrue(harness.previews.isEmpty)
+
+        let image = NSImage(size: NSSize(width: 640, height: 480))
+        harness.completeNextRender(with: .success(image))
+
+        XCTAssertEqual(harness.previews.count, 1)
+        let preview = try XCTUnwrap(harness.previews.first)
+        XCTAssertTrue(preview.image === image)
+        XCTAssertEqual(preview.markdown, "# Finder source\n")
+        XCTAssertEqual(harness.writtenImages.count, 1)
+    }
+
     func testMarkdownFileRenderFailureLeavesClipboardAndHistoryUntouched() {
         let harness = RenderCoordinatorHarness()
         let initialChangeCount = harness.clipboardChangeCount

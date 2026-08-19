@@ -13,6 +13,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   existing local renderer and clipboard output flow without keeping file
   history or changing the clipboard when selection, reading, or rendering
   fails.
+- Open `.md` and `.markdown` files with md2png from Finder, then show the
+  successful result in Preview. The in-app file picker now disables every
+  extension other than `.md`, `.markdown`, and `.txt`.
 
 ## [0.13.1] - 2026-08-19
 

@@ -224,6 +224,9 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 
 verify-dist: app
 	cmp -s THIRD_PARTY_NOTICES.md "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
+	test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:CFBundleTypeRole' "$(CONTENTS)/Info.plist")" = "Viewer"
+	test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:LSHandlerRank' "$(CONTENTS)/Info.plist")" = "Alternate"
+	test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:LSItemContentTypes:0' "$(CONTENTS)/Info.plist")" = "net.daringfireball.markdown"
 	grep -Fq '](ThirdPartyLicenses/Sparkle-2.9.5.txt)' "$(LEGAL_RESOURCES)/THIRD_PARTY_NOTICES.md"
 	test -f "$(SPARKLE_LICENSE)"
 	cmp -s "$(SPARKLE_LICENSE_SOURCE)" "$(SPARKLE_LICENSE)"

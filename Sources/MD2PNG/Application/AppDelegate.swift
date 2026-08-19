@@ -129,6 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isSampleGuidePresentationScheduled = false
     private var isWaitingForUpdateDeferralBeforeTermination = false
     private var updateStatusObserverID: UUID?
+    private var isReadyForFileOpen = false
+    private var hasReceivedFileOpenRequest = false
+    private var deferredFileOpenRequests: [[URL]] = []
 
 #if DEBUG
     var clipboardMenuRefreshCountForTesting: Int {
@@ -227,9 +230,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let failedRegistrationIDs = globalShortcutCoordinator.start()
 
-        if welcomePreference.shouldShowOnLaunch {
+        if welcomePreference.shouldShowOnLaunch && !hasReceivedFileOpenRequest {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
+                guard !self.hasReceivedFileOpenRequest else { return }
                 self.windowPresentationCoordinator.showWelcomeIfNeeded(
                     shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
                 )
@@ -251,6 +255,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             stage: .applicationLaunch,
             result: .succeeded
         )
+
+        isReadyForFileOpen = true
+        let requests = deferredFileOpenRequests
+        deferredFileOpenRequests.removeAll()
+        for request in requests {
+            openMarkdownFiles(request)
+        }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        hasReceivedFileOpenRequest = true
+        guard isReadyForFileOpen else {
+            deferredFileOpenRequests.append(urls)
+            return
+        }
+        openMarkdownFiles(urls)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -390,11 +410,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         do {
-            let markdown = try MarkdownFileInput.load(from: fileURL)
-            renderCoordinator.renderMarkdownFile(markdown)
+            try renderMarkdownFile(at: fileURL, showsPreviewOnSuccess: false)
         } catch {
             show(error)
         }
+    }
+
+    private func openMarkdownFiles(_ urls: [URL]) {
+        do {
+            let fileURL = try MarkdownFileOpenRequest.singleFileURL(from: urls)
+            guard renderCoordinator.canStartRenderAction else {
+                throw AppError.markdownFileOpenBusy
+            }
+            try renderMarkdownFile(at: fileURL, showsPreviewOnSuccess: true)
+        } catch {
+            show(error)
+        }
+    }
+
+    private func renderMarkdownFile(
+        at fileURL: URL,
+        showsPreviewOnSuccess: Bool
+    ) throws {
+        let markdown = try MarkdownFileInput.load(from: fileURL)
+        renderCoordinator.renderMarkdownFile(
+            markdown,
+            showsPreviewOnSuccess: showsPreviewOnSuccess
+        )
     }
 
     private func applyRenderState(_ state: RenderCoordinatorState) {

@@ -8,6 +8,7 @@ for the complete project history and release details.
 ### Added
 
 - Render a local Markdown or text file directly from the md2png menu.
+- Open Markdown files with md2png from Finder and preview the rendered result.
 
 ## [0.13.1] - 2026-08-19
 

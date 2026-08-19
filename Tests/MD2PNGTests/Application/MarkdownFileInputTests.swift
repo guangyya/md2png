@@ -39,6 +39,81 @@ final class MarkdownFileInputTests: XCTestCase {
         }
     }
 
+    func testSupportedFileURLUsesExactExtensions() {
+        for filenameExtension in ["md", "MARKDOWN", "txt"] {
+            XCTAssertTrue(MarkdownFileInput.supports(
+                fileURL: URL(fileURLWithPath: "/tmp/source.\(filenameExtension)")
+            ))
+        }
+
+        for filenameExtension in ["py", "csv", "rtf", "html"] {
+            XCTAssertFalse(MarkdownFileInput.supports(
+                fileURL: URL(fileURLWithPath: "/tmp/source.\(filenameExtension)")
+            ))
+        }
+
+        XCTAssertFalse(MarkdownFileInput.supports(
+            fileURL: URL(string: "https://example.com/source.md")!
+        ))
+    }
+
+    @MainActor
+    func testPickerDelegateDisablesUnsupportedFilesButKeepsDirectoriesEnabled() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "md2png-picker-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let markdown = root.appendingPathComponent("source.md")
+        let python = root.appendingPathComponent("source.py")
+        let extensionDirectory = root.appendingPathComponent(
+            "folder.csv",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: extensionDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        XCTAssertTrue(FileManager.default.createFile(
+            atPath: markdown.path,
+            contents: Data("# Markdown".utf8)
+        ))
+        XCTAssertTrue(FileManager.default.createFile(
+            atPath: python.path,
+            contents: Data("print('not markdown')".utf8)
+        ))
+
+        let delegate = MarkdownFilePickerDelegate()
+        XCTAssertTrue(delegate.panel(NSObject(), shouldEnable: markdown))
+        XCTAssertFalse(delegate.panel(NSObject(), shouldEnable: python))
+        XCTAssertTrue(delegate.panel(NSObject(), shouldEnable: extensionDirectory))
+        XCTAssertNoThrow(try delegate.panel(NSObject(), validate: markdown))
+        XCTAssertThrowsError(try delegate.panel(NSObject(), validate: python))
+    }
+
+    func testFinderOpenRequestAcceptsExactlyOneFile() throws {
+        let expected = URL(fileURLWithPath: "/tmp/source.md")
+        XCTAssertEqual(
+            try MarkdownFileOpenRequest.singleFileURL(from: [expected]),
+            expected
+        )
+
+        for urls in [
+            [URL](),
+            [expected, URL(fileURLWithPath: "/tmp/another.md")]
+        ] {
+            XCTAssertThrowsError(
+                try MarkdownFileOpenRequest.singleFileURL(from: urls)
+            ) { error in
+                guard case AppError.multipleMarkdownFilesUnsupported = error else {
+                    return XCTFail(
+                        "Expected multipleMarkdownFilesUnsupported, got \(error)"
+                    )
+                }
+            }
+        }
+    }
+
     func testUnsupportedTypeIsRejectedBeforeReading() {
         var didRead = false
 
@@ -106,7 +181,9 @@ final class MarkdownFileInputTests: XCTestCase {
             AppError.unsupportedMarkdownFileType,
             .markdownFileReadFailed,
             .markdownFileInvalidEncoding,
-            .emptyMarkdownFile
+            .emptyMarkdownFile,
+            .multipleMarkdownFilesUnsupported,
+            .markdownFileOpenBusy
         ] {
             XCTAssertTrue(error.message(localizationBundle: english).contains(
                 "clipboard is unchanged"
