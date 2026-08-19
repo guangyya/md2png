@@ -109,11 +109,7 @@ struct AboutContentView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 20) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 88, height: 88)
-                .accessibilityHidden(true)
+            AppIconView(size: 88)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 10) {

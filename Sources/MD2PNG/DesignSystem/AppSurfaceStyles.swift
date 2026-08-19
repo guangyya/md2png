@@ -7,6 +7,18 @@ struct AppWindowBackdrop: View {
     }
 }
 
+struct AppIconView: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
 struct AppInlineStatusLabel: View {
     let title: String
     let systemImage: String
