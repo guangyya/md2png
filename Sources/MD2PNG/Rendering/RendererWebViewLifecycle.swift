@@ -42,11 +42,6 @@ final class RendererWebViewLifecycle: NSObject, WKNavigationDelegate {
         webView.navigationDelegate = self
     }
 
-    isolated deinit {
-        webView.navigationDelegate = nil
-        hostWindow.orderOut(nil)
-    }
-
     func prepareRenderer(for attempt: RendererRecoveryState.LoadAttempt) -> Bool {
         guard pageURL != nil else { return false }
         installWebView(for: attempt)
