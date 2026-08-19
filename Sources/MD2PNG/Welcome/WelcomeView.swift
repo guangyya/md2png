@@ -18,20 +18,7 @@ struct WelcomeView: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.contentGroups) {
                     HStack(alignment: .top, spacing: 13) {
-                        Image(nsImage: NSApp.applicationIconImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 44, height: 44)
-                            .padding(7)
-                            .background(
-                                Color(nsColor: .controlBackgroundColor),
-                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                    .stroke(Color.primary.opacity(0.14), lineWidth: 0.75)
-                            }
-                            .accessibilityHidden(true)
+                        AppIconView(size: 58)
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text(copy.title)
