@@ -5,6 +5,11 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Fixed
+
+- Improve renderer recovery validation reliability across supported Apple
+  toolchains.
+
 ## [0.13.0] - 2026-08-19
 
 ### Added

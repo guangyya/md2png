@@ -377,6 +377,14 @@ test("trusted publication tooling can stage from main while a pre-contract sourc
 
 test("preparation App token has only branch and pull request write permissions", () => {
   const prepare = workflows["prepare-release-pr.yml"];
+  const prepareWorkflow = parseYaml(prepare);
+  const tokenStep = prepareWorkflow.jobs.prepare.steps.find(
+    (step) => step.name === "Mint repository-scoped preparation token",
+  );
+  assert.equal(tokenStep.with["client-id"], "${{ vars.RELEASE_PREP_CLIENT_ID }}");
+  assert.equal(tokenStep.with["private-key"], "${{ secrets.RELEASE_PREP_PRIVATE_KEY }}");
+  assert.equal(tokenStep.with["app-id"], undefined);
+  assert.doesNotMatch(prepare, /RELEASE_PREP_APP_ID/);
   assert.match(prepare, /permission-contents: write\n          permission-pull-requests: write/);
   assert.doesNotMatch(prepare, /permission-(actions|issues|workflows): write/);
   assert.match(prepare, /persist-credentials: false/);

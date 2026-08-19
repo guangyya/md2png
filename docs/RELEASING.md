@@ -37,8 +37,8 @@ The normal release path uses two separately scoped identities:
 - Install a dedicated GitHub App only on this repository. Grant it repository
   metadata read, Contents write, and Pull requests write. Do not grant Actions,
   administration, environments, secrets, or Release publication permissions.
-  Store its App ID and private key as repository secrets
-  `RELEASE_PREP_APP_ID` and `RELEASE_PREP_PRIVATE_KEY`.
+  Store its Client ID as the repository variable `RELEASE_PREP_CLIENT_ID` and
+  its private key as the repository secret `RELEASE_PREP_PRIVATE_KEY`.
 - Create the protected `release-signing` environment. Store
   `RELEASE_CERTIFICATE_P12_BASE64`, `RELEASE_CERTIFICATE_PASSWORD`,
   `RELEASE_SIGN_IDENTITY`, `RELEASE_CERTIFICATE_SHA256`, `APPLE_ID`,

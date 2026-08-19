@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Migrate release preparation from the deprecated GitHub App ID action input to
+  the recommended Client ID configuration.
+
+### Fixed
+
+- Make renderer timeout recovery validation deterministic across supported
+  Xcode toolchains.
+
 ## [0.13.0] - 2026-08-19
 
 ### Added
