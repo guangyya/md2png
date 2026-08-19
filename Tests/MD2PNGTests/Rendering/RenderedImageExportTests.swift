@@ -39,11 +39,45 @@ final class RenderedImageExportTests: XCTestCase {
         let exported = try XCTUnwrap(NSBitmapImageRep(
             data: RenderedImageExport.pngData(for: styled)
         ))
+        let original = try XCTUnwrap(NSBitmapImageRep(
+            data: RenderedImageExport.pngData(for: image)
+        ))
 
         XCTAssertEqual(RenderedImageExport.pixelSize(of: styled), NSSize(width: 64, height: 48))
         XCTAssertEqual(styled.size, image.size)
         XCTAssertLessThan(try XCTUnwrap(exported.colorAt(x: 0, y: 0)).alphaComponent, 0.05)
         XCTAssertGreaterThan(try XCTUnwrap(exported.colorAt(x: 32, y: 24)).alphaComponent, 0.95)
+        XCTAssertGreaterThan(try XCTUnwrap(original.colorAt(x: 0, y: 0)).alphaComponent, 0.95)
+    }
+
+    @MainActor
+    func testRoundedStyleDoesNotResampleInteriorPixels() throws {
+        let image = try makePixelPatternImage(
+            pointSize: NSSize(width: 32, height: 24),
+            pixelSize: NSSize(width: 64, height: 48)
+        )
+        let original = try XCTUnwrap(NSBitmapImageRep(
+            data: RenderedImageExport.pngData(for: image)
+        ))
+
+        let styled = try RenderedImageStyler.apply(.rounded, to: image)
+        let exported = try XCTUnwrap(NSBitmapImageRep(
+            data: RenderedImageExport.pngData(for: styled)
+        ))
+
+        for y in 16 ..< 32 {
+            for x in 16 ..< 48 {
+                var actual = [Int](repeating: 0, count: exported.samplesPerPixel)
+                var expected = [Int](repeating: 0, count: original.samplesPerPixel)
+                exported.getPixel(&actual, atX: x, y: y)
+                original.getPixel(&expected, atX: x, y: y)
+                XCTAssertEqual(
+                    actual,
+                    expected,
+                    "Pixel changed at (\(x), \(y))"
+                )
+            }
+        }
     }
 
     func testPNGExportPreservesTheHighestResolutionRepresentation() throws {
@@ -227,6 +261,39 @@ final class RenderedImageExportTests: XCTestCase {
             context.flushGraphics()
             NSGraphicsContext.restoreGraphicsState()
         }
+        let image = NSImage(size: pointSize)
+        image.addRepresentation(bitmap)
+        return image
+    }
+
+    private func makePixelPatternImage(
+        pointSize: NSSize,
+        pixelSize: NSSize
+    ) throws -> NSImage {
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(pixelSize.width),
+            pixelsHigh: Int(pixelSize.height),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bitmapFormat: [.alphaNonpremultiplied],
+            bytesPerRow: Int(pixelSize.width) * 4,
+            bitsPerPixel: 32
+        ))
+        let pixels = try XCTUnwrap(bitmap.bitmapData)
+        for y in 0 ..< bitmap.pixelsHigh {
+            for x in 0 ..< bitmap.pixelsWide {
+                let offset = y * bitmap.bytesPerRow + x * 4
+                pixels[offset] = UInt8((x * 17 + y * 3) % 256)
+                pixels[offset + 1] = UInt8((x * 5 + y * 19) % 256)
+                pixels[offset + 2] = UInt8((x * 11 + y * 7) % 256)
+                pixels[offset + 3] = 255
+            }
+        }
+        bitmap.size = pointSize
         let image = NSImage(size: pointSize)
         image.addRepresentation(bitmap)
         return image

@@ -35,59 +35,111 @@ enum RenderedImageStyler {
         to image: NSImage
     ) throws -> NSImage {
         guard style == .rounded else { return image }
-        let pixelSize = RenderedImageExport.pixelSize(of: image)
-        let pixelsWide = Int(pixelSize.width.rounded())
-        let pixelsHigh = Int(pixelSize.height.rounded())
-        guard pixelsWide > 0,
-              pixelsHigh > 0,
-              let bitmap = NSBitmapImageRep(
-                  bitmapDataPlanes: nil,
-                  pixelsWide: pixelsWide,
-                  pixelsHigh: pixelsHigh,
-                  bitsPerSample: 8,
-                  samplesPerPixel: 4,
-                  hasAlpha: true,
-                  isPlanar: false,
-                  colorSpaceName: .deviceRGB,
-                  bytesPerRow: 0,
-                  bitsPerPixel: 0
-              ),
-              let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
+        guard let bitmap = mutableBitmapPreservingPixels(from: image),
+              bitmap.pixelsWide > 0,
+              bitmap.pixelsHigh > 0 else {
             throw AppError.pngEncodingFailed
         }
 
-        let bounds = NSRect(
-            x: 0,
-            y: 0,
-            width: pixelsWide,
-            height: pixelsHigh
-        )
         let radius = min(
             roundedCornerRadius,
-            min(bounds.width, bounds.height) / 2
+            CGFloat(min(bitmap.pixelsWide, bitmap.pixelsHigh)) / 2
         )
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = context
-        context.cgContext.clear(bounds)
-        NSBezierPath(
-            roundedRect: bounds,
-            xRadius: radius,
-            yRadius: radius
-        ).addClip()
-        image.draw(
-            in: bounds,
-            from: NSRect(origin: .zero, size: image.size),
-            operation: .copy,
-            fraction: 1,
-            respectFlipped: false,
-            hints: [.interpolation: NSImageInterpolation.high]
-        )
-        context.flushGraphics()
-        NSGraphicsContext.restoreGraphicsState()
+        applyRoundedAlphaMask(to: bitmap, radius: radius)
 
         bitmap.size = image.size
         let styledImage = NSImage(size: image.size)
         styledImage.addRepresentation(bitmap)
         return styledImage
+    }
+
+    private static func mutableBitmapPreservingPixels(
+        from image: NSImage
+    ) -> NSBitmapImageRep? {
+        let source = image.representations
+            .compactMap({ $0 as? NSBitmapImageRep })
+            .max(by: {
+                $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh
+            })
+        if let source,
+           source.hasAlpha,
+           !source.isPlanar,
+           let copy = source.copy() as? NSBitmapImageRep {
+            return copy
+        }
+
+        var proposedRect = NSRect(origin: .zero, size: image.size)
+        guard let sourceImage = source?.cgImage
+            ?? image.cgImage(
+                forProposedRect: &proposedRect,
+                context: nil,
+                hints: nil
+            ) else { return nil }
+        let colorSpace = sourceImage.colorSpace
+            ?? CGColorSpace(name: CGColorSpace.sRGB)
+            ?? CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue
+            | CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: sourceImage.width,
+            height: sourceImage.height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        context.interpolationQuality = .none
+        context.draw(
+            sourceImage,
+            in: CGRect(x: 0, y: 0, width: sourceImage.width, height: sourceImage.height)
+        )
+        guard let copiedImage = context.makeImage() else { return nil }
+        return NSBitmapImageRep(cgImage: copiedImage)
+    }
+
+    private static func applyRoundedAlphaMask(
+        to bitmap: NSBitmapImageRep,
+        radius: CGFloat
+    ) {
+        let cornerExtent = Int(ceil(radius))
+        let alphaIndex = bitmap.bitmapFormat.contains(.alphaFirst)
+            ? 0
+            : bitmap.samplesPerPixel - 1
+        let maximumSample = (1 << bitmap.bitsPerSample) - 1
+        var samples = [Int](repeating: 0, count: bitmap.samplesPerPixel)
+
+        for yOffset in 0 ..< cornerExtent {
+            for xOffset in 0 ..< cornerExtent {
+                let distance = hypot(
+                    radius - CGFloat(xOffset) - 0.5,
+                    radius - CGFloat(yOffset) - 0.5
+                )
+                let coverage = min(max(radius + 0.5 - distance, 0), 1)
+                guard coverage < 1 else { continue }
+
+                let coordinates = [
+                    (xOffset, yOffset),
+                    (bitmap.pixelsWide - 1 - xOffset, yOffset),
+                    (xOffset, bitmap.pixelsHigh - 1 - yOffset),
+                    (bitmap.pixelsWide - 1 - xOffset, bitmap.pixelsHigh - 1 - yOffset)
+                ]
+                for (x, y) in coordinates {
+                    bitmap.getPixel(&samples, atX: x, y: y)
+                    if !bitmap.bitmapFormat.contains(.alphaNonpremultiplied) {
+                        for index in samples.indices where index != alphaIndex {
+                            samples[index] = Int(
+                                (CGFloat(samples[index]) * coverage).rounded()
+                            )
+                        }
+                    }
+                    let existingAlpha = min(max(samples[alphaIndex], 0), maximumSample)
+                    samples[alphaIndex] = Int(
+                        (CGFloat(existingAlpha) * coverage).rounded()
+                    )
+                    bitmap.setPixel(&samples, atX: x, y: y)
+                }
+            }
+        }
     }
 }
