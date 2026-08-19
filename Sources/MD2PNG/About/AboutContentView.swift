@@ -102,7 +102,9 @@ struct AboutContentView: View {
             width: AboutLayout.windowSize.width,
             height: AboutLayout.windowSize.height
         )
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            AppWindowBackdrop()
+        }
     }
 
     private var header: some View {
@@ -207,14 +209,7 @@ struct AboutContentView: View {
             }
             .id(model.releaseNotesRevision)
             .frame(maxHeight: .infinity)
-            .background(
-                Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            }
+            .appCardStyle()
         }
         .padding(.horizontal, 28)
         .padding(.top, 12)
@@ -459,14 +454,7 @@ private struct AboutUpdateCard: View {
             maxHeight: AboutLayout.detailedUpdateHeight,
             alignment: presentation.detail == nil ? .leading : .topLeading
         )
-        .background(
-            Color.primary.opacity(0.06),
-            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        }
+        .appCardStyle()
         .help(L10n.text(
             "about.check_for_updates_help",
             defaultValue: "Checks the signed update feed only when you choose Check for Updates."

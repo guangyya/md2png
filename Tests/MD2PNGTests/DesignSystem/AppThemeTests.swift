@@ -3,14 +3,28 @@ import XCTest
 @testable import MD2PNG
 
 final class AppThemeTests: XCTestCase {
-    func testSharedSurfaceMetricsPreserveTheReviewedVisualStyle() {
+    func testSharedSurfaceMetricsPreserveTheCompactLayout() {
         XCTAssertEqual(AppTheme.Metrics.cardCornerRadius, 10)
         XCTAssertEqual(AppTheme.Metrics.shortcutCornerRadius, 7)
-        XCTAssertEqual(AppTheme.Metrics.cardBorderWidth, 0.5)
         XCTAssertEqual(AppTheme.Spacing.windowHorizontal, 22)
         XCTAssertEqual(AppTheme.Spacing.contentGroups, 12)
         XCTAssertEqual(AppTheme.Spacing.footerVertical, 11)
-        XCTAssertEqual(AppTheme.Opacity.prominentCardHover, 0.12)
+    }
+
+    func testCardSurfaceStyleUsesClearerBoundariesForIncreasedContrast() {
+        let standard = AppTheme.CardSurfaceStyle(contrast: .standard)
+        let increased = AppTheme.CardSurfaceStyle(contrast: .increased)
+
+        XCTAssertGreaterThan(increased.borderOpacity, standard.borderOpacity)
+        XCTAssertGreaterThan(increased.borderWidth, standard.borderWidth)
+        XCTAssertGreaterThan(
+            increased.highlightFillOpacity,
+            standard.highlightFillOpacity
+        )
+        XCTAssertGreaterThan(
+            increased.highlightBorderOpacity,
+            standard.highlightBorderOpacity
+        )
     }
 
     func testShortcutControlStyleRespondsToIncreasedContrast() {
@@ -21,4 +35,5 @@ final class AppThemeTests: XCTestCase {
         XCTAssertGreaterThan(increased.borderOpacity, standard.borderOpacity)
         XCTAssertGreaterThan(increased.borderWidth, standard.borderWidth)
     }
+
 }

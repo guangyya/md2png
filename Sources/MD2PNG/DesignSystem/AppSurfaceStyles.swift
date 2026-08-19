@@ -3,24 +3,7 @@ import SwiftUI
 
 struct AppWindowBackdrop: View {
     var body: some View {
-        LinearGradient(
-            stops: [
-                .init(
-                    color: Color.cyan.opacity(AppTheme.Opacity.backdropCyan),
-                    location: 0
-                ),
-                .init(
-                    color: Color(nsColor: .windowBackgroundColor),
-                    location: 0.42
-                ),
-                .init(
-                    color: Color.purple.opacity(AppTheme.Opacity.backdropPurple),
-                    location: 1
-                )
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        Color(nsColor: .windowBackgroundColor)
     }
 }
 
@@ -54,42 +37,35 @@ struct AppSectionHeading: View {
 }
 
 private struct AppCardStyle: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     let isHighlighted: Bool
-    let highlightStyle: AppTheme.CardHighlightStyle
+
+    private var style: AppTheme.CardSurfaceStyle {
+        AppTheme.CardSurfaceStyle(contrast: colorSchemeContrast)
+    }
 
     func body(content: Content) -> some View {
         content
             .background {
                 ZStack {
-                    LinearGradient(
-                        colors: [
-                            leadingColor,
-                            Color.accentColor.opacity(AppTheme.Opacity.cardAccent)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    if isHighlighted && highlightStyle == .overlay {
-                        Color.accentColor.opacity(AppTheme.Opacity.cardHover)
+                    Color(nsColor: .controlBackgroundColor)
+                    if isHighlighted {
+                        Color.accentColor.opacity(style.highlightFillOpacity)
                     }
                 }
                 .clipShape(AppTheme.Shape.card)
+                .allowsHitTesting(false)
             }
             .overlay {
                 AppTheme.Shape.card.stroke(
-                    Color.accentColor.opacity(AppTheme.Opacity.cardBorder),
-                    lineWidth: AppTheme.Metrics.cardBorderWidth
+                    isHighlighted
+                        ? Color.accentColor.opacity(style.highlightBorderOpacity)
+                        : Color.primary.opacity(style.borderOpacity),
+                    lineWidth: style.borderWidth
                 )
+                .allowsHitTesting(false)
             }
-    }
-
-    private var leadingColor: Color {
-        if isHighlighted && highlightStyle == .leadingGradient {
-            return Color.accentColor.opacity(AppTheme.Opacity.prominentCardHover)
-        }
-        return Color(nsColor: .controlBackgroundColor).opacity(
-            AppTheme.Opacity.cardControlBackground
-        )
     }
 }
 
@@ -120,16 +96,8 @@ private struct AppShortcutControlModifier: ViewModifier {
 }
 
 extension View {
-    func appCardStyle(
-        isHighlighted: Bool = false,
-        highlightStyle: AppTheme.CardHighlightStyle = .overlay
-    ) -> some View {
-        modifier(
-            AppCardStyle(
-                isHighlighted: isHighlighted,
-                highlightStyle: highlightStyle
-            )
-        )
+    func appCardStyle(isHighlighted: Bool = false) -> some View {
+        modifier(AppCardStyle(isHighlighted: isHighlighted))
     }
 
     func appShortcutControlStyle(isActive: Bool = false) -> some View {
@@ -137,6 +105,6 @@ extension View {
     }
 
     func appWindowFooterStyle() -> some View {
-        background(.regularMaterial)
+        background(Color(nsColor: .windowBackgroundColor))
     }
 }
