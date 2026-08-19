@@ -3,18 +3,18 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let diagnosticLogger: DiagnosticLogger
-    private let splitImageExportCompletionPresenter = SplitImageExportCompletionPresenter()
-    private lazy var hud = HUDController(announce: { [weak self] message, priority in
-        self?.announce(message, priority: priority)
-    })
-    private let rendererErrorDetailsPresenter = RendererErrorDetailsPresenter()
     private lazy var updateController = UpdateController(
         diagnosticLogger: diagnosticLogger,
         updateDriver: SparkleUpdateDriver {
             UpdateChannel.current().repository?.appcastURL
         },
         beforeInstallAndRelaunch: { [weak self] update in
-            self?.approveInstallAndRelaunch(update) ?? false
+            guard let self else { return false }
+            return self.feedbackPresenter.approveInstallAndRelaunch(
+                update,
+                canBeginUpdateInstall: self.renderCoordinator.canBeginUpdateInstall,
+                hasTransientContent: self.renderCoordinator.hasTransientContent
+            )
         },
         onInstallAccepted: { [weak self] in
             self?.setUpdateInstallPending(true)
@@ -27,6 +27,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let welcomePreference = WelcomePreference()
     private let globalShortcutPreference: GlobalShortcutPreference
     private let injectedSampleGuidePresenter: (any SampleGuidePresenting)?
+    private lazy var feedbackPresenter = ApplicationFeedbackPresenter(
+        actions: ApplicationFeedbackPresenter.Actions(
+            statusItemButton: { [weak self] in
+                self?.menuCoordinator.button
+            },
+            saveFailedRenderAsSplitPNGs: { [weak self] in
+                self?.renderCoordinator.saveFailedRenderAsSplitPNGs()
+            }
+        )
+    )
     private lazy var sampleGuidePresenter: any SampleGuidePresenting = {
         if let injectedSampleGuidePresenter {
             return injectedSampleGuidePresenter
@@ -67,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.previewDidCopy(changeCount: changeCount)
             },
             showError: { [weak self] error in
-                self?.show(error)
+                self?.feedbackPresenter.show(error)
             },
             applyShortcuts: { [weak self] configuration in
                 self?.applyGlobalShortcuts(configuration) ?? []
@@ -89,16 +99,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var renderCoordinator = RenderCoordinator(
         diagnosticLogger: diagnosticLogger,
         confirmClipboardOverwrite: { [weak self] action in
-            self?.confirmClipboardOverwrite(action) ?? false
+            self?.feedbackPresenter.confirmClipboardOverwrite(action) ?? false
         },
         onStateChange: { [weak self] state in
             self?.applyRenderState(state)
         },
         onNotice: { [weak self] notice in
-            self?.show(notice)
+            self?.feedbackPresenter.show(notice)
         },
         onError: { [weak self] error in
-            self?.show(error)
+            self?.feedbackPresenter.show(error)
         },
         onPreviewRequested: { [weak self] lastRender in
             self?.showPreview(lastRender)
@@ -106,22 +116,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private lazy var updateStatusPresenter = UpdateStatusPresenter(
         showHUD: { [weak self] message, symbol, style in
-            self?.hud.show(
+            self?.feedbackPresenter.showHUD(
                 message,
                 symbol: symbol,
-                style: style,
-                announces: false
+                style: style
             )
         },
         applyStatusItem: { [weak self] presentation in
-            self?.statusMenuController?.applyStatusItem(presentation)
+            self?.menuCoordinator.applyStatusItem(presentation)
         },
         isAboutVisible: { [weak self] in
             self?.isAboutVisible() == true
         },
         announce: { [weak self] message in
-            self?.announce(message, priority: .medium)
+            self?.feedbackPresenter.announce(message, priority: .medium)
         }
+    )
+    private lazy var menuCoordinator = ApplicationMenuCoordinator(
+        updateController: updateController,
+        updateStatusPresenter: updateStatusPresenter,
+        currentRenderState: { [weak self] in
+            self?.renderCoordinator.state ?? RenderCoordinatorState(
+                isRendering: false,
+                hasLastSource: false,
+                hasLastRender: false,
+                isUpdateInstallPending: false,
+                isPresentingClipboardConfirmation: false,
+                selectedWidthPreset: .standard,
+                selectedTheme: .cleanLight
+            )
+        },
+        currentShortcutConfiguration: { [weak self] in
+            self?.globalShortcutCoordinator.configuration ?? .default
+        },
+        actions: ApplicationMenuCoordinator.Actions(
+            renderClipboard: { [weak self] in
+                self?.renderCoordinator.renderClipboard()
+            },
+            renderMarkdownFile: { [weak self] in
+                self?.renderMarkdownFile()
+            },
+            showLastRender: { [weak self] in
+                self?.renderCoordinator.showLastRender()
+            },
+            rerenderLastMarkdown: { [weak self] in
+                self?.renderCoordinator.rerenderLastMarkdown()
+            },
+            restoreLastMarkdown: { [weak self] in
+                self?.renderCoordinator.restoreLastMarkdown()
+            },
+            renderExample: { [weak self] kind in
+                self?.renderCoordinator.renderExample(kind)
+            },
+            selectWidthPreset: { [weak self] preset in
+                self?.renderCoordinator.selectWidthPreset(preset)
+            },
+            selectTheme: { [weak self] theme in
+                self?.renderCoordinator.selectTheme(theme)
+            },
+            showSettings: { [weak self] in
+                self?.windowPresentationCoordinator.showSettings()
+            },
+            showWelcome: { [weak self] in
+                guard let self else { return }
+                self.windowPresentationCoordinator.showWelcome(
+                    shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
+                )
+            },
+            showAbout: { [weak self] in
+                self?.windowPresentationCoordinator.showAbout()
+            },
+            dismissTransientPresentation: { [weak self] in
+                self?.sampleGuidePresenter.dismiss()
+            },
+            quit: { NSApp.terminate(nil) }
+        )
+    )
+    private lazy var terminationCoordinator = ApplicationTerminationCoordinator(
+        dependencies: ApplicationTerminationCoordinator.Dependencies(
+            isUpdateInstallPending: { [weak self] in
+                self?.renderCoordinator.isUpdateInstallPending == true
+            },
+            cancelPreparedInstallation: { [weak self] completion in
+                self?.updateController
+                    .cancelPreparedInstallationForApplicationTermination(
+                        completion: completion
+                    ) ?? false
+            }
+        ),
+        diagnosticLogger: diagnosticLogger
     )
     private lazy var markdownFileServiceProvider = MarkdownFileServiceProvider(
         onOpen: { [weak self] urls in
@@ -129,18 +212,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     )
 
-    private var statusMenuController: StatusMenuController?
-    private var clipboardContainsMarkdown = false
     private var isSampleGuidePresentationScheduled = false
-    private var isWaitingForUpdateDeferralBeforeTermination = false
-    private var updateStatusObserverID: UUID?
     private var isReadyForFileOpen = false
     private var hasReceivedFileOpenRequest = false
     private var deferredFileOpenRequests: [[URL]] = []
 
 #if DEBUG
     var clipboardMenuRefreshCountForTesting: Int {
-        statusMenuController?.clipboardPreviewUpdateCount ?? 0
+        menuCoordinator.clipboardPreviewUpdateCountForTesting
     }
 #endif
 
@@ -173,7 +252,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyGlobalShortcutState(_ state: GlobalShortcutCoordinator.State) {
-        statusMenuController?.applyShortcuts(state.configuration)
+        menuCoordinator.applyShortcuts(state.configuration)
         windowPresentationCoordinator.refreshWelcomeShortcutsIfVisible(
             state.welcomeShortcuts
         )
@@ -202,17 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func previewDidCopy(changeCount: Int) {
         renderCoordinator.recordOwnedClipboardWrite(changeCount: changeCount)
-        hud.show(
-            L10n.text(
-                "hud.png_copied_again",
-                defaultValue: "PNG copied again — paste with Command-V"
-            ),
-            symbol: "doc.on.clipboard.fill",
-            accessibilityAnnouncement: L10n.text(
-                "hud.png_copied_again_accessibility",
-                defaultValue: "PNG copied again and ready to paste with Command-V"
-            )
-        )
+        feedbackPresenter.showPreviewCopied()
     }
 
     private func showPreview(_ lastRender: LastRender) {
@@ -231,7 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         windowPresentationCoordinator.prepareForApplicationLaunch()
         NSApp.servicesProvider = markdownFileServiceProvider
-        configureStatusItem()
+        menuCoordinator.configure()
         updateStatusPresenter.presentRelaunchResultIfNeeded()
 
         let failedRegistrationIDs = globalShortcutCoordinator.start()
@@ -246,14 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else if !failedRegistrationIDs.isEmpty {
             DispatchQueue.main.async { [weak self] in
-                self?.hud.show(
-                    L10n.text(
-                        "hud.shortcut_conflict",
-                        defaultValue: "A global shortcut is already in use — menu commands still work"
-                    ),
-                    symbol: "keyboard.badge.ellipsis",
-                    style: .error
-                )
+                self?.feedbackPresenter.showShortcutConflict()
             }
         }
         diagnosticLogger.record(
@@ -300,118 +362,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(
         _ sender: NSApplication
     ) -> NSApplication.TerminateReply {
-        if renderCoordinator.isUpdateInstallPending {
-            diagnosticLogger.record(
-                category: .appLifecycle,
-                stage: .applicationTermination,
-                result: .accepted
-            )
-            return .terminateNow
+        terminationCoordinator.shouldTerminate {
+            sender.reply(toApplicationShouldTerminate: true)
         }
-        if isWaitingForUpdateDeferralBeforeTermination {
-            diagnosticLogger.record(
-                category: .appLifecycle,
-                stage: .applicationTermination,
-                result: .deferred,
-                level: .verbose
-            )
-            return .terminateLater
-        }
-
-        isWaitingForUpdateDeferralBeforeTermination = true
-        let waitsForDeferral = updateController
-            .cancelPreparedInstallationForApplicationTermination { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self,
-                          self.isWaitingForUpdateDeferralBeforeTermination else {
-                        return
-                    }
-                    self.isWaitingForUpdateDeferralBeforeTermination = false
-                    self.diagnosticLogger.record(
-                        category: .appLifecycle,
-                        stage: .applicationTermination,
-                        result: .accepted
-                    )
-                    sender.reply(toApplicationShouldTerminate: true)
-                }
-            }
-        if waitsForDeferral {
-            diagnosticLogger.record(
-                category: .appLifecycle,
-                stage: .applicationTermination,
-                result: .deferred
-            )
-            return .terminateLater
-        }
-        isWaitingForUpdateDeferralBeforeTermination = false
-        diagnosticLogger.record(
-            category: .appLifecycle,
-            stage: .applicationTermination,
-            result: .accepted
-        )
-        return .terminateNow
-    }
-
-    private func configureStatusItem() {
-        guard statusMenuController == nil else { return }
-        let renderState = renderCoordinator.state
-        let controller = StatusMenuController(
-            selectedWidthPreset: renderState.selectedWidthPreset,
-            selectedTheme: renderState.selectedTheme,
-            shortcutConfiguration: globalShortcutCoordinator.configuration,
-            actions: StatusMenuController.Actions(
-                menuWillOpen: { [weak self] in self?.statusMenuWillOpen() },
-                renderClipboard: { [weak self] in
-                    self?.renderCoordinator.renderClipboard()
-                },
-                renderMarkdownFile: { [weak self] in
-                    self?.renderMarkdownFile()
-                },
-                showLastRender: { [weak self] in
-                    self?.renderCoordinator.showLastRender()
-                },
-                rerenderLastMarkdown: { [weak self] in
-                    self?.renderCoordinator.rerenderLastMarkdown()
-                },
-                restoreLastMarkdown: { [weak self] in
-                    self?.renderCoordinator.restoreLastMarkdown()
-                },
-                renderExample: { [weak self] kind in
-                    self?.renderCoordinator.renderExample(kind)
-                },
-                selectWidthPreset: { [weak self] preset in
-                    self?.renderCoordinator.selectWidthPreset(preset)
-                },
-                selectTheme: { [weak self] theme in
-                    self?.renderCoordinator.selectTheme(theme)
-                },
-                showSettings: { [weak self] in
-                    self?.windowPresentationCoordinator.showSettings()
-                },
-                showWelcome: { [weak self] in
-                    guard let self else { return }
-                    self.windowPresentationCoordinator.showWelcome(
-                        shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
-                    )
-                },
-                showAbout: { [weak self] in
-                    self?.windowPresentationCoordinator.showAbout()
-                },
-                quit: { NSApp.terminate(nil) }
-            )
-        )
-        statusMenuController = controller
-        refreshClipboardMenuState()
-        applyRenderState(renderState)
-
-        updateStatusObserverID = updateController.observeStatus { [weak self] status in
-            self?.updateStatusPresenter.apply(status)
-        }
-    }
-
-    private func statusMenuWillOpen() {
-        sampleGuidePresenter.dismiss()
-        refreshClipboardMenuState()
     }
 
     private func renderMarkdownFile() {
@@ -423,7 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let markdown = try MarkdownFileInput.load(from: fileURL)
             renderCoordinator.renderMarkdownFile(markdown)
         } catch {
-            show(error)
+            feedbackPresenter.show(error)
         }
     }
 
@@ -436,108 +389,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let markdown = try MarkdownFileInput.load(from: fileURL)
             renderCoordinator.previewMarkdownFile(markdown)
         } catch {
-            show(error)
+            feedbackPresenter.show(error)
         }
     }
 
     private func applyRenderState(_ state: RenderCoordinatorState) {
-        guard let statusMenuController else { return }
-        statusMenuController.selectWidthPreset(state.selectedWidthPreset)
-        statusMenuController.selectTheme(state.selectedTheme)
-        statusMenuController.apply(StatusMenuPresentation(state: StatusMenuState(
-            clipboardContainsMarkdown: clipboardContainsMarkdown,
-            hasLastSource: state.hasLastSource,
-            hasLastRender: state.hasLastRender,
-            isRendering: state.isRendering,
-            isUpdateInstallPending: state.isUpdateInstallPending
-        )))
-        updateStatusPresenter.apply(state)
-    }
-
-    private func refreshClipboardMenuState() {
-        let state = Clipboard.menuState(includeLabel: false)
-        clipboardContainsMarkdown = state.containsMarkdown
-        statusMenuController?.updateClipboardPreview(state.preview)
-        applyRenderState(renderCoordinator.state)
-    }
-
-    private func confirmClipboardOverwrite(_ action: ClipboardOverwriteAction) -> Bool {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = L10n.text(
-            "confirmation.clipboard_changed.title",
-            defaultValue: "Clipboard Changed"
-        )
-        alert.informativeText = switch action {
-        case .rerenderLastMarkdown:
-            L10n.text(
-                "confirmation.clipboard_changed.rerender",
-                defaultValue: "Another app changed the clipboard. Replace it with a new PNG rendered from the last Markdown?"
-            )
-        case .restoreLastMarkdown:
-            L10n.text(
-                "confirmation.clipboard_changed.restore",
-                defaultValue: "Another app changed the clipboard. Replace it with the last Markdown?"
-            )
-        }
-        let primaryButtonTitle = switch action {
-        case .rerenderLastMarkdown:
-            L10n.text(
-                "confirmation.render_and_replace",
-                defaultValue: "Render and Replace"
-            )
-        case .restoreLastMarkdown:
-            L10n.text(
-                "common.replace",
-                defaultValue: "Replace"
-            )
-        }
-        let primaryButton = alert.addButton(withTitle: primaryButtonTitle)
-        let cancelButton = alert.addButton(withTitle: L10n.text(
-            "common.cancel",
-            defaultValue: "Cancel"
-        ))
-        AlertKeyboard.configureDefaultAndCancel(
-            in: alert,
-            defaultButton: primaryButton,
-            cancelButton: cancelButton
-        )
-        NSApp.activate(ignoringOtherApps: true)
-        return alert.runModal() == .alertFirstButtonReturn
-    }
-
-    private func show(_ notice: RenderCoordinatorNotice) {
-        switch notice {
-        case .imageCopied:
-            hud.show(
-                L10n.text(
-                    "hud.png_copied",
-                    defaultValue: "PNG copied — paste with Command-V"
-                ),
-                symbol: "checkmark.circle.fill",
-                accessibilityAnnouncement: L10n.text(
-                    "hud.png_copied_accessibility",
-                    defaultValue: "PNG copied and ready to paste with Command-V"
-                )
-            )
-        case .markdownRestored:
-            hud.show(
-                L10n.text(
-                    "hud.markdown_restored",
-                    defaultValue: "Markdown restored — paste with Command-V"
-                ),
-                symbol: "doc.on.clipboard.fill",
-                accessibilityAnnouncement: L10n.text(
-                    "hud.markdown_restored_accessibility",
-                    defaultValue: "Markdown restored and ready to paste with Command-V"
-                )
-            )
-        case let .splitImagesSaved(count, directoryURL):
-            splitImageExportCompletionPresenter.show(
-                count: count,
-                directoryURL: directoryURL
-            )
-        }
+        menuCoordinator.apply(state)
     }
 
     private func showSampleGuide() {
@@ -555,7 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !renderState.isRendering,
               !renderState.isUpdateInstallPending,
               !renderState.isPresentingClipboardConfirmation,
-              let button = statusMenuController?.button else {
+              let button = menuCoordinator.button else {
             return
         }
         let clipboardState = Clipboard.menuState(includeLabel: false)
@@ -576,7 +433,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 #if DEBUG
     func prepareWelcomeSampleGuidePathForTesting() {
-        configureStatusItem()
+        menuCoordinator.configure()
         windowPresentationCoordinator.setVisibleForTesting(true, surface: .welcome)
     }
 
@@ -586,96 +443,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func cleanUpWelcomeSampleGuidePathForTesting() {
         windowPresentationCoordinator.setVisibleForTesting(false, surface: .welcome)
-        if let updateStatusObserverID {
-            updateController.removeStatusObserver(updateStatusObserverID)
-            self.updateStatusObserverID = nil
-        }
-        statusMenuController?.removeStatusItem()
-        statusMenuController = nil
+        menuCoordinator.tearDown()
     }
 #endif
-
-    private func show(_ error: Error) {
-        if let report = error as? RendererErrorReport {
-            switch rendererErrorDetailsPresenter.show(report) {
-            case .detailsCopied:
-                hud.show(
-                    L10n.text(
-                        "renderer_error.details_copied",
-                        defaultValue: "Error details copied"
-                    ),
-                    symbol: "doc.on.clipboard.fill",
-                    style: .informational
-                )
-            case .splitExportRequested:
-                renderCoordinator.saveFailedRenderAsSplitPNGs()
-            case .dismissed:
-                break
-            }
-            return
-        }
-        hud.show(
-            error.localizedDescription,
-            symbol: "exclamationmark.triangle.fill",
-            style: .error
-        )
-    }
-
-    private func announce(
-        _ message: String,
-        priority: NSAccessibilityPriorityLevel
-    ) {
-        guard let button = statusMenuController?.button else { return }
-        NSAccessibility.post(
-            element: button,
-            notification: .announcementRequested,
-            userInfo: [
-                .announcement: message,
-                .priority: priority.rawValue
-            ]
-        )
-    }
-
-    private func approveInstallAndRelaunch(_ update: SeamlessUpdate) -> Bool {
-        guard renderCoordinator.canBeginUpdateInstall else {
-            hud.show(
-                L10n.text(
-                    "update.finish_render_before_install",
-                    defaultValue: "Finish the current render, then choose Install and Relaunch again."
-                ),
-                symbol: "hourglass",
-                style: .error
-            )
-            return false
-        }
-        guard renderCoordinator.hasTransientContent else { return true }
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = L10n.format(
-            "update.confirm_relaunch_title",
-            defaultValue: "Install md2png %@ and relaunch?",
-            update.displayVersion
-        )
-        alert.informativeText = L10n.text(
-            "update.confirm_relaunch_detail",
-            defaultValue: "Relaunching clears Last Render and Last Markdown because they exist only in memory. Your clipboard will not be changed."
-        )
-        let installButton = alert.addButton(withTitle: L10n.text(
-            "about.update_install_relaunch",
-            defaultValue: "Install and Relaunch"
-        ))
-        let laterButton = alert.addButton(withTitle: L10n.text(
-            "about.update_later",
-            defaultValue: "Later"
-        ))
-        AlertKeyboard.configureDefaultAndCancel(
-            in: alert,
-            defaultButton: installButton,
-            cancelButton: laterButton
-        )
-        return alert.runModal() == .alertFirstButtonReturn
-    }
 
     private func setUpdateInstallPending(_ isPending: Bool) {
         renderCoordinator.setUpdateInstallPending(isPending)

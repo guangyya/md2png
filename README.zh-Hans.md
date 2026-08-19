@@ -174,7 +174,12 @@ make verify-dist \
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
+make site
+make site-check
 ```
+
+Pages 的共享结构与双语内容位于 `site-src/`；修改后运行 `make site` 生成
+`site/` 下的静态入口，并用 `make site-check` 检查生成结果与链接。
 
 即使打包了 `PROJECT_URL`，Debug 构建也绝不会使用稳定生产更新渠道。需要测试
 About 更新状态时，请使用显式的本地 fixture；它不会发送 Release 元数据请求：

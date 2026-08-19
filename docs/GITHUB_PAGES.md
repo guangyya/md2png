@@ -1,8 +1,11 @@
 # GitHub Pages
 
-The project website is a dependency-free static site in `site/`. The workflow
-in `.github/workflows/pages.yml` publishes that directory whenever a site file
-changes on `main`, and it can also be run manually.
+The project website is a dependency-free static site generated from the shared
+template in `site-src/index.html` and localized content under
+`site-src/locales/`. Run `make site` to update the committed English and
+Simplified Chinese routes in `site/`. The workflow in
+`.github/workflows/pages.yml` verifies and publishes that directory whenever a
+site source or output file changes on `main`, and it can also be run manually.
 
 The public site is served at <https://md2png.wbxsh.com/> with HTTPS enforced.
 The English page is canonical at `/`, and Simplified Chinese is available at
@@ -10,13 +13,17 @@ The English page is canonical at `/`, and Simplified Chinese is available at
 
 ## Deploy and verify changes
 
-1. Review both `site/index.html` and `site/zh/index.html`, including navigation,
-   current feature claims, downloads, privacy claims, and update instructions.
-   Keep the four feature groups synchronized across both localized pages.
-2. Merge the site changes into `main`. A change under `site/` automatically
-   starts **Deploy GitHub Pages**; the workflow can also be run manually.
-3. Confirm the workflow's `github-pages` deployment succeeds.
-4. Open <https://md2png.wbxsh.com/> and <https://md2png.wbxsh.com/zh/> over HTTPS
+1. Update shared structure in `site-src/index.html` and localized copy in the
+   matching JSON files under `site-src/locales/`. Keep the four feature groups
+   synchronized in both locale files.
+2. Run `make site`, then `make site-check`. Commit the generated
+   `site/index.html` and `site/zh/index.html` with their sources.
+3. Review both generated routes, including navigation, current feature claims,
+   downloads, privacy claims, and update instructions.
+4. Merge the site changes into `main`. A site source or output change starts
+   **Deploy GitHub Pages**; the workflow can also be run manually.
+5. Confirm the workflow's `github-pages` deployment succeeds.
+6. Open <https://md2png.wbxsh.com/> and <https://md2png.wbxsh.com/zh/> over HTTPS
    and check the updated content and release download link.
 
 ## Custom-domain recovery

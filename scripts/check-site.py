@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
@@ -111,6 +112,10 @@ def check_page(relative_path: str, canonical: str) -> None:
 
 
 def main() -> None:
+    subprocess.run(
+        [sys.executable, ROOT / "scripts/generate-site.py", "--check"],
+        check=True,
+    )
     check_page("index.html", f"{PRODUCTION_ORIGIN}/")
     check_page("zh/index.html", f"{PRODUCTION_ORIGIN}/zh/")
 

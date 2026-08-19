@@ -67,7 +67,7 @@ ifneq ($(SIGN_IDENTITY),-)
 SIGN_FLAGS += --options runtime --timestamp
 endif
 
-.PHONY: bootstrap renderer icon coverage-tool-test coverage coverage-validate release-asset-paths prepare-release validate-release-preparation test build debug-stop app verify-dist release package-dmg dmg notarize publish-release run clean
+.PHONY: bootstrap renderer icon site site-check coverage-tool-test coverage coverage-validate release-asset-paths prepare-release validate-release-preparation test build debug-stop app verify-dist release package-dmg dmg notarize publish-release run clean
 
 bootstrap:
 	cd WebRenderer && $(PNPM) install --frozen-lockfile=false
@@ -91,6 +91,12 @@ icon:
 	sips -z 512 512 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_512x512.png"
 	sips -z 1024 1024 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_512x512@2x.png"
 	iconutil -c icns "$(ICONSET_DIR)" -o "$(APP_ICON)"
+
+site:
+	python3 scripts/generate-site.py
+
+site-check:
+	python3 scripts/check-site.py
 
 coverage-tool-test:
 	$(NODE) --test scripts/tests/*.test.mjs
@@ -136,7 +142,7 @@ validate-release-preparation:
 		--base-root "$(BASE_ROOT)" \
 		--repo-root "$(CURDIR)"
 
-test: renderer coverage-tool-test
+test: renderer coverage-tool-test site-check
 	$(SWIFT_TEST_ENV) swift test
 
 build: renderer

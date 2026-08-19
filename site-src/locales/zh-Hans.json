@@ -1,0 +1,164 @@
+{
+  "meta": {
+    "description": "在 Mac 上把剪贴板 Markdown 转为精美 PNG——全程本地，保护隐私。",
+    "og_locale": "zh_CN",
+    "og_locale_alternate": "en_US",
+    "title": "md2png — 复制 Markdown，粘贴漂亮 PNG",
+    "og_description": "原生 Mac 小工具，在本地把剪贴板 Markdown 转成可以直接粘贴的图片。",
+    "og_image_alt": "md2png 在 Mac 本地把 Markdown 转为精美 PNG",
+    "twitter_description": "原生 Mac 小工具，在本地把剪贴板 Markdown 转成图片。",
+    "json_description": "原生 macOS 小工具，在本地把剪贴板 Markdown 转为精美、可直接粘贴的 PNG。",
+    "operating_system": "macOS 14 或更高版本，Apple 芯片"
+  },
+  "navigation": {
+    "links": [
+      {"href": "#how", "label": "使用方式"},
+      {"href": "#features", "label": "功能"},
+      {"href": "#privacy", "label": "隐私"},
+      {"href": "#install", "label": "安装与问答"},
+      {"href": "https://github.com/guangyya/md2png", "label": "GitHub"}
+    ]
+  },
+  "hero": {
+    "source_sample": "# 每周交付进度\n\n| 模块 | 状态 |\n|:--|:--:|\n| macOS App | ✅ 完成 |\n| 文档 | 🚧 进行中 |\n\n```mermaid\nflowchart LR\n  复制 --> 渲染 --> 粘贴\n```"
+  },
+  "trust": {
+    "items": [
+      "100% 本地渲染",
+      "无需辅助功能权限",
+      "绝不自动粘贴或发送",
+      "可离线使用"
+    ]
+  },
+  "how": {
+    "steps": [
+      {"number": "01", "title": "复制", "description": "从任意编辑器或应用复制 Markdown。", "key": "⌘ C"},
+      {"number": "02", "title": "渲染", "description": "按下全局快捷键，md2png 在本地完成渲染。", "key": "⌃⌘ X"},
+      {"number": "03", "title": "粘贴", "description": "粘贴 PNG，检查无误后由你亲自发送。", "key": "⌘ V"}
+    ]
+  },
+  "features": {
+    "items": [
+      {
+        "number": "01",
+        "label": "STYLE",
+        "title": "五种主题，三档宽度。",
+        "description": "选择配色以及紧凑、标准或宽幅画布。设置只保存在本机，并固定写入每张不透明 PNG。",
+        "tags_aria": "渲染选项",
+        "tags": ["简洁浅色", "深色", "午夜蓝"]
+      },
+      {
+        "number": "02",
+        "label": "PREVIEW",
+        "title": "分享前先检查。",
+        "description": "按实际大小或适合窗口查看、缩放、再次复制、明确保存、在 Apple“预览”中打开，或把 PNG 拖到其他应用。",
+        "tags_aria": "预览操作",
+        "tags": ["缩放", "保存", "拖动"]
+      },
+      {
+        "number": "03",
+        "label": "FILES",
+        "title": "Markdown 文件也可以。",
+        "description": "选择本地文件，使用 Finder 的“打开方式”或服务。Finder 渲染成功后会打开预览，不改变剪贴板。",
+        "tags_aria": "文件入口",
+        "tags": [".md", ".markdown", "Finder"]
+      },
+      {
+        "number": "04",
+        "label": "LONG FORM",
+        "title": "长文档也有安全退路。",
+        "description": "单图超过高度限制时，可导出带编号的 PNG 分片。md2png 会优先在内容块边界切分，绝不覆盖已有导出文件夹。",
+        "tags_aria": "分片导出行为",
+        "tags": ["内容感知", "顺序编号", "仅保存"]
+      }
+    ]
+  },
+  "showcase": {
+    "formats": [
+      {"icon": "#", "text": "Markdown 与 GFM"},
+      {"icon": "{ }", "text": "代码语法高亮"},
+      {"icon": "↳", "text": "Mermaid 图表"},
+      {"icon": "✓", "text": "表格与任务清单"}
+    ]
+  },
+  "install": {
+    "steps": [
+      {"action": "下载", "detail": "GitHub Releases 中的最新版 DMG。"},
+      {"action": "打开", "detail": "DMG，把 md2png 拖入“应用程序”。"},
+      {"action": "启动", "detail": "md2png，复制 Markdown，然后按 ⌃⌘ X。"}
+    ]
+  },
+  "faq": {
+    "items": [
+      {
+        "summary": "md2png 会上传我的 Markdown 吗？",
+        "body": "不会。渲染使用内置资源和非持久化的本地 WebKit 视图。应用没有分析、遥测、账号或云端渲染服务。"
+      },
+      {
+        "summary": "需要辅助功能权限吗？",
+        "body": "不需要。基础的复制、渲染和粘贴流程只使用剪贴板与全局快捷键。"
+      },
+      {
+        "summary": "支持 Intel Mac 吗？",
+        "body": "目前不支持。公开版本支持运行 macOS 14 或更高版本的 Apple 芯片 Mac。"
+      },
+      {
+        "summary": "macOS 显示安全提示怎么办？",
+        "body": "首次打开下载的应用时，macOS 会显示标准确认。如果提示无法验证，请删除当前副本，并从官方 Releases 页面重新下载已公证的 DMG。"
+      },
+      {
+        "summary": "如何更新和卸载？",
+        "body": "更新不会自动开始。在“关于 md2png”中选择“检查更新”，先查看签名发布说明，再明确下载、验证并安装更新；已公证的 DMG 仍可作为备用。卸载时退出应用并将它从“应用程序”移到废纸篓即可；md2png 不保留渲染历史。"
+      }
+    ]
+  },
+  "text": {
+    "skip_to_content": "跳到正文",
+    "brand_aria": "md2png 首页",
+    "navigation_aria": "主导航",
+    "language_aria": "语言",
+    "hero_eyebrow": "原生 macOS 小工具 · 本地优先",
+    "hero_title_first": "复制 Markdown，",
+    "hero_title_second": "粘贴漂亮 PNG。",
+    "hero_lede": "把表格、代码高亮和 Mermaid 图表变成清晰图片。内容不会上传，也不会替你发送任何消息。",
+    "download_for_mac": "下载 Mac 版",
+    "view_source": "查看源代码",
+    "requirements": "macOS 14+ · Apple 芯片 · 免费开源",
+    "hero_visual_aria": "Markdown 转换为精美图片的示意",
+    "shortcut_aria": "按下 Control Command X",
+    "rendered_locally": "已在本地渲染",
+    "result_image_alt": "包含格式化表格与 Mermaid 流程图的输出示例",
+    "trust_aria": "产品原则",
+    "how_kicker": "一个快捷键，不打断思路。",
+    "how_title": "几秒钟，把 Markdown 变成可粘贴的图片。",
+    "features_kicker": "不止一个快捷键",
+    "features_title": "调整输出，再按你的方式使用。",
+    "showcase_kicker": "让排版完整抵达",
+    "showcase_title": "分享清晰内容，不是 Markdown 源码。",
+    "showcase_body": "有些聊天应用会丢掉 Markdown 中最重要的排版。md2png 把视觉层级保存在适合 Retina 的图片里，让桌面和移动端看到一致效果。",
+    "showcase_image_alt": "由 md2png 渲染的每周交付进度",
+    "showcase_caption": "md2png 实际输出 · 表格 + Mermaid 流程图",
+    "privacy_kicker": "本地，就是本地",
+    "privacy_title": "你的剪贴板只留在 Mac 上。",
+    "privacy_body": "渲染使用非持久化的本地 WebKit 视图，脚本和样式都随应用内置。不依赖云服务，没有分析、遥测、账号、Bot 或目标应用集成。",
+    "privacy_link": "阅读完整隐私说明",
+    "install_kicker": "放心安装",
+    "install_title": "三步完成，然后安静待在菜单栏。",
+    "install_body": "当前公开版本使用 Developer ID 签名并经过 Apple 公证，支持运行 macOS 14 或更高版本的 Apple 芯片 Mac。",
+    "download_latest": "下载最新版",
+    "release_notes": "查看发布说明",
+    "faq_kicker": "下载前须知",
+    "faq_title": "几个常见问题。",
+    "final_kicker": "小巧应用，专注一件事。",
+    "final_title": "让下一条 Markdown 消息更好读。",
+    "final_body": "免费、开源，为 Apple 芯片 Mac 原生打造。",
+    "app_icon_alt": "md2png 应用图标",
+    "footer_license": "MIT 许可。",
+    "footer_locale_href": "../",
+    "footer_locale_lang": "en",
+    "footer_locale_label": "English",
+    "footer_releases": "版本发布",
+    "footer_help": "帮助",
+    "footer_license_link": "许可"
+  }
+}
