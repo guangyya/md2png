@@ -11,6 +11,13 @@ final class PreviewCanvasView: NSView {
         }
     }
 
+    var imageCornerRadius: CGFloat = 0 {
+        didSet {
+            guard imageCornerRadius != oldValue else { return }
+            needsDisplay = true
+        }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         NSColor.underPageBackgroundColor.setFill()
         dirtyRect.fill()
@@ -22,7 +29,15 @@ final class PreviewCanvasView: NSView {
             dx: -lineWidth / 2,
             dy: -lineWidth / 2
         )
-        let outline = NSBezierPath(rect: outlineRect)
+        let outline = if imageCornerRadius > 0 {
+            NSBezierPath(
+                roundedRect: outlineRect,
+                xRadius: imageCornerRadius + lineWidth / 2,
+                yRadius: imageCornerRadius + lineWidth / 2
+            )
+        } else {
+            NSBezierPath(rect: outlineRect)
+        }
         outline.lineWidth = lineWidth
 
         NSGraphicsContext.saveGraphicsState()

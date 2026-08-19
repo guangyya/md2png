@@ -144,6 +144,42 @@ final class SplitImageExportTests: XCTestCase {
     }
 
     @MainActor
+    func testWriterAppliesRoundedCornersToEverySplitPNG() async throws {
+        let rootURL = makeTemporaryDirectoryURL()
+        let destinationURL = rootURL.appendingPathComponent(
+            "Rounded-split",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        try await SplitImageExportWriter.write(
+            try makeSplitResult(),
+            to: destinationURL,
+            cornerStyle: .rounded
+        )
+
+        let fileURLs = try FileManager.default.contentsOfDirectory(
+            at: destinationURL,
+            includingPropertiesForKeys: nil
+        )
+        XCTAssertEqual(fileURLs.count, 2)
+        for fileURL in fileURLs {
+            let bitmap = try XCTUnwrap(NSBitmapImageRep(data: Data(contentsOf: fileURL)))
+            XCTAssertLessThan(
+                try XCTUnwrap(bitmap.colorAt(x: 0, y: 0)).alphaComponent,
+                0.05
+            )
+            XCTAssertGreaterThan(
+                try XCTUnwrap(
+                    bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)
+                ).alphaComponent,
+                0.95
+            )
+        }
+    }
+
+    @MainActor
     func testWriterNeverOverwritesAnExistingDestination() async throws {
         let rootURL = makeTemporaryDirectoryURL()
         let destinationURL = rootURL.appendingPathComponent(
@@ -266,6 +302,13 @@ final class SplitImageExportTests: XCTestCase {
             bitsPerPixel: 0
         ))
         bitmap.size = pointSize
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: pixelSize).fill()
+        context.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
         let image = NSImage(size: pointSize)
         image.addRepresentation(bitmap)
         return image

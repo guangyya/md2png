@@ -72,6 +72,30 @@ final class PreviewLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testPreviewOutlineFollowsTransparentRoundedCorners() throws {
+        _ = NSApplication.shared
+        let square = try makeImage(
+            pixelsWide: 640,
+            pixelsHigh: 360,
+            backgroundColor: .white,
+            accentColor: .systemBlue
+        )
+        let rounded = try RenderedImageStyler.apply(.rounded, to: square)
+        let controller = PreviewController()
+        defer { controller.close() }
+
+        controller.show(image: rounded)
+
+        XCTAssertGreaterThan(controller.previewCanvasImageCornerRadius, 0)
+        XCTAssertTrue(RenderedImageStyler.hasTransparentCorners(rounded))
+
+        controller.show(image: square)
+
+        XCTAssertEqual(controller.previewCanvasImageCornerRadius, 0)
+        XCTAssertFalse(RenderedImageStyler.hasTransparentCorners(square))
+    }
+
+    @MainActor
     func testPreviewContentRemainsVisibleAfterWindowResize() throws {
         _ = NSApplication.shared
         let image = try makeImage(

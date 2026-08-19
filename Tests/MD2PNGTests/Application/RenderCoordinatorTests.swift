@@ -33,6 +33,35 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(preview.markdown, "# First")
     }
 
+    func testRoundedRenderWritesAndPreviewsTheStyledImage() throws {
+        let harness = RenderCoordinatorHarness()
+        harness.clipboardMarkdown = "# Rounded"
+        harness.renderCornerStyle = .rounded
+        let coordinator = harness.makeCoordinator()
+        let image = NSImage(
+            size: NSSize(width: 64, height: 48),
+            flipped: false
+        ) { bounds in
+            NSColor.systemRed.setFill()
+            bounds.fill()
+            return true
+        }
+
+        coordinator.renderClipboard()
+        harness.completeNextRender(with: .success(image))
+        coordinator.showLastRender()
+
+        let written = try XCTUnwrap(harness.writtenImages.first)
+        let preview = try XCTUnwrap(harness.previews.first?.image)
+        XCTAssertTrue(written === preview)
+        XCTAssertFalse(written === image)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(
+            data: RenderedImageExport.pngData(for: written)
+        ))
+        XCTAssertLessThan(try XCTUnwrap(bitmap.colorAt(x: 0, y: 0)).alphaComponent, 0.05)
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 32, y: 24)).alphaComponent, 0.95)
+    }
+
     func testRenderFailurePreservesClipboardAndLastSuccessfulSource() throws {
         let harness = RenderCoordinatorHarness()
         harness.clipboardMarkdown = "Successful source"
@@ -449,6 +478,7 @@ private final class RenderCoordinatorHarness {
     var confirmationResult = true
     var splitExportDestinationURL: URL?
     var splitExportWriteError: Error?
+    var renderCornerStyle: RenderCornerStyle = .square
     private(set) var renderRequests: [RenderRequest] = []
     private(set) var splitRenderRequests: [SplitRenderRequest] = []
     private(set) var chosenSplitExportDestinations: [SplitDestinationRequest] = []
@@ -524,6 +554,9 @@ private final class RenderCoordinatorHarness {
                     self?.splitExportWrites.append((result, destinationURL))
                 }
             ),
+            renderCornerStyle: { [weak self] in
+                self?.renderCornerStyle ?? .square
+            },
             diagnosticLogger: diagnosticLogger,
             confirmClipboardOverwrite: { [weak self] action in
                 guard let self else { return false }
