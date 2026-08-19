@@ -358,29 +358,11 @@ final class RenderCoordinator {
             return
         }
 
-        do {
-            let changeCount = try dependencies.writeMarkdown(markdown)
-            lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
-            diagnosticLogger.record(
-                category: .clipboard,
-                stage: .clipboardWrite,
-                result: .succeeded,
-                clipboardType: .markdown,
-                clipboardOwnership: .owned
-            )
-            render(markdown, showsPreviewOnSuccess: true)
-        } catch {
-            diagnosticLogger.record(
-                category: .clipboard,
-                stage: .clipboardWrite,
-                result: .failed,
-                level: .error,
-                error: error,
-                clipboardType: .markdown,
-                clipboardOwnership: .unknown
-            )
-            onError(error)
-        }
+        render(
+            markdown,
+            showsPreviewOnSuccess: true,
+            writesImageToClipboard: false
+        )
     }
 
     func selectWidthPreset(_ preset: RenderWidthPreset) {
@@ -412,7 +394,8 @@ final class RenderCoordinator {
 
     private func render(
         _ markdown: String,
-        showsPreviewOnSuccess: Bool = false
+        showsPreviewOnSuccess: Bool = false,
+        writesImageToClipboard: Bool = true
     ) {
         guard canStartRenderAction else { return }
         pendingSplitExportRecovery = nil
@@ -444,7 +427,12 @@ final class RenderCoordinator {
                         self.renderCornerStyle(),
                         to: image
                     )
-                    let changeCount = try self.dependencies.writeImage(outputImage)
+                    let changeCount: Int?
+                    if writesImageToClipboard {
+                        changeCount = try self.dependencies.writeImage(outputImage)
+                    } else {
+                        changeCount = nil
+                    }
                     let dimensions = Self.pixelDimensions(for: outputImage)
                     self.lastImage = outputImage
                     self.lastRenderWidthPreset = requestedWidthPreset
@@ -452,15 +440,17 @@ final class RenderCoordinator {
                         markdown: markdown,
                         clipboardChangeCount: changeCount
                     )
-                    self.diagnosticLogger.record(
-                        category: .clipboard,
-                        stage: .clipboardWrite,
-                        result: .succeeded,
-                        operationID: operationID,
-                        clipboardType: .png,
-                        clipboardOwnership: .owned,
-                        dimensions: dimensions
-                    )
+                    if writesImageToClipboard {
+                        self.diagnosticLogger.record(
+                            category: .clipboard,
+                            stage: .clipboardWrite,
+                            result: .succeeded,
+                            operationID: operationID,
+                            clipboardType: .png,
+                            clipboardOwnership: .owned,
+                            dimensions: dimensions
+                        )
+                    }
                     self.diagnosticLogger.record(
                         category: .renderer,
                         stage: .renderCompletion,
@@ -472,21 +462,25 @@ final class RenderCoordinator {
                         dimensions: dimensions
                     )
                     self.finishRender()
-                    self.onNotice(.imageCopied)
+                    if writesImageToClipboard {
+                        self.onNotice(.imageCopied)
+                    }
                     if showsPreviewOnSuccess, let lastRender = self.lastRender {
                         self.onPreviewRequested(lastRender)
                     }
                 } catch {
-                    self.diagnosticLogger.record(
-                        category: .clipboard,
-                        stage: .clipboardWrite,
-                        result: .failed,
-                        level: .error,
-                        operationID: operationID,
-                        error: error,
-                        clipboardType: .png,
-                        clipboardOwnership: .unknown
-                    )
+                    if writesImageToClipboard {
+                        self.diagnosticLogger.record(
+                            category: .clipboard,
+                            stage: .clipboardWrite,
+                            result: .failed,
+                            level: .error,
+                            operationID: operationID,
+                            error: error,
+                            clipboardType: .png,
+                            clipboardOwnership: .unknown
+                        )
+                    }
                     self.diagnosticLogger.record(
                         category: .renderer,
                         stage: .renderCompletion,

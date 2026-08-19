@@ -155,7 +155,7 @@
 "preview.window_title" = "预览";
 "preview.window_title_with_dimensions" = "预览 — %1$ld × %2$ld px";
 "preview.window_title_with_width" = "预览 — %1$@ · %2$ld × %3$ld px";
-"preview.copy_again" = "再次复制";
+"preview.copy" = "复制";
 "preview.save_png" = "保存 PNG…";
 "preview.open_in_preview" = "在“预览”中打开";
 "preview.fit" = "适合窗口";

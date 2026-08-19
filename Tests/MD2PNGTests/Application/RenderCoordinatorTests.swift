@@ -77,6 +77,33 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(harness.writtenImages.count, 1)
     }
 
+    func testExampleShowsPreviewWithoutChangingClipboard() throws {
+        let harness = RenderCoordinatorHarness()
+        let initialChangeCount = harness.clipboardChangeCount
+        let coordinator = harness.makeCoordinator()
+
+        coordinator.renderExample(.short)
+
+        XCTAssertEqual(harness.renderRequests.map(\.markdown), [
+            ExampleKind.short.menuTitle
+        ])
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+
+        let image = NSImage(size: NSSize(width: 640, height: 480))
+        harness.completeNextRender(with: .success(image))
+
+        XCTAssertEqual(harness.clipboardChangeCount, initialChangeCount)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.notices.isEmpty)
+        let preview = try XCTUnwrap(harness.previews.first)
+        XCTAssertTrue(preview.image === image)
+        XCTAssertEqual(preview.markdown, ExampleKind.short.menuTitle)
+        XCTAssertTrue(coordinator.state.hasLastRender)
+        XCTAssertTrue(coordinator.state.hasLastSource)
+    }
+
     func testMarkdownFileRenderFailureLeavesClipboardAndHistoryUntouched() {
         let harness = RenderCoordinatorHarness()
         let initialChangeCount = harness.clipboardChangeCount

@@ -4,7 +4,7 @@ import AppKit
 final class PreviewToolbarController: NSObject, NSToolbarDelegate,
     NSToolbarItemValidation {
     private enum Identifier {
-        static let copyAgain = NSToolbarItem.Identifier("preview.copy-again")
+        static let copyImage = NSToolbarItem.Identifier("preview.copy")
         static let savePNG = NSToolbarItem.Identifier("preview.save-png")
         static let openInPreview = NSToolbarItem.Identifier("preview.open-in-preview")
         static let fit = NSToolbarItem.Identifier("preview.fit")
@@ -97,13 +97,13 @@ final class PreviewToolbarController: NSObject, NSToolbarDelegate,
         willBeInsertedIntoToolbar flag: Bool
     ) -> NSToolbarItem? {
         switch itemIdentifier {
-        case Identifier.copyAgain:
+        case Identifier.copyImage:
             toolbarItem(
                 identifier: itemIdentifier,
-                labelKey: "preview.copy_again",
-                label: "Copy Again",
+                labelKey: "preview.copy",
+                label: "Copy",
                 symbol: "square.on.square",
-                action: #selector(copyAgain(_:))
+                action: #selector(copyImage(_:))
             )
         case Identifier.savePNG:
             toolbarItem(
@@ -166,7 +166,7 @@ final class PreviewToolbarController: NSObject, NSToolbarDelegate,
 
     private var itemIdentifiers: [NSToolbarItem.Identifier] {
         [
-            Identifier.copyAgain,
+            Identifier.copyImage,
             Identifier.savePNG,
             Identifier.openInPreview,
             .flexibleSpace,
@@ -238,8 +238,8 @@ final class PreviewToolbarController: NSObject, NSToolbarDelegate,
         return symbol.withSymbolConfiguration(configuration) ?? symbol
     }
 
-    @objc private func copyAgain(_ sender: Any?) {
-        onCommand(.copyAgain)
+    @objc private func copyImage(_ sender: Any?) {
+        onCommand(.copyImage)
     }
 
     @objc private func savePNG(_ sender: Any?) {

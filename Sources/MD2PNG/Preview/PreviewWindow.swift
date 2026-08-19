@@ -64,7 +64,7 @@ final class PreviewZoomStatusView: NSView {
 final class PreviewWindow: AppWindow {
     enum Command: Equatable {
         case close
-        case copyAgain
+        case copyImage
         case savePNG
         case openInPreview
         case fit
@@ -87,7 +87,7 @@ final class PreviewWindow: AppWindow {
         if relevantModifiers == .command {
             return switch characters {
             case "w": .close
-            case "c": .copyAgain
+            case "c": .copyImage
             case "s": .savePNG
             case "9": .fit
             case "0": .actualSize

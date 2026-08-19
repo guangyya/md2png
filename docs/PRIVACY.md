@@ -14,6 +14,7 @@ The app accesses the clipboard only in response to visible user actions:
 | Render Markdown File… | Reads one explicitly selected UTF-8 Markdown or plain-text file; unsupported extensions are disabled, and PNG/TIFF is written only after a successful render without reading the clipboard |
 | Finder Open With | Reads one explicitly opened `.md` or `.markdown` file, uses the same local renderer, and opens Preview only after success |
 | Finder Service | Reads the file paths Finder explicitly sends through **Services → Preview with md2png**, then applies the same local single-file checks and success behavior without reading general clipboard contents |
+| Bundled Example | Renders the explicitly selected bundled Markdown and opens Preview without reading or writing the general clipboard; Preview copies only on an explicit Copy action |
 | Save as Split PNGs after a size-limit error | Uses the unchanged non-empty source from the failed render; writes numbered PNG files only to the folder explicitly selected by the user and does not write to the clipboard |
 | Re-render Last Markdown | Reads the latest successful source from app memory; writes PNG and TIFF only after a successful render and any required clipboard confirmation |
 | Restore Last Markdown | Writes the latest successful source after any required clipboard confirmation |
@@ -26,9 +27,9 @@ cannot be read, decoded, or rendered, the clipboard is unchanged. A Finder
 Service request uses a separate system service pasteboard for its file paths;
 it does not read the general clipboard. The app keeps no recent-file list,
 persistent access bookmark, file path, or directory monitor.
-If a bundled Example fails, that explicitly selected sample remains on the
-clipboard instead. Clipboard contents are managed by macOS and can still be
-read by other applications according to macOS clipboard behavior.
+Bundled Examples never change the clipboard unless the user explicitly chooses
+Copy in Preview. Clipboard contents are managed by macOS and can still be read
+by other applications according to macOS clipboard behavior.
 
 The most recent successful image and its source Markdown are retained only in
 app memory for **Show Last Render**, **Re-render Last Markdown**, and **Restore

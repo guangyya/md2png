@@ -84,7 +84,7 @@ final class ClipboardTests: XCTestCase {
             ))
         }
 
-        XCTAssertEqual(PreviewWindow.command(for: try event("c")), .copyAgain)
+        XCTAssertEqual(PreviewWindow.command(for: try event("c")), .copyImage)
         XCTAssertEqual(PreviewWindow.command(for: try event("s")), .savePNG)
         XCTAssertEqual(PreviewWindow.command(for: try event("9")), .fit)
         XCTAssertEqual(PreviewWindow.command(for: try event("0")), .actualSize)
@@ -98,7 +98,7 @@ final class ClipboardTests: XCTestCase {
     }
 
     @MainActor
-    func testPreviewCopyAgainUsesInjectedClipboardBoundary() throws {
+    func testPreviewCopyUsesInjectedClipboardBoundary() throws {
         _ = NSApplication.shared
         let image = NSImage(size: NSSize(width: 120, height: 80))
         var copiedImage: NSImage?

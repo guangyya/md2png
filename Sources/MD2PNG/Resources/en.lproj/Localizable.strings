@@ -155,7 +155,7 @@
 "preview.window_title" = "Preview";
 "preview.window_title_with_dimensions" = "Preview — %1$ld × %2$ld px";
 "preview.window_title_with_width" = "Preview — %1$@ · %2$ld × %3$ld px";
-"preview.copy_again" = "Copy Again";
+"preview.copy" = "Copy";
 "preview.save_png" = "Save PNG…";
 "preview.open_in_preview" = "Open in Preview";
 "preview.fit" = "Fit to Window";

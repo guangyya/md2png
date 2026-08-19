@@ -50,6 +50,9 @@ The render command never activates another app, pastes into it, or sends a
 message. If clipboard rendering fails, the source Markdown remains on the
 clipboard.
 
+Bundled Examples open directly in Preview without changing the clipboard. Use
+Preview's Copy action only when you want the rendered PNG on the clipboard.
+
 For a result that exceeds the single-image height limit, the error dialog offers
 **Save as Split PNGs…**. After rendering the slices, the folder chooser shows
 the exact PNG count. Pick a parent folder and md2png creates a new, safely named

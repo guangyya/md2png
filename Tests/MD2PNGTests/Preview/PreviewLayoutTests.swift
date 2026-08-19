@@ -278,7 +278,7 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertEqual(
             Set(controller.previewToolbarLabels),
             Set([
-                L10n.text("preview.copy_again", defaultValue: "Copy Again"),
+                L10n.text("preview.copy", defaultValue: "Copy"),
                 L10n.text("preview.save_png", defaultValue: "Save PNG…"),
                 L10n.text("preview.open_in_preview", defaultValue: "Open in Preview"),
                 L10n.text("preview.fit", defaultValue: "Fit to Window"),
@@ -292,7 +292,7 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertEqual(
             controller.toolbarDefaultItemIdentifiers(NSToolbar(identifier: "preview-layout-test")),
             [
-                NSToolbarItem.Identifier("preview.copy-again"),
+                NSToolbarItem.Identifier("preview.copy"),
                 NSToolbarItem.Identifier("preview.save-png"),
                 NSToolbarItem.Identifier("preview.open-in-preview"),
                 .flexibleSpace,

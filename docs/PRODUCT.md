@@ -48,6 +48,8 @@ sending it.
   disables unsupported extensions; Finder can open one `.md` or `.markdown`
   file with md2png, or send one file through **Services → Preview with md2png**,
   and shows Preview only after a successful render.
+- Bundled Examples render directly into Preview without changing the clipboard;
+  copying the resulting PNG remains an explicit Preview action.
 - Explicit Save-only export of tall clipboard Markdown into a new folder of
   numbered PNGs. Slices use the current theme and width, prefer block boundaries,
   and protect fitting code blocks, Mermaid diagrams, and table rows without
