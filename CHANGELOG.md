@@ -7,6 +7,22 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add a **Rounded Corners** option under Settings → PNG Output, disabled by
+  default, that preserves transparent rounded corners across the clipboard,
+  Preview, Save, drag exports, and every split PNG without rerasterizing the
+  rendered pixels.
+
+### Changed
+
+- Simplify About, Settings, and Welcome with system window backgrounds, clearer
+  adaptive card boundaries, and a consistent app icon presentation.
+- Refine Preview with a subtle adaptive image boundary, less canvas padding,
+  aspect-aware sizing for shorter images, and an outline that follows rounded
+  PNG output while preserving existing zoom, scroll, save, copy, and drag
+  behavior.
+
 ## [0.12.0] - 2026-08-19
 
 ### Added
