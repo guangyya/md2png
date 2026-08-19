@@ -5,6 +5,8 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-19
+
 ### Added
 
 - Drag the current Preview image into Finder or another compatible app.
