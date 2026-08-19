@@ -28,6 +28,12 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertGreaterThan(controller.displayedImageFrame.height, 100)
         XCTAssertTrue(controller.imageIsAttachedToWindow)
         XCTAssertFalse(controller.canvasUsesAutoLayout)
+        XCTAssertTrue(controller.previewDrawsCanvasBackground)
+        XCTAssertEqual(
+            controller.previewCanvasBackgroundColor,
+            NSColor.underPageBackgroundColor
+        )
+        XCTAssertEqual(controller.previewCanvasImageFrame, controller.displayedImageFrame)
         XCTAssertFalse(controller.displayedImageVisibleRect.isEmpty)
         XCTAssertTrue(controller.documentVisibleRect.intersects(controller.displayedImageFrame))
         XCTAssertTrue(controller.displayedImage === image)
@@ -83,7 +89,7 @@ final class PreviewLayoutTests: XCTestCase {
 
         XCTAssertLessThanOrEqual(
             controller.displayedImageFrame.width,
-            controller.previewViewportSize.width - 48 + 0.001
+            controller.previewViewportSize.width - PreviewLayout.canvasPadding * 2 + 0.001
         )
         XCTAssertTrue(containsColor(
             .systemGreen,
@@ -108,7 +114,11 @@ final class PreviewLayoutTests: XCTestCase {
             controller.previewCanvasSize.height,
             controller.previewViewportSize.height
         )
-        XCTAssertEqual(controller.displayedImageFrame.minY, 24, accuracy: 0.001)
+        XCTAssertEqual(
+            controller.displayedImageFrame.minY,
+            PreviewLayout.canvasPadding,
+            accuracy: 0.001
+        )
         XCTAssertEqual(controller.visibleDocumentOrigin.y, 0, accuracy: 0.001)
         XCTAssertTrue(controller.displayedImage === image)
     }
@@ -454,8 +464,8 @@ final class PreviewLayoutTests: XCTestCase {
         )
 
         XCTAssertEqual(layout.canvasSize, NSSize(width: 720, height: 580))
-        XCTAssertEqual(layout.zoomFactor, 1.68, accuracy: 0.001)
-        XCTAssertEqual(layout.imageFrame.size, NSSize(width: 672, height: 504))
+        XCTAssertEqual(layout.zoomFactor, 1.72, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.size, NSSize(width: 688, height: 516))
         XCTAssertEqual(layout.imageFrame.midX, 360, accuracy: 0.001)
         XCTAssertEqual(layout.imageFrame.midY, 290, accuracy: 0.001)
     }
@@ -466,7 +476,7 @@ final class PreviewLayoutTests: XCTestCase {
             viewportSize: NSSize(width: 720, height: 580)
         )
 
-        XCTAssertEqual(layout.imageFrame.width, 672, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 688, accuracy: 0.001)
         XCTAssertLessThan(layout.imageFrame.height, 580)
         XCTAssertEqual(layout.imageFrame.midX, 360, accuracy: 0.001)
         XCTAssertEqual(layout.imageFrame.midY, 290, accuracy: 0.001)
@@ -478,10 +488,10 @@ final class PreviewLayoutTests: XCTestCase {
             viewportSize: NSSize(width: 720, height: 580)
         )
 
-        XCTAssertEqual(layout.imageFrame.width, 672, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 688, accuracy: 0.001)
         XCTAssertGreaterThan(layout.canvasSize.height, 580)
-        XCTAssertEqual(layout.imageFrame.minX, 24, accuracy: 0.001)
-        XCTAssertEqual(layout.imageFrame.minY, 24, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.minX, PreviewLayout.canvasPadding, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.minY, PreviewLayout.canvasPadding, accuracy: 0.001)
     }
 
     func testPreviewWindowWidthReflectsPresetUntilLimitedByScreen() {
@@ -499,11 +509,20 @@ final class PreviewLayoutTests: XCTestCase {
             visibleScreenSize: screenSize
         )
 
-        XCTAssertEqual(compact.contentSize, NSSize(width: 768, height: 640))
-        XCTAssertEqual(standard.contentSize, NSSize(width: 1_168, height: 640))
+        XCTAssertEqual(compact.contentSize, NSSize(width: 752, height: 640))
+        XCTAssertEqual(standard.contentSize, NSSize(width: 1_152, height: 640))
         XCTAssertEqual(wide.contentSize, NSSize(width: 1_360, height: 640))
         XCTAssertLessThan(compact.contentSize.width, standard.contentSize.width)
         XCTAssertLessThan(standard.contentSize.width, wide.contentSize.width)
+    }
+
+    func testPreviewWindowHeightFollowsAShortImage() {
+        let layout = PreviewWindowLayout.calculate(
+            imageSize: NSSize(width: 520, height: 180),
+            visibleScreenSize: NSSize(width: 1_440, height: 900)
+        )
+
+        XCTAssertEqual(layout.contentSize, NSSize(width: 552, height: 212))
     }
 
     func testActualSizeMapsOneImagePixelToOneBackingPixel() {
@@ -516,7 +535,7 @@ final class PreviewLayoutTests: XCTestCase {
 
         XCTAssertEqual(layout.zoomFactor, 1)
         XCTAssertEqual(layout.imageFrame.size, NSSize(width: 720, height: 1_120))
-        XCTAssertEqual(layout.imageFrame.minY, 24)
+        XCTAssertEqual(layout.imageFrame.minY, PreviewLayout.canvasPadding)
     }
 
     func testRetinaFitCanExceedOneHundredPercentToFillTheWindow() {
@@ -527,8 +546,8 @@ final class PreviewLayoutTests: XCTestCase {
             zoomMode: .fit
         )
 
-        XCTAssertEqual(layout.zoomFactor, 2, accuracy: 0.001)
-        XCTAssertEqual(layout.imageFrame.width, 520, accuracy: 0.001)
+        XCTAssertEqual(layout.zoomFactor, 2.0615, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 536, accuracy: 0.001)
         XCTAssertEqual(layout.imageFrame.midX, 284, accuracy: 0.001)
     }
 
@@ -540,10 +559,10 @@ final class PreviewLayoutTests: XCTestCase {
             zoomMode: .fit
         )
 
-        XCTAssertEqual(layout.zoomFactor, 0.6, accuracy: 0.001)
-        XCTAssertEqual(layout.imageFrame.width, 672, accuracy: 0.001)
+        XCTAssertEqual(layout.zoomFactor, 0.6143, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.width, 688, accuracy: 0.001)
         XCTAssertGreaterThan(layout.canvasSize.height, 580)
-        XCTAssertEqual(layout.imageFrame.minY, 24, accuracy: 0.001)
+        XCTAssertEqual(layout.imageFrame.minY, PreviewLayout.canvasPadding, accuracy: 0.001)
     }
 
     func testCustomZoomClampsAndCreatesHorizontalScrollingCanvas() {
@@ -563,7 +582,7 @@ final class PreviewLayoutTests: XCTestCase {
         XCTAssertEqual(maximum.zoomFactor, 4)
         XCTAssertEqual(maximum.imageFrame.size, NSSize(width: 1_600, height: 1_200))
         XCTAssertGreaterThan(maximum.canvasSize.width, 720)
-        XCTAssertEqual(maximum.imageFrame.minX, 24)
+        XCTAssertEqual(maximum.imageFrame.minX, PreviewLayout.canvasPadding)
         XCTAssertEqual(minimum.zoomFactor, 0.25)
         XCTAssertEqual(minimum.imageFrame.size, NSSize(width: 100, height: 75))
     }

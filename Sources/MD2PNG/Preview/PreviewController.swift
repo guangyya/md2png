@@ -36,6 +36,9 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
     var displayedImageFrame: NSRect { imageView.frame }
     var previewCanvasSize: NSSize { canvasView.frame.size }
     var previewViewportSize: NSSize { scrollView.contentSize }
+    var previewDrawsCanvasBackground: Bool { scrollView.drawsBackground }
+    var previewCanvasBackgroundColor: NSColor { scrollView.backgroundColor }
+    var previewCanvasImageFrame: NSRect { canvasView.imageFrame }
     var visibleDocumentOrigin: NSPoint { scrollView.contentView.bounds.origin }
     var displayedImage: NSImage? { imageView.image }
     var displayedImageVisibleRect: NSRect { imageView.visibleRect }
@@ -167,7 +170,8 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
 
         scrollView.frame = window.contentView!.bounds
         scrollView.autoresizingMask = [.width, .height]
-        scrollView.drawsBackground = false
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = .underPageBackgroundColor
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
         scrollView.hasVerticalScroller = true
@@ -317,6 +321,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
             zoomMode: zoomMode
         )
         canvasView.frame = NSRect(origin: .zero, size: layout.canvasSize)
+        canvasView.imageFrame = layout.imageFrame
         imageView.frame = layout.imageFrame
         currentZoomFactor = layout.zoomFactor
         toolbarController.updateZoomStatus(currentZoomFactor)

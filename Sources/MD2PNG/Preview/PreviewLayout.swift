@@ -11,6 +11,7 @@ struct PreviewLayout {
     let imageFrame: NSRect
     let zoomFactor: CGFloat
 
+    static let canvasPadding: CGFloat = 16
     static let minimumZoomFactor: CGFloat = 0.25
     static let maximumZoomFactor: CGFloat = 4
 
@@ -19,7 +20,7 @@ struct PreviewLayout {
         backingScaleFactor: CGFloat,
         viewportSize: NSSize,
         zoomMode: PreviewZoomMode,
-        padding: CGFloat = 24
+        padding: CGFloat = PreviewLayout.canvasPadding
     ) -> PreviewLayout {
         guard imagePixelSize.width > 0, imagePixelSize.height > 0 else {
             return PreviewLayout(canvasSize: viewportSize, imageFrame: .zero, zoomFactor: 1)
@@ -66,7 +67,7 @@ struct PreviewLayout {
     static func calculate(
         imageSize: NSSize,
         viewportSize: NSSize,
-        padding: CGFloat = 24
+        padding: CGFloat = PreviewLayout.canvasPadding
     ) -> PreviewLayout {
         calculate(
             imagePixelSize: imageSize,
@@ -84,10 +85,11 @@ struct PreviewWindowLayout {
     static func calculate(
         imageSize: NSSize,
         visibleScreenSize: NSSize,
-        horizontalImagePadding: CGFloat = 48,
+        horizontalImagePadding: CGFloat = PreviewLayout.canvasPadding * 2,
         horizontalScreenMargin: CGFloat = 80,
         verticalScreenMargin: CGFloat = 120,
         minimumContentWidth: CGFloat = 520,
+        minimumContentHeight: CGFloat = 200,
         preferredContentHeight: CGFloat = 640
     ) -> PreviewWindowLayout {
         let maximumContentWidth = max(
@@ -99,13 +101,29 @@ struct PreviewWindowLayout {
             minimumWidth,
             imageSize.width + horizontalImagePadding
         )
-        let maximumContentHeight = max(
+        let maximumContentHeight = min(
+            preferredContentHeight,
+            max(
+                1,
+                visibleScreenSize.height - verticalScreenMargin
+            )
+        )
+        let safeImageWidth = max(1, imageSize.width)
+        let displayedImageWidth = max(
             1,
-            visibleScreenSize.height - verticalScreenMargin
+            min(desiredWidth, maximumContentWidth) - horizontalImagePadding
+        )
+        let desiredContentHeight = displayedImageWidth
+            * max(1, imageSize.height) / safeImageWidth
+            + PreviewLayout.canvasPadding * 2
+        let minimumHeight = min(minimumContentHeight, maximumContentHeight)
+        let contentHeight = min(
+            max(minimumHeight, desiredContentHeight),
+            maximumContentHeight
         )
         return PreviewWindowLayout(contentSize: NSSize(
             width: min(desiredWidth, maximumContentWidth),
-            height: min(preferredContentHeight, maximumContentHeight)
+            height: contentHeight
         ))
     }
 }

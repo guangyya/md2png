@@ -2,6 +2,42 @@ import AppKit
 
 final class PreviewCanvasView: NSView {
     override var isFlipped: Bool { true }
+    override var isOpaque: Bool { true }
+
+    var imageFrame: NSRect = .zero {
+        didSet {
+            guard imageFrame != oldValue else { return }
+            needsDisplay = true
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.underPageBackgroundColor.setFill()
+        dirtyRect.fill()
+
+        guard !imageFrame.isEmpty else { return }
+        let scale = max(1, window?.backingScaleFactor ?? 1)
+        let lineWidth = 1 / scale
+        let outlineRect = imageFrame.insetBy(
+            dx: -lineWidth / 2,
+            dy: -lineWidth / 2
+        )
+        let outline = NSBezierPath(rect: outlineRect)
+        outline.lineWidth = lineWidth
+
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
+        shadow.shadowBlurRadius = 5
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+        shadow.set()
+        NSColor.separatorColor.setStroke()
+        outline.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSColor.separatorColor.setStroke()
+        outline.stroke()
+    }
 }
 
 final class PreviewZoomStatusView: NSView {
