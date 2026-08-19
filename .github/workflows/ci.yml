@@ -94,31 +94,6 @@ jobs:
           UPDATE_CHANNEL="$UPDATE_CHANNEL"
           BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
 
-      - name: Build debug app for local verification
-        if: matrix.xcode_version == '26.2'
-        run: >-
-          make app
-          CONFIGURATION=debug
-          PROJECT_URL="$PROJECT_URL"
-          UPDATE_CHANNEL=disabled
-          BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER"
-
-      - name: Archive debug app for local verification
-        if: matrix.xcode_version == '26.2'
-        run: >-
-          ditto -c -k --sequesterRsrc --keepParent
-          dist/debug/md2png.app
-          md2png-debug.zip
-
-      - name: Upload debug app for local verification
-        if: matrix.xcode_version == '26.2'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: md2png-debug-xcode-26.2
-          path: md2png-debug.zip
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Verify generated renderer is committed
         run: git diff --exit-code -- Sources/MD2PNG/Resources/renderer.bundle.js
 
