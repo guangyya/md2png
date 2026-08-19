@@ -89,6 +89,7 @@ final class RenderCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(harness.splitRenderRequests.count, 1)
         XCTAssertEqual(harness.splitRenderRequests.first?.markdown, "# Tall source")
+        XCTAssertTrue(harness.chosenSplitExportDestinations.isEmpty)
         XCTAssertTrue(coordinator.state.isRendering)
     }
 
@@ -144,7 +145,7 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.state.selectedTheme, .dark)
         XCTAssertTrue(harness.renderRequests.isEmpty)
         XCTAssertTrue(harness.splitRenderRequests.isEmpty)
-        XCTAssertTrue(harness.chosenSplitExportNames.isEmpty)
+        XCTAssertTrue(harness.chosenSplitExportDestinations.isEmpty)
     }
 
     func testSplitExportUsesCurrentPresentationWithoutChangingClipboardOrHistory() async throws {
@@ -161,7 +162,7 @@ final class RenderCoordinatorTests: XCTestCase {
         harness.startSplitRecovery(using: coordinator)
 
         XCTAssertTrue(coordinator.state.isRendering)
-        XCTAssertEqual(harness.chosenSplitExportNames, ["Tall release notes-split"])
+        XCTAssertTrue(harness.chosenSplitExportDestinations.isEmpty)
         let request = try XCTUnwrap(harness.splitRenderRequests.first)
         XCTAssertEqual(request.markdown, "# Tall release notes")
         XCTAssertEqual(request.widthPreset, .wide)
@@ -170,6 +171,9 @@ final class RenderCoordinatorTests: XCTestCase {
 
         let result = try makeSplitResult()
         harness.completeNextSplitRender(with: .success(result))
+        XCTAssertEqual(harness.chosenSplitExportDestinations, [
+            .init(suggestedName: "Tall release notes-split", fileCount: 2)
+        ])
         await waitForRenderActionToFinish(coordinator)
 
         XCTAssertEqual(harness.splitExportWrites.count, 1)
@@ -177,22 +181,31 @@ final class RenderCoordinatorTests: XCTestCase {
             harness.splitExportWrites.first?.1,
             harness.splitExportDestinationURL
         )
-        XCTAssertEqual(harness.notices, [.splitImagesSaved(count: 2)])
+        XCTAssertEqual(harness.notices, [.splitImagesSaved(
+            count: 2,
+            directoryURL: try XCTUnwrap(harness.splitExportDestinationURL)
+        )])
         XCTAssertTrue(harness.writtenImages.isEmpty)
         XCTAssertTrue(harness.writtenMarkdown.isEmpty)
         XCTAssertFalse(coordinator.state.hasLastRender)
         XCTAssertFalse(coordinator.state.hasLastSource)
     }
 
-    func testCancellingSplitExportDoesNotRenderOrChangeClipboard() {
+    func testCancellingSplitExportAfterCountIsKnownDoesNotWriteOrChangeClipboard() throws {
         let harness = RenderCoordinatorHarness()
         harness.clipboardMarkdown = "# Keep me"
         let coordinator = harness.makeCoordinator()
 
         harness.startSplitRecovery(using: coordinator)
+        XCTAssertTrue(coordinator.state.isRendering)
+        XCTAssertEqual(harness.splitRenderRequests.count, 1)
+
+        harness.completeNextSplitRender(with: .success(try makeSplitResult()))
 
         XCTAssertFalse(coordinator.state.isRendering)
-        XCTAssertEqual(harness.chosenSplitExportNames, ["Keep me-split"])
+        XCTAssertEqual(harness.chosenSplitExportDestinations, [
+            .init(suggestedName: "Keep me-split", fileCount: 2)
+        ])
         XCTAssertTrue(harness.splitRenderRequests.isEmpty)
         XCTAssertTrue(harness.writtenImages.isEmpty)
         XCTAssertTrue(harness.writtenMarkdown.isEmpty)
@@ -410,6 +423,11 @@ final class RenderCoordinatorTests: XCTestCase {
 
 @MainActor
 private final class RenderCoordinatorHarness {
+    struct SplitDestinationRequest: Equatable {
+        let suggestedName: String
+        let fileCount: Int
+    }
+
     struct RenderRequest {
         let markdown: String
         let widthPreset: RenderWidthPreset
@@ -433,7 +451,7 @@ private final class RenderCoordinatorHarness {
     var splitExportWriteError: Error?
     private(set) var renderRequests: [RenderRequest] = []
     private(set) var splitRenderRequests: [SplitRenderRequest] = []
-    private(set) var chosenSplitExportNames: [String] = []
+    private(set) var chosenSplitExportDestinations: [SplitDestinationRequest] = []
     private(set) var writtenImages: [NSImage] = []
     private(set) var writtenMarkdown: [String] = []
     private(set) var selectedWidthPresets: [RenderWidthPreset] = []
@@ -494,8 +512,11 @@ private final class RenderCoordinatorHarness {
                 selectTheme: { [weak self] theme in
                     self?.selectedThemes.append(theme)
                 },
-                chooseSplitExportDestination: { [weak self] suggestedName in
-                    self?.chosenSplitExportNames.append(suggestedName)
+                chooseSplitExportDestination: { [weak self] suggestedName, fileCount in
+                    self?.chosenSplitExportDestinations.append(.init(
+                        suggestedName: suggestedName,
+                        fileCount: fileCount
+                    ))
                     return self?.splitExportDestinationURL
                 },
                 writeSplitExport: { [weak self] result, destinationURL in

@@ -70,6 +70,7 @@ final class WindowPresentationCoordinator {
     private let shortcutState: () -> ShortcutState
     private let actions: Actions
     private let activationCoordinator: WindowActivationCoordinator
+    private let previewDragExportStore: PreviewDragExportStore
 
     private lazy var previewController = PreviewController(
         onCopied: { [weak self] changeCount in
@@ -83,7 +84,8 @@ final class WindowPresentationCoordinator {
         },
         onShowSettings: { [weak self] in
             self?.showSettings()
-        }
+        },
+        dragExportStore: previewDragExportStore
     )
     private lazy var aboutController = AboutController(
         updateController: updateController,
@@ -139,7 +141,8 @@ final class WindowPresentationCoordinator {
         globalShortcutPreference: GlobalShortcutPreference,
         shortcutState: @escaping () -> ShortcutState,
         actions: Actions,
-        activationCoordinator: WindowActivationCoordinator = WindowActivationCoordinator()
+        activationCoordinator: WindowActivationCoordinator = WindowActivationCoordinator(),
+        previewDragExportStore: PreviewDragExportStore = PreviewDragExportStore()
     ) {
         self.updateController = updateController
         self.diagnosticLogger = diagnosticLogger
@@ -149,10 +152,15 @@ final class WindowPresentationCoordinator {
         self.shortcutState = shortcutState
         self.actions = actions
         self.activationCoordinator = activationCoordinator
+        self.previewDragExportStore = previewDragExportStore
     }
 
     func prepareForApplicationLaunch() {
         activationCoordinator.prepareForApplicationLaunch()
+    }
+
+    func prepareForApplicationTermination() {
+        previewDragExportStore.clear()
     }
 
     func showPreview(_ lastRender: LastRender) {

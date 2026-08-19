@@ -79,13 +79,16 @@
 "hud.png_copied_accessibility" = "PNG 已复制，可以按 Command-V 粘贴";
 "hud.png_copied_again_accessibility" = "PNG 已再次复制，可以按 Command-V 粘贴";
 "hud.markdown_restored_accessibility" = "Markdown 已恢复，可以按 Command-V 粘贴";
-"hud.split_png_saved" = "已保存 1 张分片 PNG";
-"hud.split_pngs_saved" = "已保存 %ld 张分片 PNG";
 "hud.launch_at_login_requires_approval" = "请在“登录项”中允许 md2png 以完成设置";
 
-"split_export.choose_folder_title" = "选择分片 PNG 的保存位置";
-"split_export.choose_folder_message" = "md2png 将新建“%@”文件夹，并在其中保存编号 PNG；不会写入剪贴板。";
+"split_export.save_one_title" = "保存 1 张分片 PNG";
+"split_export.save_many_title" = "保存 %ld 张分片 PNG";
+"split_export.save_one_message" = "md2png 将新建“%@”文件夹，并在其中保存 1 张编号 PNG；不会写入剪贴板。";
+"split_export.save_many_message" = "md2png 将新建“%1$@”文件夹，并在其中保存 %2$ld 张编号 PNG；不会写入剪贴板。";
 "split_export.choose_folder_action" = "选择文件夹";
+"split_export.saved_one_title" = "已保存 1 张分片 PNG";
+"split_export.saved_many_title" = "已保存 %ld 张分片 PNG";
+"split_export.saved_message" = "编号 PNG 已保存到“%@”。";
 
 "confirmation.clipboard_changed.title" = "剪贴板已更改";
 "confirmation.clipboard_changed.rerender" = "其他应用已更改剪贴板。是否用上次的 Markdown 重新渲染 PNG 并替换当前内容？";
@@ -135,9 +138,9 @@
 "error.launch_at_login_unavailable" = "无法更改“登录时启动”。请打开“系统设置”，手动修改“登录项”。";
 "error.launch_at_login_failed" = "无法更改“登录时启动”。请重新打开 md2png 后重试。";
 
-"preview.window_title" = "上次渲染";
-"preview.window_title_with_dimensions" = "上次渲染 — %1$ld × %2$ld px";
-"preview.window_title_with_width" = "上次渲染 — %1$@ · %2$ld × %3$ld px";
+"preview.window_title" = "预览";
+"preview.window_title_with_dimensions" = "预览 — %1$ld × %2$ld px";
+"preview.window_title_with_width" = "预览 — %1$@ · %2$ld × %3$ld px";
 "preview.copy_again" = "再次复制";
 "preview.save_png" = "保存 PNG…";
 "preview.open_in_preview" = "在“预览”中打开";
@@ -150,6 +153,7 @@
 "preview.reset_actual_size" = "重置为实际大小";
 "preview.rendered_image" = "渲染后的图像";
 "preview.rendered_image_dimensions" = "%1$ld × %2$ld 像素";
+"preview.drag_help" = "拖动即可将此 PNG 导出到其他应用或文件夹。";
 
 "welcome.window_title" = "欢迎使用 md2png";
 "welcome.title" = "把 Markdown 变成精美 PNG";
@@ -323,3 +327,5 @@
 "common.ok" = "好";
 "common.replace" = "替换";
 "common.cancel" = "取消";
+"common.done" = "完成";
+"common.show_in_finder" = "在 Finder 中显示";

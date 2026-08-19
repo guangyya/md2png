@@ -8,7 +8,7 @@ enum ClipboardOverwriteAction: Equatable {
 enum RenderCoordinatorNotice: Equatable {
     case imageCopied
     case markdownRestored
-    case splitImagesSaved(count: Int)
+    case splitImagesSaved(count: Int, directoryURL: URL)
 }
 
 struct RenderCoordinatorState: Equatable {
@@ -61,7 +61,10 @@ final class RenderCoordinator {
         let loadExample: (ExampleKind) throws -> String
         let selectWidthPreset: (RenderWidthPreset) -> Void
         let selectTheme: (RenderTheme) -> Void
-        let chooseSplitExportDestination: (_ suggestedDirectoryName: String) -> URL?
+        let chooseSplitExportDestination: (
+            _ suggestedDirectoryName: String,
+            _ fileCount: Int
+        ) -> URL?
         let writeSplitExport: (
             _ result: SplitRenderResult,
             _ destinationDirectoryURL: URL
@@ -103,9 +106,10 @@ final class RenderCoordinator {
                 loadExample: AppResources.exampleMarkdown(for:),
                 selectWidthPreset: widthPreference.select,
                 selectTheme: themePreference.select,
-                chooseSplitExportDestination: { suggestedDirectoryName in
+                chooseSplitExportDestination: { suggestedDirectoryName, fileCount in
                     SplitImageExportDestination.choose(
-                        suggestedDirectoryName: suggestedDirectoryName
+                        suggestedDirectoryName: suggestedDirectoryName,
+                        fileCount: fileCount
                     )
                 },
                 writeSplitExport: { result, destinationDirectoryURL in
@@ -137,8 +141,11 @@ final class RenderCoordinator {
             self.isRendering = isExporting
             self.notifyStateChange()
         },
-        onSuccess: { [weak self] count in
-            self?.onNotice(.splitImagesSaved(count: count))
+        onSuccess: { [weak self] count, directoryURL in
+            self?.onNotice(.splitImagesSaved(
+                count: count,
+                directoryURL: directoryURL
+            ))
         },
         onError: { [weak self] error in
             self?.onError(error)

@@ -35,6 +35,15 @@ folder and writes numbered PNGs locally. It does not add those images to the
 clipboard, upload them, or retain a history. Existing export folders are not
 overwritten.
 
+Dragging from the Preview window is also an explicit local export. The app
+creates one generation-isolated PNG in the system temporary directory only when
+dragging starts, then offers its file URL and PNG bytes to the receiving app.
+An unused cancelled export is removed immediately. An accepted export stays
+available until md2png quits so receivers can finish reading it, then the app
+removes its temporary export directory. Repeated drags of the same preview reuse
+the same file. Dragging does not read or change the clipboard, upload the image,
+or retain a render history.
+
 ## Local rendering
 
 - Markdown is rendered in a non-persistent local `WKWebView`.

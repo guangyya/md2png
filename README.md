@@ -46,9 +46,11 @@ message. If clipboard rendering fails, the source Markdown remains on the
 clipboard.
 
 For a result that exceeds the single-image height limit, the error dialog offers
-**Save as Split PNGs…**. Pick a parent folder and md2png creates a new, safely
-named folder of numbered PNGs without replacing the source Markdown on the
-clipboard.
+**Save as Split PNGs…**. After rendering the slices, the folder chooser shows
+the exact PNG count. Pick a parent folder and md2png creates a new, safely named
+folder of numbered PNGs without replacing the source Markdown on the clipboard.
+When saving finishes, choose **Show in Finder** to select every exported PNG for
+immediate dragging into another app.
 
 ## Supported content
 
@@ -88,7 +90,7 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` by default (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
-| Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result with copy, save, open, fit, actual-size, and zoom controls |
+| Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result in Preview with drag, copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Theme | — | Selects one of five bundled render palettes and remembers the selection locally |
@@ -126,11 +128,13 @@ a combination, Settings marks it unavailable while the equivalent menu command
 continues to work; **Restore Defaults** returns to `Control-Command-X` and
 `Control-Command-Z`.
 
-The Last Render window opens at a width that reflects the output, within the
-current screen, and identifies the preset and PNG pixel dimensions in its
-title. Its toolbar can copy the image again, save it explicitly, open it in
-Preview, fit it to the window, inspect one PNG pixel per display backing pixel,
-and zoom without changing the generated image or clipboard contents.
+The Preview window opened by **Show Last Render** reflects the output width,
+stays within the current screen, and identifies the preset and PNG pixel
+dimensions in its title. Drag the rendered image into Finder or another
+compatible app to create a PNG at the chosen destination. Its toolbar can copy
+the image again, save it explicitly, open it in Apple's Preview, fit it to the
+window, inspect one PNG pixel per display backing pixel, and zoom without
+changing the generated image or clipboard contents.
 
 When rendering fails, md2png shows a compact details dialog that distinguishes
 Mermaid syntax, bundled-resource, WebKit recovery, timeout, size-limit, invalid
@@ -177,6 +181,10 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 - Markdown and generated images are never uploaded.
 - Split PNG export is offered only as an explicit recovery action after a
   size-limit error, is Save-only, and never writes images to the clipboard.
+- Drag export creates one generation-isolated PNG in the system temporary
+  directory only after the user starts dragging. An unused cancelled export is
+  removed immediately; an accepted export remains readable by the receiving app
+  until md2png quits, then is deleted. Dragging does not change the clipboard.
 - The latest successful Markdown source is retained only in memory for the Last
   Markdown actions and is discarded when md2png quits.
 - External Markdown images are replaced with a text placeholder instead of

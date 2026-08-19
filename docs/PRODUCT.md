@@ -45,7 +45,8 @@ sending it.
 - Explicit Save-only export of tall clipboard Markdown into a new folder of
   numbered PNGs. Slices use the current theme and width, prefer block boundaries,
   and protect fitting code blocks, Mermaid diagrams, and table rows without
-  changing the clipboard.
+  changing the clipboard. The destination chooser confirms the exact part count,
+  and completion can select every saved PNG in Finder for immediate reuse.
 - Configurable global render and last-preview shortcuts, with local persistence,
   conflict feedback, Restore Defaults, and equivalent menu commands that remain
   available when global registration fails.
@@ -55,8 +56,8 @@ sending it.
   and at accessibility text sizes, and a menu command to reopen it. Bundled
   examples open their preview after rendering.
 - Compact clipboard preview, non-activating HUD, and an in-memory preview of the
-  latest successful render with explicit copy, save, Preview, fit, actual-size,
-  and zoom controls.
+  latest successful render with explicit drag, copy, save, Preview, fit,
+  actual-size, and zoom controls.
 - In-memory access to re-render or restore the latest successful Markdown,
   guarded by clipboard ownership checks and explicit replacement confirmation.
 - Short, long, formatting, code, checklist, table, flowchart, sequence, and
@@ -83,10 +84,14 @@ sending it.
 ## Width presets
 
 Compact wraps prose sooner, Standard preserves the original output sizing, and
-Wide gives dense tables and diagrams more room. The Last Render window reflects
-the selected output width within the current screen and identifies the preset
-and PNG pixel dimensions in its title. Actual Size maps one PNG pixel to one
-display backing pixel, while zoom changes only the preview presentation.
+Wide gives dense tables and diagrams more room. The Preview window opened by
+Show Last Render reflects the selected output width within the current screen
+and identifies the preset and PNG pixel dimensions in its title. Starting a
+drag creates one generation-isolated PNG in the system temporary directory and
+offers both its file URL and PNG data to the receiving app. Cancelled unused
+exports are removed immediately; accepted exports remain readable until md2png
+quits. Actual Size maps one PNG pixel to one display backing pixel, while zoom
+changes only the preview presentation.
 
 These are real Retina outputs from the same
 [width comparison source](../Examples/width-presets.md). They live here instead
