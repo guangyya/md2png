@@ -6,6 +6,8 @@ enum AppError: LocalizedError {
     case markdownFileReadFailed
     case markdownFileInvalidEncoding
     case emptyMarkdownFile
+    case multipleMarkdownFilesUnsupported
+    case markdownFileOpenBusy
     case rendererUnavailable
     case rendererRecoveryFailed
     case rendererTimedOut
@@ -55,6 +57,18 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.empty_markdown_file",
                 defaultValue: "The selected file has no Markdown to render. The clipboard is unchanged.",
+                bundle: localizationBundle
+            )
+        case .multipleMarkdownFilesUnsupported:
+            return L10n.text(
+                "error.multiple_markdown_files_unsupported",
+                defaultValue: "Open one Markdown file at a time. The clipboard is unchanged.",
+                bundle: localizationBundle
+            )
+        case .markdownFileOpenBusy:
+            return L10n.text(
+                "error.markdown_file_open_busy",
+                defaultValue: "Another render is already in progress. The file wasn’t opened, and the clipboard is unchanged.",
                 bundle: localizationBundle
             )
         case .rendererUnavailable:

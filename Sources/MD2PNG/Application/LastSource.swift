@@ -10,7 +10,7 @@ struct LastSourceState {
 
     mutating func recordSuccessfulRender(
         markdown: String,
-        clipboardChangeCount: Int
+        clipboardChangeCount: Int?
     ) {
         self.markdown = markdown
         ownedClipboardChangeCount = clipboardChangeCount

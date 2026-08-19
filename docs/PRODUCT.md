@@ -44,7 +44,13 @@ sending it.
 - Retina-friendly PNG/TIFF clipboard output.
 - Explicit rendering of one selected local UTF-8 `.md`, `.markdown`, or `.txt`
   file through the same renderer and clipboard output path, without recent-file
-  history, persistent access, or clipboard changes on failure.
+  history, persistent access, or clipboard changes on failure. The picker
+  disables unsupported extensions; Finder can open one `.md` or `.markdown`
+  file with md2png, or send one file through **Services → Preview with md2png**,
+  and shows Preview only after a successful render without changing the
+  clipboard. Copying remains an explicit Preview action.
+- Bundled Examples render directly into Preview without changing the clipboard;
+  copying the resulting PNG remains an explicit Preview action.
 - Explicit Save-only export of tall clipboard Markdown into a new folder of
   numbered PNGs. Slices use the current theme and width, prefer block boundaries,
   and protect fitting code blocks, Mermaid diagrams, and table rows without
@@ -132,7 +138,8 @@ System/Auto appearance matching remain outside this phase.
 - Bundle all JavaScript, CSS, localization, and examples required at runtime.
 - Keep the last render in memory only; do not create a content history.
 - Keep only its paired latest source Markdown in memory and discard it on quit.
-- Read a local Markdown file only after explicit selection; do not retain its
+- Read a local Markdown file only after explicit selection in the picker,
+  Finder's Open With command, or the md2png Finder Service; do not retain its
   path, monitor its directory, or create a persistent file-access bookmark.
 
 ## Deliberate non-goals

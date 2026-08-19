@@ -108,6 +108,8 @@
 "error.markdown_file_read_failed" = "Couldn’t read the selected file. The clipboard is unchanged. Check its permissions and try again.";
 "error.markdown_file_invalid_encoding" = "The selected file isn’t valid UTF-8. The clipboard is unchanged. Save it as UTF-8 and try again.";
 "error.empty_markdown_file" = "The selected file has no Markdown to render. The clipboard is unchanged.";
+"error.multiple_markdown_files_unsupported" = "Open one Markdown file at a time. The clipboard is unchanged.";
+"error.markdown_file_open_busy" = "Another render is already in progress. The file wasn’t opened, and the clipboard is unchanged.";
 "error.renderer_unavailable" = "Couldn’t render the Markdown. The clipboard is unchanged. Reopen md2png, then try again.";
 "error.renderer_recovery_failed" = "Couldn’t render the Markdown. The clipboard is unchanged. Try again; if it still fails, reopen md2png.";
 "error.renderer_timed_out" = "Rendering took too long. The clipboard is unchanged. Shorten the Markdown and try again.";
@@ -153,7 +155,7 @@
 "preview.window_title" = "Preview";
 "preview.window_title_with_dimensions" = "Preview — %1$ld × %2$ld px";
 "preview.window_title_with_width" = "Preview — %1$@ · %2$ld × %3$ld px";
-"preview.copy_again" = "Copy Again";
+"preview.copy" = "Copy";
 "preview.save_png" = "Save PNG…";
 "preview.open_in_preview" = "Open in Preview";
 "preview.fit" = "Fit to Window";

@@ -41,9 +41,18 @@ messages.
 4. Paste the generated PNG with `Command-V`.
 5. Review the attachment and send it yourself.
 
+Alternatively, Control-click a `.md` or `.markdown` file in Finder, choose
+**Open With → md2png**, and md2png renders it locally and opens the successful
+result in its Preview window without changing the clipboard. Finder also offers
+**Services → Preview with md2png** for the same workflow. Choose Copy in Preview
+only when you want the PNG on the clipboard.
+
 The render command never activates another app, pastes into it, or sends a
 message. If clipboard rendering fails, the source Markdown remains on the
 clipboard.
+
+Bundled Examples open directly in Preview without changing the clipboard. Use
+Preview's Copy action only when you want the rendered PNG on the clipboard.
 
 For a result that exceeds the single-image height limit, the error dialog offers
 **Save as Split PNGs…**. After rendering the slices, the folder chooser shows
@@ -90,7 +99,7 @@ A GFM table needs a separator row:
 | Command | Shortcut | Behavior |
 |---|---|---|
 | Render Clipboard as Image | `Control-Command-X` by default (global) | Renders clipboard Markdown and replaces it with PNG/TIFF on success |
-| Render Markdown File… | — | Reads one explicitly selected UTF-8 `.md`, `.markdown`, or `.txt` file and writes PNG/TIFF to the clipboard only after a successful render |
+| Render Markdown File… | — | Reads one explicitly selected UTF-8 `.md`, `.markdown`, or `.txt` file; unsupported extensions are disabled, and PNG/TIFF reaches the clipboard only after a successful render |
 | Show Last Render | `Control-Command-Z` by default (global) | Opens the most recent result in Preview with drag, copy, save, open, fit, actual-size, and zoom controls |
 | Re-render Last Markdown | — | Renders the latest successful source with the currently selected theme and width |
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
@@ -183,6 +192,14 @@ reference for tables, highlighted code, and multiple diagrams in one image.
 - **Render Markdown File…** reads only the file selected for that action, keeps
   no recent-file access or history, and leaves the clipboard unchanged if
   selection, reading, or rendering fails.
+- **Open With → md2png** in Finder accepts one `.md` or `.markdown` file at a
+  time, uses the same local renderer and current output settings, and opens the
+  Preview window only after success without changing the clipboard.
+- **Services → Preview with md2png** accepts one Finder file at a time and
+  applies the same type checks and failure behavior. macOS Services cannot hide
+  the command by filename extension, so unsupported files are rejected after
+  invocation. Supported files also leave the clipboard unchanged until Copy is
+  explicitly chosen in Preview.
 - Split PNG export is offered only as an explicit recovery action after a
   size-limit error, is Save-only, and never writes images to the clipboard.
 - Drag export creates one generation-isolated PNG in the system temporary

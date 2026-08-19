@@ -8,6 +8,8 @@ for the complete project history and release details.
 ### Added
 
 - Render a local Markdown or text file directly from the md2png menu.
+- Open or send Markdown files to md2png from Finder and preview without copying.
+- Preview bundled Examples without changing the clipboard until Copy is chosen.
 
 ## [0.13.1] - 2026-08-19
 

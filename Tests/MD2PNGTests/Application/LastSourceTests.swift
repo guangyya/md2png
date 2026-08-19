@@ -35,10 +35,17 @@ final class LastSourceTests: XCTestCase {
     func testSuccessfulExampleReplacesThePreviousSource() {
         var state = LastSourceState()
         state.recordSuccessfulRender(markdown: "User Markdown", clipboardChangeCount: 30)
-        state.recordSuccessfulRender(markdown: "Example Markdown", clipboardChangeCount: 31)
+        state.recordSuccessfulRender(
+            markdown: "Example Markdown",
+            clipboardChangeCount: nil
+        )
 
         XCTAssertEqual(state.markdown, "Example Markdown")
-        XCTAssertEqual(state.ownedClipboardChangeCount, 31)
+        XCTAssertNil(state.ownedClipboardChangeCount)
+        XCTAssertTrue(state.requiresConfirmation(currentClipboardChangeCount: 30))
+
+        state.recordOwnedClipboardWrite(changeCount: 31)
+        XCTAssertFalse(state.requiresConfirmation(currentClipboardChangeCount: 31))
     }
 
     func testExternalClipboardChangeRequiresConfirmation() {

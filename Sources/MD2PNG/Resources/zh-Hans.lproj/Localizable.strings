@@ -108,6 +108,8 @@
 "error.markdown_file_read_failed" = "无法读取所选文件，剪贴板内容未改变。请检查文件权限后重试。";
 "error.markdown_file_invalid_encoding" = "所选文件不是有效的 UTF-8，剪贴板内容未改变。请将文件另存为 UTF-8 后重试。";
 "error.empty_markdown_file" = "所选文件中没有可渲染的 Markdown，剪贴板内容未改变。";
+"error.multiple_markdown_files_unsupported" = "请一次只打开一个 Markdown 文件，剪贴板内容未改变。";
+"error.markdown_file_open_busy" = "另一个渲染任务正在进行，文件未打开，剪贴板内容未改变。";
 "error.renderer_unavailable" = "无法渲染 Markdown，剪贴板内容未改变。请重新打开 md2png 后重试。";
 "error.renderer_recovery_failed" = "无法渲染 Markdown，剪贴板内容未改变。请重试；若仍然失败，请重新打开 md2png。";
 "error.renderer_timed_out" = "渲染时间过长，剪贴板内容未改变。请缩短 Markdown 后重试。";
@@ -153,7 +155,7 @@
 "preview.window_title" = "预览";
 "preview.window_title_with_dimensions" = "预览 — %1$ld × %2$ld px";
 "preview.window_title_with_width" = "预览 — %1$@ · %2$ld × %3$ld px";
-"preview.copy_again" = "再次复制";
+"preview.copy" = "复制";
 "preview.save_png" = "保存 PNG…";
 "preview.open_in_preview" = "在“预览”中打开";
 "preview.fit" = "适合窗口";

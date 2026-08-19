@@ -379,8 +379,8 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
         switch command {
         case .close:
             window?.performClose(nil)
-        case .copyAgain:
-            copyAgain(nil)
+        case .copyImage:
+            copyCurrentImage(nil)
         case .savePNG:
             savePNG(nil)
         case .openInPreview:
@@ -396,7 +396,7 @@ final class PreviewController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    @objc private func copyAgain(_ sender: Any?) {
+    @objc private func copyCurrentImage(_ sender: Any?) {
         guard let image = imageView.image else { return }
         do {
             onCopied(try copyImage(image))

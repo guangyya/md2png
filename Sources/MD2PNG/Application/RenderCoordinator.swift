@@ -38,6 +38,19 @@ final class RenderCoordinator {
         let theme: RenderTheme
     }
 
+    private enum RenderDestination: Equatable {
+        case clipboard
+        case preview
+
+        var writesImageToClipboard: Bool {
+            self == .clipboard
+        }
+
+        var showsPreview: Bool {
+            self == .preview
+        }
+    }
+
     @MainActor
     struct Dependencies {
         let render: (
@@ -278,6 +291,11 @@ final class RenderCoordinator {
         render(markdown)
     }
 
+    func previewMarkdownFile(_ markdown: String) {
+        guard canStartRenderAction else { return }
+        render(markdown, destination: .preview)
+    }
+
     func saveFailedRenderAsSplitPNGs() {
         guard canStartRenderAction, let recovery = pendingSplitExportRecovery else { return }
         pendingSplitExportRecovery = nil
@@ -355,29 +373,7 @@ final class RenderCoordinator {
             return
         }
 
-        do {
-            let changeCount = try dependencies.writeMarkdown(markdown)
-            lastSource.recordOwnedClipboardWrite(changeCount: changeCount)
-            diagnosticLogger.record(
-                category: .clipboard,
-                stage: .clipboardWrite,
-                result: .succeeded,
-                clipboardType: .markdown,
-                clipboardOwnership: .owned
-            )
-            render(markdown, showsPreviewOnSuccess: true)
-        } catch {
-            diagnosticLogger.record(
-                category: .clipboard,
-                stage: .clipboardWrite,
-                result: .failed,
-                level: .error,
-                error: error,
-                clipboardType: .markdown,
-                clipboardOwnership: .unknown
-            )
-            onError(error)
-        }
+        render(markdown, destination: .preview)
     }
 
     func selectWidthPreset(_ preset: RenderWidthPreset) {
@@ -409,7 +405,7 @@ final class RenderCoordinator {
 
     private func render(
         _ markdown: String,
-        showsPreviewOnSuccess: Bool = false
+        destination: RenderDestination = .clipboard
     ) {
         guard canStartRenderAction else { return }
         pendingSplitExportRecovery = nil
@@ -441,7 +437,12 @@ final class RenderCoordinator {
                         self.renderCornerStyle(),
                         to: image
                     )
-                    let changeCount = try self.dependencies.writeImage(outputImage)
+                    let changeCount: Int?
+                    if destination.writesImageToClipboard {
+                        changeCount = try self.dependencies.writeImage(outputImage)
+                    } else {
+                        changeCount = nil
+                    }
                     let dimensions = Self.pixelDimensions(for: outputImage)
                     self.lastImage = outputImage
                     self.lastRenderWidthPreset = requestedWidthPreset
@@ -449,15 +450,17 @@ final class RenderCoordinator {
                         markdown: markdown,
                         clipboardChangeCount: changeCount
                     )
-                    self.diagnosticLogger.record(
-                        category: .clipboard,
-                        stage: .clipboardWrite,
-                        result: .succeeded,
-                        operationID: operationID,
-                        clipboardType: .png,
-                        clipboardOwnership: .owned,
-                        dimensions: dimensions
-                    )
+                    if destination.writesImageToClipboard {
+                        self.diagnosticLogger.record(
+                            category: .clipboard,
+                            stage: .clipboardWrite,
+                            result: .succeeded,
+                            operationID: operationID,
+                            clipboardType: .png,
+                            clipboardOwnership: .owned,
+                            dimensions: dimensions
+                        )
+                    }
                     self.diagnosticLogger.record(
                         category: .renderer,
                         stage: .renderCompletion,
@@ -469,21 +472,25 @@ final class RenderCoordinator {
                         dimensions: dimensions
                     )
                     self.finishRender()
-                    self.onNotice(.imageCopied)
-                    if showsPreviewOnSuccess, let lastRender = self.lastRender {
+                    if destination.writesImageToClipboard {
+                        self.onNotice(.imageCopied)
+                    }
+                    if destination.showsPreview, let lastRender = self.lastRender {
                         self.onPreviewRequested(lastRender)
                     }
                 } catch {
-                    self.diagnosticLogger.record(
-                        category: .clipboard,
-                        stage: .clipboardWrite,
-                        result: .failed,
-                        level: .error,
-                        operationID: operationID,
-                        error: error,
-                        clipboardType: .png,
-                        clipboardOwnership: .unknown
-                    )
+                    if destination.writesImageToClipboard {
+                        self.diagnosticLogger.record(
+                            category: .clipboard,
+                            stage: .clipboardWrite,
+                            result: .failed,
+                            level: .error,
+                            operationID: operationID,
+                            error: error,
+                            clipboardType: .png,
+                            clipboardOwnership: .unknown
+                        )
+                    }
                     self.diagnosticLogger.record(
                         category: .renderer,
                         stage: .renderCompletion,
