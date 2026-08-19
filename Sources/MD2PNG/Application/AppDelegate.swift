@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let diagnosticLogger: DiagnosticLogger
+    private let splitImageExportCompletionPresenter = SplitImageExportCompletionPresenter()
     private lazy var hud = HUDController(announce: { [weak self] message, priority in
         self?.announce(message, priority: priority)
     })
@@ -472,20 +473,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     defaultValue: "Markdown restored and ready to paste with Command-V"
                 )
             )
-        case let .splitImagesSaved(count):
-            let message = count == 1
-                ? L10n.text(
-                    "hud.split_png_saved",
-                    defaultValue: "Saved 1 split PNG"
-                )
-                : L10n.format(
-                    "hud.split_pngs_saved",
-                    defaultValue: "Saved %ld split PNGs",
-                    count
-                )
-            hud.show(
-                message,
-                symbol: "folder.badge.checkmark"
+        case let .splitImagesSaved(count, directoryURL):
+            splitImageExportCompletionPresenter.show(
+                count: count,
+                directoryURL: directoryURL
             )
         }
     }

@@ -45,7 +45,8 @@ sending it.
 - Explicit Save-only export of tall clipboard Markdown into a new folder of
   numbered PNGs. Slices use the current theme and width, prefer block boundaries,
   and protect fitting code blocks, Mermaid diagrams, and table rows without
-  changing the clipboard.
+  changing the clipboard. The destination chooser confirms the exact part count,
+  and completion can select every saved PNG in Finder for immediate reuse.
 - Configurable global render and last-preview shortcuts, with local persistence,
   conflict feedback, Restore Defaults, and equivalent menu commands that remain
   available when global registration fails.

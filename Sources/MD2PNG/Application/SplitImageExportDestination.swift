@@ -1,22 +1,64 @@
 import AppKit
 
+struct SplitImageExportDestinationPresentation: Equatable {
+    let title: String
+    let message: String
+    let prompt: String
+
+    static func make(
+        suggestedDirectoryName: String,
+        fileCount: Int,
+        localizationBundle: Bundle? = nil
+    ) -> SplitImageExportDestinationPresentation {
+        let title = fileCount == 1
+            ? L10n.text(
+                "split_export.save_one_title",
+                defaultValue: "Save 1 Split PNG",
+                bundle: localizationBundle
+            )
+            : L10n.format(
+                "split_export.save_many_title",
+                defaultValue: "Save %ld Split PNGs",
+                bundle: localizationBundle,
+                fileCount
+            )
+        let message = fileCount == 1
+            ? L10n.format(
+                "split_export.save_one_message",
+                defaultValue: "md2png will create a new “%@” folder containing 1 numbered PNG file. Nothing will be copied to the clipboard.",
+                bundle: localizationBundle,
+                suggestedDirectoryName
+            )
+            : L10n.format(
+                "split_export.save_many_message",
+                defaultValue: "md2png will create a new “%1$@” folder containing %2$ld numbered PNG files. Nothing will be copied to the clipboard.",
+                bundle: localizationBundle,
+                suggestedDirectoryName,
+                fileCount
+            )
+        return SplitImageExportDestinationPresentation(
+            title: title,
+            message: message,
+            prompt: L10n.text(
+                "split_export.choose_folder_action",
+                defaultValue: "Choose Folder",
+                bundle: localizationBundle
+            )
+        )
+    }
+}
+
 @MainActor
 enum SplitImageExportDestination {
-    static func choose(suggestedDirectoryName: String) -> URL? {
+    static func choose(suggestedDirectoryName: String, fileCount: Int) -> URL? {
+        let presentation = SplitImageExportDestinationPresentation.make(
+            suggestedDirectoryName: suggestedDirectoryName,
+            fileCount: fileCount
+        )
         let panel = NSOpenPanel()
-        panel.title = L10n.text(
-            "split_export.choose_folder_title",
-            defaultValue: "Choose a Folder for Split PNGs"
-        )
-        panel.message = L10n.format(
-            "split_export.choose_folder_message",
-            defaultValue: "md2png will create a new “%@” folder containing numbered PNG files. Nothing will be copied to the clipboard.",
-            suggestedDirectoryName
-        )
-        panel.prompt = L10n.text(
-            "split_export.choose_folder_action",
-            defaultValue: "Choose Folder"
-        )
+        panel.title = presentation.title
+        panel.message = presentation.message
+        panel.prompt = presentation.prompt
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false

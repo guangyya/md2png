@@ -46,9 +46,11 @@ message. If clipboard rendering fails, the source Markdown remains on the
 clipboard.
 
 For a result that exceeds the single-image height limit, the error dialog offers
-**Save as Split PNGs…**. Pick a parent folder and md2png creates a new, safely
-named folder of numbered PNGs without replacing the source Markdown on the
-clipboard.
+**Save as Split PNGs…**. After rendering the slices, the folder chooser shows
+the exact PNG count. Pick a parent folder and md2png creates a new, safely named
+folder of numbered PNGs without replacing the source Markdown on the clipboard.
+When saving finishes, choose **Show in Finder** to select every exported PNG for
+immediate dragging into another app.
 
 ## Supported content
 

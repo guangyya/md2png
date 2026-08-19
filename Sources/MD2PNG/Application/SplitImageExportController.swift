@@ -5,7 +5,10 @@ final class SplitImageExportController {
     typealias RenderCompletion = (Result<SplitRenderResult, Error>) -> Void
 
     struct Dependencies {
-        let chooseDestination: (_ suggestedDirectoryName: String) -> URL?
+        let chooseDestination: (
+            _ suggestedDirectoryName: String,
+            _ fileCount: Int
+        ) -> URL?
         let render: (
             _ markdown: String,
             _ widthPreset: RenderWidthPreset,
@@ -22,7 +25,7 @@ final class SplitImageExportController {
     private let dependencies: Dependencies
     private let diagnosticLogger: DiagnosticLogger
     private let onExportingChange: (Bool) -> Void
-    private let onSuccess: (Int) -> Void
+    private let onSuccess: (_ count: Int, _ destinationDirectoryURL: URL) -> Void
     private let onError: (Error) -> Void
     private(set) var isExporting = false
 
@@ -30,7 +33,7 @@ final class SplitImageExportController {
         dependencies: Dependencies,
         diagnosticLogger: DiagnosticLogger,
         onExportingChange: @escaping (Bool) -> Void,
-        onSuccess: @escaping (Int) -> Void,
+        onSuccess: @escaping (_ count: Int, _ destinationDirectoryURL: URL) -> Void,
         onError: @escaping (Error) -> Void
     ) {
         self.dependencies = dependencies
@@ -56,23 +59,6 @@ final class SplitImageExportController {
             operationID: operationID
         )
 
-        let suggestedDirectoryName = SplitImageExportNaming
-            .suggestedDirectoryName(from: markdown)
-        guard let destinationDirectoryURL = dependencies
-            .chooseDestination(suggestedDirectoryName) else {
-            diagnosticLogger.record(
-                category: .renderer,
-                stage: .renderCompletion,
-                result: .cancelled,
-                operationID: operationID,
-                durationMilliseconds: DiagnosticDuration.milliseconds(
-                    since: startedAt
-                )
-            )
-            setExporting(false)
-            return
-        }
-
         dependencies.render(
             markdown,
             widthPreset,
@@ -81,7 +67,8 @@ final class SplitImageExportController {
         ) { [weak self] result in
             self?.renderDidFinish(
                 result,
-                destinationDirectoryURL: destinationDirectoryURL,
+                suggestedDirectoryName: SplitImageExportNaming
+                    .suggestedDirectoryName(from: markdown),
                 operationID: operationID,
                 startedAt: startedAt
             )
@@ -90,12 +77,38 @@ final class SplitImageExportController {
 
     private func renderDidFinish(
         _ result: Result<SplitRenderResult, Error>,
-        destinationDirectoryURL: URL,
+        suggestedDirectoryName: String,
         operationID: DiagnosticOperationID,
         startedAt: UInt64
     ) {
         switch result {
         case let .success(splitResult):
+            guard !splitResult.parts.isEmpty else {
+                onError(AppError.splitExportWriteFailed)
+                setExporting(false)
+                return
+            }
+            guard let destinationDirectoryURL = dependencies.chooseDestination(
+                suggestedDirectoryName,
+                splitResult.parts.count
+            ) else {
+                diagnosticLogger.record(
+                    category: .renderer,
+                    stage: .renderCompletion,
+                    result: .cancelled,
+                    operationID: operationID,
+                    durationMilliseconds: DiagnosticDuration.milliseconds(
+                        since: startedAt
+                    ),
+                    dimensions: DiagnosticDimensions(
+                        width: Int(splitResult.contentSize.width.rounded()),
+                        height: Int(splitResult.contentSize.height.rounded())
+                    ),
+                    itemCount: splitResult.parts.count
+                )
+                setExporting(false)
+                return
+            }
             Task { @MainActor [weak self] in
                 await self?.write(
                     splitResult,
@@ -143,7 +156,7 @@ final class SplitImageExportController {
                 ),
                 itemCount: result.parts.count
             )
-            onSuccess(result.parts.count)
+            onSuccess(result.parts.count, destinationDirectoryURL)
         } catch {
             diagnosticLogger.record(
                 category: .renderer,

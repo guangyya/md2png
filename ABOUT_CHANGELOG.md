@@ -5,6 +5,15 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Drag the current Preview image into Finder or another compatible app.
+- Show split PNGs in Finder after saving them.
+
+### Changed
+
+- Show the exact number of split PNGs before choosing their destination.
+
 ## [0.11.0] - 2026-08-18
 
 ### Added

@@ -3,6 +3,49 @@ import XCTest
 @testable import MD2PNG
 
 final class SplitImageExportTests: XCTestCase {
+    func testSaveDestinationPresentationIncludesExactFileCount() {
+        let single = SplitImageExportDestinationPresentation.make(
+            suggestedDirectoryName: "Roadmap-split",
+            fileCount: 1
+        )
+        XCTAssertEqual(single.title, "Save 1 Split PNG")
+        XCTAssertTrue(single.message.contains("containing 1 numbered PNG file"))
+
+        let multiple = SplitImageExportDestinationPresentation.make(
+            suggestedDirectoryName: "Roadmap-split",
+            fileCount: 12
+        )
+        XCTAssertEqual(multiple.title, "Save 12 Split PNGs")
+        XCTAssertTrue(multiple.message.contains("containing 12 numbered PNG files"))
+        XCTAssertEqual(multiple.prompt, "Choose Folder")
+    }
+
+    @MainActor
+    func testCompletionCanRevealEverySavedPNGInFinder() {
+        let destinationURL = URL(
+            fileURLWithPath: "/tmp/Roadmap-split",
+            isDirectory: true
+        )
+        var presented: SplitImageExportCompletionPresentation?
+        var revealedURLs: [URL] = []
+        let presenter = SplitImageExportCompletionPresenter(dependencies: .init(
+            confirmShowInFinder: { presentation in
+                presented = presentation
+                return true
+            },
+            revealFiles: { revealedURLs = $0 }
+        ))
+
+        presenter.show(count: 2, directoryURL: destinationURL)
+
+        XCTAssertEqual(presented?.title, "Saved 2 Split PNGs")
+        XCTAssertEqual(presented?.showInFinderTitle, "Show in Finder")
+        XCTAssertEqual(revealedURLs.map(\.lastPathComponent), [
+            "Roadmap-split-01.png",
+            "Roadmap-split-02.png"
+        ])
+    }
+
     func testNamingUsesMarkdownAndStableZeroPaddedNumbers() {
         XCTAssertEqual(
             SplitImageExportNaming.suggestedDirectoryName(

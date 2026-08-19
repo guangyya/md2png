@@ -17,6 +17,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Rename the Last Render window to Preview while keeping **Show Last Render** as
   the menu command that reopens the latest in-memory result.
+- Show the exact split-image count before choosing a destination, then offer to
+  select every saved PNG in Finder for immediate reuse.
 
 ## [0.11.0] - 2026-08-18
 

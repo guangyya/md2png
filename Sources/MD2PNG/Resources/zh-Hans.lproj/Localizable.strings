@@ -79,13 +79,16 @@
 "hud.png_copied_accessibility" = "PNG 已复制，可以按 Command-V 粘贴";
 "hud.png_copied_again_accessibility" = "PNG 已再次复制，可以按 Command-V 粘贴";
 "hud.markdown_restored_accessibility" = "Markdown 已恢复，可以按 Command-V 粘贴";
-"hud.split_png_saved" = "已保存 1 张分片 PNG";
-"hud.split_pngs_saved" = "已保存 %ld 张分片 PNG";
 "hud.launch_at_login_requires_approval" = "请在“登录项”中允许 md2png 以完成设置";
 
-"split_export.choose_folder_title" = "选择分片 PNG 的保存位置";
-"split_export.choose_folder_message" = "md2png 将新建“%@”文件夹，并在其中保存编号 PNG；不会写入剪贴板。";
+"split_export.save_one_title" = "保存 1 张分片 PNG";
+"split_export.save_many_title" = "保存 %ld 张分片 PNG";
+"split_export.save_one_message" = "md2png 将新建“%@”文件夹，并在其中保存 1 张编号 PNG；不会写入剪贴板。";
+"split_export.save_many_message" = "md2png 将新建“%1$@”文件夹，并在其中保存 %2$ld 张编号 PNG；不会写入剪贴板。";
 "split_export.choose_folder_action" = "选择文件夹";
+"split_export.saved_one_title" = "已保存 1 张分片 PNG";
+"split_export.saved_many_title" = "已保存 %ld 张分片 PNG";
+"split_export.saved_message" = "编号 PNG 已保存到“%@”。";
 
 "confirmation.clipboard_changed.title" = "剪贴板已更改";
 "confirmation.clipboard_changed.rerender" = "其他应用已更改剪贴板。是否用上次的 Markdown 重新渲染 PNG 并替换当前内容？";
@@ -324,3 +327,5 @@
 "common.ok" = "好";
 "common.replace" = "替换";
 "common.cancel" = "取消";
+"common.done" = "完成";
+"common.show_in_finder" = "在 Finder 中显示";

@@ -79,13 +79,16 @@
 "hud.png_copied_accessibility" = "PNG copied and ready to paste with Command-V";
 "hud.png_copied_again_accessibility" = "PNG copied again and ready to paste with Command-V";
 "hud.markdown_restored_accessibility" = "Markdown restored and ready to paste with Command-V";
-"hud.split_png_saved" = "Saved 1 split PNG";
-"hud.split_pngs_saved" = "Saved %ld split PNGs";
 "hud.launch_at_login_requires_approval" = "Allow md2png in Login Items to finish setup";
 
-"split_export.choose_folder_title" = "Choose a Folder for Split PNGs";
-"split_export.choose_folder_message" = "md2png will create a new “%@” folder containing numbered PNG files. Nothing will be copied to the clipboard.";
+"split_export.save_one_title" = "Save 1 Split PNG";
+"split_export.save_many_title" = "Save %ld Split PNGs";
+"split_export.save_one_message" = "md2png will create a new “%@” folder containing 1 numbered PNG file. Nothing will be copied to the clipboard.";
+"split_export.save_many_message" = "md2png will create a new “%1$@” folder containing %2$ld numbered PNG files. Nothing will be copied to the clipboard.";
 "split_export.choose_folder_action" = "Choose Folder";
+"split_export.saved_one_title" = "Saved 1 Split PNG";
+"split_export.saved_many_title" = "Saved %ld Split PNGs";
+"split_export.saved_message" = "The numbered PNG files were saved in “%@”.";
 
 "confirmation.clipboard_changed.title" = "Clipboard Changed";
 "confirmation.clipboard_changed.rerender" = "Another app changed the clipboard. Replace it with a new PNG rendered from the last Markdown?";
@@ -324,3 +327,5 @@
 "common.ok" = "OK";
 "common.replace" = "Replace";
 "common.cancel" = "Cancel";
+"common.done" = "Done";
+"common.show_in_finder" = "Show in Finder";
