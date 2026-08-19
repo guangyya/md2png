@@ -17,6 +17,35 @@ final class RenderedImageExportTests: XCTestCase {
         XCTAssertEqual(preference.selectedStyle, .square)
     }
 
+    func testRoundedCornerRadiusAdaptsToOutputWidthWithinSafeLimits() {
+        XCTAssertEqual(
+            RenderedImageStyler.roundedCornerRadius(
+                for: NSSize(width: 720, height: 1_000)
+            ),
+            24
+        )
+        XCTAssertEqual(
+            RenderedImageStyler.roundedCornerRadius(
+                for: NSSize(width: 1_120, height: 1_000)
+            ),
+            33.6,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            RenderedImageStyler.roundedCornerRadius(
+                for: NSSize(width: 1_520, height: 1_000)
+            ),
+            45.6,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            RenderedImageStyler.roundedCornerRadius(
+                for: NSSize(width: 2_000, height: 40)
+            ),
+            20
+        )
+    }
+
     @MainActor
     func testSquareStyleReturnsTheOriginalImageWithoutReprocessing() throws {
         let image = try makeRetinaImage(
@@ -42,10 +71,13 @@ final class RenderedImageExportTests: XCTestCase {
         let original = try XCTUnwrap(NSBitmapImageRep(
             data: RenderedImageExport.pngData(for: image)
         ))
+        let tiff = try XCTUnwrap(styled.tiffRepresentation)
+        let tiffBitmap = try XCTUnwrap(NSBitmapImageRep(data: tiff))
 
         XCTAssertEqual(RenderedImageExport.pixelSize(of: styled), NSSize(width: 64, height: 48))
         XCTAssertEqual(styled.size, image.size)
         XCTAssertLessThan(try XCTUnwrap(exported.colorAt(x: 0, y: 0)).alphaComponent, 0.05)
+        XCTAssertLessThan(try XCTUnwrap(tiffBitmap.colorAt(x: 0, y: 0)).alphaComponent, 0.05)
         XCTAssertGreaterThan(try XCTUnwrap(exported.colorAt(x: 32, y: 24)).alphaComponent, 0.95)
         XCTAssertGreaterThan(try XCTUnwrap(original.colorAt(x: 0, y: 0)).alphaComponent, 0.95)
     }
@@ -53,8 +85,8 @@ final class RenderedImageExportTests: XCTestCase {
     @MainActor
     func testRoundedStyleDoesNotResampleInteriorPixels() throws {
         let image = try makePixelPatternImage(
-            pointSize: NSSize(width: 32, height: 24),
-            pixelSize: NSSize(width: 64, height: 48)
+            pointSize: NSSize(width: 64, height: 48),
+            pixelSize: NSSize(width: 128, height: 96)
         )
         let original = try XCTUnwrap(NSBitmapImageRep(
             data: RenderedImageExport.pngData(for: image)
@@ -65,8 +97,8 @@ final class RenderedImageExportTests: XCTestCase {
             data: RenderedImageExport.pngData(for: styled)
         ))
 
-        for y in 16 ..< 32 {
-            for x in 16 ..< 48 {
+        for y in 24 ..< 72 {
+            for x in 24 ..< 104 {
                 var actual = [Int](repeating: 0, count: exported.samplesPerPixel)
                 var expected = [Int](repeating: 0, count: original.samplesPerPixel)
                 exported.getPixel(&actual, atX: x, y: y)

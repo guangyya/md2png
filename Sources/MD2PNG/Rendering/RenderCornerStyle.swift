@@ -27,7 +27,21 @@ struct RenderCornerPreference {
 }
 
 enum RenderedImageStyler {
-    static let roundedCornerRadius: CGFloat = 16
+    private static let minimumRoundedCornerRadius: CGFloat = 24
+    private static let maximumRoundedCornerRadius: CGFloat = 48
+    private static let roundedCornerWidthRatio: CGFloat = 0.03
+
+    static func roundedCornerRadius(for pixelSize: NSSize) -> CGFloat {
+        let proportionalRadius = pixelSize.width * roundedCornerWidthRatio
+        let preferredRadius = min(
+            max(proportionalRadius, minimumRoundedCornerRadius),
+            maximumRoundedCornerRadius
+        )
+        return min(
+            preferredRadius,
+            min(pixelSize.width, pixelSize.height) / 2
+        )
+    }
 
     @MainActor
     static func apply(
@@ -41,10 +55,10 @@ enum RenderedImageStyler {
             throw AppError.pngEncodingFailed
         }
 
-        let radius = min(
-            roundedCornerRadius,
-            CGFloat(min(bitmap.pixelsWide, bitmap.pixelsHigh)) / 2
-        )
+        let radius = roundedCornerRadius(for: NSSize(
+            width: bitmap.pixelsWide,
+            height: bitmap.pixelsHigh
+        ))
         applyRoundedAlphaMask(to: bitmap, radius: radius)
 
         bitmap.size = image.size
