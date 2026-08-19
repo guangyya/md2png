@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-19
+
 ### Added
 
 - Drag the rendered image from the Preview window into Finder or another
