@@ -39,8 +39,10 @@ SPARKLE_LICENSE := $(THIRD_PARTY_LICENSES)/Sparkle-2.9.5.txt
 SPARKLE_TEST_FRAMEWORKS := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
 SWIFT_TEST_ENV = DYLD_FRAMEWORK_PATH="$(SPARKLE_TEST_FRAMEWORKS)$${DYLD_FRAMEWORK_PATH:+:$${DYLD_FRAMEWORK_PATH}}"
 ICON_SOURCE := Assets/AppIcon/AppIcon.png
+ICON_CANVAS := .build/AppIcon-canvas.png
 ICONSET_DIR := .build/AppIcon.iconset
 APP_ICON := .build/AppIcon.icns
+ICON_CANVAS_GENERATOR := scripts/generate-app-icon-canvas.swift
 VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
@@ -77,16 +79,17 @@ renderer:
 icon:
 	rm -rf "$(ICONSET_DIR)"
 	mkdir -p "$(ICONSET_DIR)"
-	sips -z 16 16 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_16x16.png"
-	sips -z 32 32 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_16x16@2x.png"
-	sips -z 32 32 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_32x32.png"
-	sips -z 64 64 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_32x32@2x.png"
-	sips -z 128 128 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_128x128.png"
-	sips -z 256 256 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_128x128@2x.png"
-	sips -z 256 256 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_256x256.png"
-	sips -z 512 512 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_256x256@2x.png"
-	sips -z 512 512 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_512x512.png"
-	sips -z 1024 1024 "$(ICON_SOURCE)" --out "$(ICONSET_DIR)/icon_512x512@2x.png"
+	swift "$(ICON_CANVAS_GENERATOR)" "$(ICON_SOURCE)" "$(ICON_CANVAS)"
+	sips -z 16 16 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_16x16.png"
+	sips -z 32 32 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_16x16@2x.png"
+	sips -z 32 32 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_32x32.png"
+	sips -z 64 64 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_32x32@2x.png"
+	sips -z 128 128 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_128x128.png"
+	sips -z 256 256 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_128x128@2x.png"
+	sips -z 256 256 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_256x256.png"
+	sips -z 512 512 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_256x256@2x.png"
+	sips -z 512 512 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_512x512.png"
+	sips -z 1024 1024 "$(ICON_CANVAS)" --out "$(ICONSET_DIR)/icon_512x512@2x.png"
 	iconutil -c icns "$(ICONSET_DIR)" -o "$(APP_ICON)"
 
 coverage-tool-test:

@@ -51,11 +51,12 @@ sending it.
   clipboard. Copying remains an explicit Preview action.
 - Bundled Examples render directly into Preview without changing the clipboard;
   copying the resulting PNG remains an explicit Preview action.
-- Explicit Save-only export of tall clipboard Markdown into a new folder of
-  numbered PNGs. Slices use the current theme and width, prefer block boundaries,
-  and protect fitting code blocks, Mermaid diagrams, and table rows without
-  changing the clipboard. The destination chooser confirms the exact part count,
-  and completion can select every saved PNG in Finder for immediate reuse.
+- Explicit Save-only recovery for a height-limit failure, exporting the retained
+  source Markdown into a new folder of numbered PNGs. Slices use the theme and
+  width captured by the failed render, prefer block boundaries, and protect
+  fitting code blocks, Mermaid diagrams, and table rows without changing the
+  clipboard. The destination chooser confirms the exact part count, and
+  completion can select every saved PNG in Finder for immediate reuse.
 - Configurable global render and last-preview shortcuts, with local persistence,
   conflict feedback, Restore Defaults, and equivalent menu commands that remain
   available when global registration fails.

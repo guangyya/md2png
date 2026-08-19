@@ -5,6 +5,8 @@
 md2png is a menu bar accessory. It does not show a Dock icon or open a main
 window at launch. Look for the md2png symbol in the macOS menu bar. If the menu
 bar is crowded, check hidden menu bar items or temporarily quit another utility.
+The Dock icon appears only while an md2png window such as Welcome, Preview,
+Settings, or About is open, then disappears after the last window closes.
 
 ## A global shortcut does nothing
 

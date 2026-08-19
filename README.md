@@ -105,7 +105,7 @@ A GFM table needs a separator row:
 | Restore Last Markdown | — | Restores the latest successful source to the clipboard |
 | Theme | — | Selects one of five bundled render palettes and remembers the selection locally |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
-| Examples | — | Copies and renders the selected bundled sample, then opens its preview |
+| Examples | — | Renders the selected bundled sample and opens Preview without changing the clipboard |
 | Launch at Login | — | Opts the main app into the native macOS login service; off by default |
 | Settings… | `Command-,` | Records, applies, and restores the two global shortcuts |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
