@@ -221,6 +221,10 @@ final class MarkdownRenderer: NSObject, WKNavigationDelegate {
         ObjectIdentifier(webView)
     }
 
+    var recoveryPhaseForTesting: RendererRecoveryState.Phase {
+        recoveryState.phase
+    }
+
     func simulateContentProcessTerminationForTesting() {
         webViewWebContentProcessDidTerminate(webView)
     }
