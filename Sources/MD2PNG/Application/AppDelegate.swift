@@ -334,6 +334,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 renderClipboard: { [weak self] in
                     self?.renderCoordinator.renderClipboard()
                 },
+                renderMarkdownFile: { [weak self] in
+                    self?.renderMarkdownFile()
+                },
                 showLastRender: { [weak self] in
                     self?.renderCoordinator.showLastRender()
                 },
@@ -379,6 +382,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func statusMenuWillOpen() {
         sampleGuidePresenter.dismiss()
         refreshClipboardMenuState()
+    }
+
+    private func renderMarkdownFile() {
+        guard renderCoordinator.canStartRenderAction,
+              let fileURL = MarkdownFilePicker.choose() else {
+            return
+        }
+        do {
+            let markdown = try MarkdownFileInput.load(from: fileURL)
+            renderCoordinator.renderMarkdownFile(markdown)
+        } catch {
+            show(error)
+        }
     }
 
     private func applyRenderState(_ state: RenderCoordinatorState) {

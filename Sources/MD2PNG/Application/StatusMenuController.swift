@@ -10,6 +10,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     struct Actions {
         let menuWillOpen: () -> Void
         let renderClipboard: () -> Void
+        let renderMarkdownFile: () -> Void
         let showLastRender: () -> Void
         let rerenderLastMarkdown: () -> Void
         let restoreLastMarkdown: () -> Void
@@ -157,6 +158,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         )
         renderMenuItem.target = self
 
+        let renderMarkdownFileMenuItem = NSMenuItem(
+            title: StatusMenuPresentation.title(for: .renderMarkdownFile),
+            action: #selector(renderMarkdownFile),
+            keyEquivalent: ""
+        )
+        renderMarkdownFileMenuItem.target = self
+
         let previewMenuItem = NSMenuItem(
             title: StatusMenuPresentation.title(for: .showLastRender),
             action: #selector(showLastRender),
@@ -266,6 +274,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         statusMenuItems = [
             .renderClipboard: renderMenuItem,
+            .renderMarkdownFile: renderMarkdownFileMenuItem,
             .showLastRender: previewMenuItem,
             .rerenderLastMarkdown: rerenderLastMarkdownMenuItem,
             .restoreLastMarkdown: restoreLastMarkdownMenuItem,
@@ -304,6 +313,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func renderClipboard() {
         actions.renderClipboard()
+    }
+
+    @objc private func renderMarkdownFile() {
+        actions.renderMarkdownFile()
     }
 
     @objc private func showLastRender() {

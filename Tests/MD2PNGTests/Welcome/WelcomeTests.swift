@@ -84,6 +84,8 @@ final class WelcomeTests: XCTestCase {
         XCTAssertEqual(chinese.pasteStepCompletionDetail, "检查后再发送")
         XCTAssertEqual(englishGuide.title, "Find Examples in the md2png menu")
         XCTAssertEqual(chineseGuide.title, "在 md2png 菜单中找到“示例”")
+        XCTAssertEqual(englishGuide.renderMarkdownFile, "Render Markdown File…")
+        XCTAssertEqual(chineseGuide.renderMarkdownFile, "渲染 Markdown 文件…")
         XCTAssertEqual(englishGuide.exampleTitle(.short), "Short Example")
         XCTAssertEqual(chineseGuide.exampleTitle(.short), "简短示例")
         XCTAssertEqual(chinese.shortcutDetected, "已检测")
@@ -613,11 +615,11 @@ final class WelcomeTests: XCTestCase {
 
     func testSampleGuideKeepsACompactDemoMenu() {
         XCTAssertEqual(SampleGuideLayout.menuSections, [
-            [.renderClipboard, .showLastRender],
+            [.renderClipboard, .renderMarkdownFile, .showLastRender],
             [.theme, .outputWidth, .examples],
             [.about, .quit]
         ])
-        XCTAssertEqual(SampleGuideLayout.menuSections.flatMap { $0 }.count, 7)
+        XCTAssertEqual(SampleGuideLayout.menuSections.flatMap { $0 }.count, 8)
     }
 
     func testSampleGuidePlacementKeepsAValidAnchorAndOpensExamplesOnTheRight() {

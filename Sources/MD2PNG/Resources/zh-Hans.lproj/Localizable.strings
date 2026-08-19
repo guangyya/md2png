@@ -6,6 +6,7 @@
 
 "menu.clipboard" = "剪贴板";
 "menu.render" = "将剪贴板渲染为图片";
+"menu.render_markdown_file" = "渲染 Markdown 文件…";
 "menu.rerender_last_markdown" = "重新渲染上次的 Markdown";
 "menu.restore_last_markdown" = "恢复上次的 Markdown";
 "menu.show_last_render" = "显示上次渲染";
@@ -34,6 +35,10 @@
 "clipboard.labeled" = "剪贴板：%@";
 "clipboard.png_image" = "PNG 图片";
 "clipboard.no_text" = "无文本";
+
+"file_import.title" = "渲染 Markdown 文件";
+"file_import.message" = "选择要在本机渲染的 Markdown 或纯文本文件。";
+"file_import.prompt" = "渲染";
 
 "example.short" = "简短示例";
 "example.long" = "完整示例";
@@ -99,6 +104,10 @@
 "confirmation.render_and_replace" = "渲染并替换";
 
 "error.empty_clipboard" = "没有可渲染的 Markdown。请先复制 Markdown，然后重试。";
+"error.unsupported_markdown_file_type" = "请选择 .md、.markdown 或 .txt 文件，剪贴板内容未改变。";
+"error.markdown_file_read_failed" = "无法读取所选文件，剪贴板内容未改变。请检查文件权限后重试。";
+"error.markdown_file_invalid_encoding" = "所选文件不是有效的 UTF-8，剪贴板内容未改变。请将文件另存为 UTF-8 后重试。";
+"error.empty_markdown_file" = "所选文件中没有可渲染的 Markdown，剪贴板内容未改变。";
 "error.renderer_unavailable" = "无法渲染 Markdown，剪贴板内容未改变。请重新打开 md2png 后重试。";
 "error.renderer_recovery_failed" = "无法渲染 Markdown，剪贴板内容未改变。请重试；若仍然失败，请重新打开 md2png。";
 "error.renderer_timed_out" = "渲染时间过长，剪贴板内容未改变。请缩短 Markdown 后重试。";

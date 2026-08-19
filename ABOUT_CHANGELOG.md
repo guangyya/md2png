@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Render a local Markdown or text file directly from the md2png menu.
+
 ## [0.13.1] - 2026-08-19
 
 ### Fixed

@@ -7,7 +7,7 @@ import XCTest
 final class StatusMenuPresentationTests: XCTestCase {
     func testMenuLayoutKeepsFrequentCommandsFirstAndEveryCommandStable() {
         XCTAssertEqual(StatusMenuLayout.sections, [
-            [.renderClipboard, .showLastRender],
+            [.renderClipboard, .renderMarkdownFile, .showLastRender],
             [.rerenderLastMarkdown, .restoreLastMarkdown],
             [.theme, .outputWidth, .examples],
             [.settings, .showWelcome, .about],
@@ -28,6 +28,8 @@ final class StatusMenuPresentationTests: XCTestCase {
 
         XCTAssertEqual(empty[.renderClipboard].title, "Render Clipboard as Image")
         XCTAssertFalse(empty[.renderClipboard].isEnabled)
+        XCTAssertEqual(empty[.renderMarkdownFile].title, "Render Markdown File…")
+        XCTAssertTrue(empty[.renderMarkdownFile].isEnabled)
         XCTAssertFalse(empty[.showLastRender].isEnabled)
         XCTAssertFalse(empty[.rerenderLastMarkdown].isEnabled)
         XCTAssertFalse(empty[.restoreLastMarkdown].isEnabled)
@@ -50,6 +52,8 @@ final class StatusMenuPresentationTests: XCTestCase {
         )
 
         XCTAssertTrue(presentation[.renderClipboard].isEnabled)
+        XCTAssertEqual(presentation[.renderMarkdownFile].title, "渲染 Markdown 文件…")
+        XCTAssertTrue(presentation[.renderMarkdownFile].isEnabled)
         XCTAssertTrue(presentation[.showLastRender].isEnabled)
         XCTAssertTrue(presentation[.rerenderLastMarkdown].isEnabled)
         XCTAssertTrue(presentation[.restoreLastMarkdown].isEnabled)
@@ -102,6 +106,7 @@ final class StatusMenuPresentationTests: XCTestCase {
         ] {
             let presentation = StatusMenuPresentation(state: state)
             XCTAssertFalse(presentation[.renderClipboard].isEnabled)
+            XCTAssertFalse(presentation[.renderMarkdownFile].isEnabled)
             XCTAssertTrue(presentation[.showLastRender].isEnabled)
             XCTAssertFalse(presentation[.rerenderLastMarkdown].isEnabled)
             XCTAssertFalse(presentation[.restoreLastMarkdown].isEnabled)
@@ -176,6 +181,24 @@ final class StatusMenuPresentationTests: XCTestCase {
     }
 
     @MainActor
+    func testRenderMarkdownFileMenuRoutesItsExplicitAction() {
+        _ = NSApplication.shared
+        var actionCount = 0
+        let controller = StatusMenuController(
+            selectedWidthPreset: .standard,
+            selectedTheme: .cleanLight,
+            actions: emptyStatusMenuActions(renderMarkdownFile: {
+                actionCount += 1
+            })
+        )
+        defer { controller.removeStatusItem() }
+
+        controller.performCommandForTesting(.renderMarkdownFile)
+
+        XCTAssertEqual(actionCount, 1)
+    }
+
+    @MainActor
     func testShortcutConflictKeepsEquivalentMenuCommandsAndAccessibleNames() throws {
         let english = try XCTUnwrap(L10n.localizedBundle(for: "en"))
         let chinese = try XCTUnwrap(L10n.localizedBundle(for: "zh-Hans"))
@@ -222,10 +245,13 @@ final class StatusMenuPresentationTests: XCTestCase {
     }
 
     @MainActor
-    private func emptyStatusMenuActions() -> StatusMenuController.Actions {
+    private func emptyStatusMenuActions(
+        renderMarkdownFile: @escaping () -> Void = {}
+    ) -> StatusMenuController.Actions {
         StatusMenuController.Actions(
             menuWillOpen: {},
             renderClipboard: {},
+            renderMarkdownFile: renderMarkdownFile,
             showLastRender: {},
             rerenderLastMarkdown: {},
             restoreLastMarkdown: {},

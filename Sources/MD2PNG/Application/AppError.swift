@@ -2,6 +2,10 @@ import Foundation
 
 enum AppError: LocalizedError {
     case emptyClipboard
+    case unsupportedMarkdownFileType
+    case markdownFileReadFailed
+    case markdownFileInvalidEncoding
+    case emptyMarkdownFile
     case rendererUnavailable
     case rendererRecoveryFailed
     case rendererTimedOut
@@ -27,6 +31,30 @@ enum AppError: LocalizedError {
             return L10n.text(
                 "error.empty_clipboard",
                 defaultValue: "No Markdown to render. Copy Markdown, then try again.",
+                bundle: localizationBundle
+            )
+        case .unsupportedMarkdownFileType:
+            return L10n.text(
+                "error.unsupported_markdown_file_type",
+                defaultValue: "Choose a .md, .markdown, or .txt file. The clipboard is unchanged.",
+                bundle: localizationBundle
+            )
+        case .markdownFileReadFailed:
+            return L10n.text(
+                "error.markdown_file_read_failed",
+                defaultValue: "Couldn’t read the selected file. The clipboard is unchanged. Check its permissions and try again.",
+                bundle: localizationBundle
+            )
+        case .markdownFileInvalidEncoding:
+            return L10n.text(
+                "error.markdown_file_invalid_encoding",
+                defaultValue: "The selected file isn’t valid UTF-8. The clipboard is unchanged. Save it as UTF-8 and try again.",
+                bundle: localizationBundle
+            )
+        case .emptyMarkdownFile:
+            return L10n.text(
+                "error.empty_markdown_file",
+                defaultValue: "The selected file has no Markdown to render. The clipboard is unchanged.",
                 bundle: localizationBundle
             )
         case .rendererUnavailable:
