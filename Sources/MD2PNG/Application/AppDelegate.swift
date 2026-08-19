@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let diagnosticLogger: DiagnosticLogger
-    private lazy var updateController = UpdateController(
+    private lazy var updateController: UpdateController = UpdateController(
         diagnosticLogger: diagnosticLogger,
         updateDriver: SparkleUpdateDriver {
             UpdateChannel.current().repository?.appcastURL
@@ -27,16 +27,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let welcomePreference = WelcomePreference()
     private let globalShortcutPreference: GlobalShortcutPreference
     private let injectedSampleGuidePresenter: (any SampleGuidePresenting)?
-    private lazy var feedbackPresenter = ApplicationFeedbackPresenter(
-        actions: ApplicationFeedbackPresenter.Actions(
-            statusItemButton: { [weak self] in
-                self?.menuCoordinator.button
-            },
-            saveFailedRenderAsSplitPNGs: { [weak self] in
-                self?.renderCoordinator.saveFailedRenderAsSplitPNGs()
-            }
+    private lazy var feedbackPresenter: ApplicationFeedbackPresenter =
+        ApplicationFeedbackPresenter(
+            actions: ApplicationFeedbackPresenter.Actions(
+                statusItemButton: { [weak self] in
+                    self?.menuCoordinator.button
+                },
+                saveFailedRenderAsSplitPNGs: { [weak self] in
+                    self?.renderCoordinator.saveFailedRenderAsSplitPNGs()
+                }
+            )
         )
-    )
     private lazy var sampleGuidePresenter: any SampleGuidePresenting = {
         if let injectedSampleGuidePresenter {
             return injectedSampleGuidePresenter
@@ -47,170 +48,177 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
     }()
-    private lazy var globalShortcutCoordinator = GlobalShortcutCoordinator(
-        preference: globalShortcutPreference,
-        diagnosticLogger: diagnosticLogger,
-        verify: { [weak self] command in
-            self?.verifyGlobalShortcut(command) ?? false
-        },
-        perform: { [weak self] command in
-            self?.performGlobalShortcut(command)
-        },
-        onStateChange: { [weak self] state in
-            self?.applyGlobalShortcutState(state)
-        }
-    )
-    private lazy var windowPresentationCoordinator = WindowPresentationCoordinator(
-        updateController: updateController,
-        diagnosticLogger: diagnosticLogger,
-        launchAtLoginController: launchAtLoginController,
-        welcomePreference: welcomePreference,
-        globalShortcutPreference: globalShortcutPreference,
-        shortcutState: { [weak self] in
-            self?.currentShortcutWindowState() ?? .init(
-                configuration: .default,
-                failedRegistrationIDs: []
-            )
-        },
-        actions: WindowPresentationCoordinator.Actions(
-            previewCopied: { [weak self] changeCount in
-                self?.previewDidCopy(changeCount: changeCount)
+    private lazy var globalShortcutCoordinator: GlobalShortcutCoordinator =
+        GlobalShortcutCoordinator(
+            preference: globalShortcutPreference,
+            diagnosticLogger: diagnosticLogger,
+            verify: { [weak self] command in
+                self?.verifyGlobalShortcut(command) ?? false
             },
-            showError: { [weak self] error in
-                self?.feedbackPresenter.show(error)
+            perform: { [weak self] command in
+                self?.performGlobalShortcut(command)
             },
-            applyShortcuts: { [weak self] configuration in
-                self?.applyGlobalShortcuts(configuration) ?? []
-            },
-            suspendShortcuts: { [weak self] in
-                self?.suspendGlobalShortcuts()
-            },
-            restoreShortcuts: { [weak self] in
-                self?.restoreGlobalShortcuts()
-            },
-            trySample: { [weak self] in
-                self?.showSampleGuide()
-            },
-            dismissTransientPresentation: { [weak self] in
-                self?.sampleGuidePresenter.dismiss()
+            onStateChange: { [weak self] state in
+                self?.applyGlobalShortcutState(state)
             }
         )
-    )
-    private lazy var renderCoordinator = RenderCoordinator(
-        diagnosticLogger: diagnosticLogger,
-        confirmClipboardOverwrite: { [weak self] action in
-            self?.feedbackPresenter.confirmClipboardOverwrite(action) ?? false
-        },
-        onStateChange: { [weak self] state in
-            self?.applyRenderState(state)
-        },
-        onNotice: { [weak self] notice in
-            self?.feedbackPresenter.show(notice)
-        },
-        onError: { [weak self] error in
-            self?.feedbackPresenter.show(error)
-        },
-        onPreviewRequested: { [weak self] lastRender in
-            self?.showPreview(lastRender)
-        }
-    )
-    private lazy var updateStatusPresenter = UpdateStatusPresenter(
-        showHUD: { [weak self] message, symbol, style in
-            self?.feedbackPresenter.showHUD(
-                message,
-                symbol: symbol,
-                style: style
-            )
-        },
-        applyStatusItem: { [weak self] presentation in
-            self?.menuCoordinator.applyStatusItem(presentation)
-        },
-        isAboutVisible: { [weak self] in
-            self?.isAboutVisible() == true
-        },
-        announce: { [weak self] message in
-            self?.feedbackPresenter.announce(message, priority: .medium)
-        }
-    )
-    private lazy var menuCoordinator = ApplicationMenuCoordinator(
-        updateController: updateController,
-        updateStatusPresenter: updateStatusPresenter,
-        currentRenderState: { [weak self] in
-            self?.renderCoordinator.state ?? RenderCoordinatorState(
-                isRendering: false,
-                hasLastSource: false,
-                hasLastRender: false,
-                isUpdateInstallPending: false,
-                isPresentingClipboardConfirmation: false,
-                selectedWidthPreset: .standard,
-                selectedTheme: .cleanLight
-            )
-        },
-        currentShortcutConfiguration: { [weak self] in
-            self?.globalShortcutCoordinator.configuration ?? .default
-        },
-        actions: ApplicationMenuCoordinator.Actions(
-            renderClipboard: { [weak self] in
-                self?.renderCoordinator.renderClipboard()
-            },
-            renderMarkdownFile: { [weak self] in
-                self?.renderMarkdownFile()
-            },
-            showLastRender: { [weak self] in
-                self?.renderCoordinator.showLastRender()
-            },
-            rerenderLastMarkdown: { [weak self] in
-                self?.renderCoordinator.rerenderLastMarkdown()
-            },
-            restoreLastMarkdown: { [weak self] in
-                self?.renderCoordinator.restoreLastMarkdown()
-            },
-            renderExample: { [weak self] kind in
-                self?.renderCoordinator.renderExample(kind)
-            },
-            selectWidthPreset: { [weak self] preset in
-                self?.renderCoordinator.selectWidthPreset(preset)
-            },
-            selectTheme: { [weak self] theme in
-                self?.renderCoordinator.selectTheme(theme)
-            },
-            showSettings: { [weak self] in
-                self?.windowPresentationCoordinator.showSettings()
-            },
-            showWelcome: { [weak self] in
-                guard let self else { return }
-                self.windowPresentationCoordinator.showWelcome(
-                    shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
+    private lazy var windowPresentationCoordinator: WindowPresentationCoordinator =
+        WindowPresentationCoordinator(
+            updateController: updateController,
+            diagnosticLogger: diagnosticLogger,
+            launchAtLoginController: launchAtLoginController,
+            welcomePreference: welcomePreference,
+            globalShortcutPreference: globalShortcutPreference,
+            shortcutState: { [weak self] in
+                self?.currentShortcutWindowState() ?? .init(
+                    configuration: .default,
+                    failedRegistrationIDs: []
                 )
             },
-            showAbout: { [weak self] in
-                self?.windowPresentationCoordinator.showAbout()
-            },
-            dismissTransientPresentation: { [weak self] in
-                self?.sampleGuidePresenter.dismiss()
-            },
-            quit: { NSApp.terminate(nil) }
+            actions: WindowPresentationCoordinator.Actions(
+                previewCopied: { [weak self] changeCount in
+                    self?.previewDidCopy(changeCount: changeCount)
+                },
+                showError: { [weak self] error in
+                    self?.feedbackPresenter.show(error)
+                },
+                applyShortcuts: { [weak self] configuration in
+                    self?.applyGlobalShortcuts(configuration) ?? []
+                },
+                suspendShortcuts: { [weak self] in
+                    self?.suspendGlobalShortcuts()
+                },
+                restoreShortcuts: { [weak self] in
+                    self?.restoreGlobalShortcuts()
+                },
+                trySample: { [weak self] in
+                    self?.showSampleGuide()
+                },
+                dismissTransientPresentation: { [weak self] in
+                    self?.sampleGuidePresenter.dismiss()
+                }
+            )
         )
-    )
-    private lazy var terminationCoordinator = ApplicationTerminationCoordinator(
-        dependencies: ApplicationTerminationCoordinator.Dependencies(
-            isUpdateInstallPending: { [weak self] in
-                self?.renderCoordinator.isUpdateInstallPending == true
+    private lazy var renderCoordinator: RenderCoordinator =
+        RenderCoordinator(
+            diagnosticLogger: diagnosticLogger,
+            confirmClipboardOverwrite: { [weak self] action in
+                self?.feedbackPresenter.confirmClipboardOverwrite(action) ?? false
             },
-            cancelPreparedInstallation: { [weak self] completion in
-                self?.updateController
-                    .cancelPreparedInstallationForApplicationTermination(
-                        completion: completion
-                    ) ?? false
+            onStateChange: { [weak self] state in
+                self?.applyRenderState(state)
+            },
+            onNotice: { [weak self] notice in
+                self?.feedbackPresenter.show(notice)
+            },
+            onError: { [weak self] error in
+                self?.feedbackPresenter.show(error)
+            },
+            onPreviewRequested: { [weak self] lastRender in
+                self?.showPreview(lastRender)
             }
-        ),
-        diagnosticLogger: diagnosticLogger
-    )
-    private lazy var markdownFileServiceProvider = MarkdownFileServiceProvider(
-        onOpen: { [weak self] urls in
-            self?.receiveMarkdownFileOpenRequest(urls)
-        }
-    )
+        )
+    private lazy var updateStatusPresenter: UpdateStatusPresenter =
+        UpdateStatusPresenter(
+            showHUD: { [weak self] message, symbol, style in
+                self?.feedbackPresenter.showHUD(
+                    message,
+                    symbol: symbol,
+                    style: style
+                )
+            },
+            applyStatusItem: { [weak self] presentation in
+                self?.menuCoordinator.applyStatusItem(presentation)
+            },
+            isAboutVisible: { [weak self] in
+                self?.isAboutVisible() == true
+            },
+            announce: { [weak self] message in
+                self?.feedbackPresenter.announce(message, priority: .medium)
+            }
+        )
+    private lazy var menuCoordinator: ApplicationMenuCoordinator =
+        ApplicationMenuCoordinator(
+            updateController: updateController,
+            updateStatusPresenter: updateStatusPresenter,
+            currentRenderState: { [weak self] in
+                self?.renderCoordinator.state ?? RenderCoordinatorState(
+                    isRendering: false,
+                    hasLastSource: false,
+                    hasLastRender: false,
+                    isUpdateInstallPending: false,
+                    isPresentingClipboardConfirmation: false,
+                    selectedWidthPreset: .standard,
+                    selectedTheme: .cleanLight
+                )
+            },
+            currentShortcutConfiguration: { [weak self] in
+                self?.globalShortcutCoordinator.configuration ?? .default
+            },
+            actions: ApplicationMenuCoordinator.Actions(
+                renderClipboard: { [weak self] in
+                    self?.renderCoordinator.renderClipboard()
+                },
+                renderMarkdownFile: { [weak self] in
+                    self?.renderMarkdownFile()
+                },
+                showLastRender: { [weak self] in
+                    self?.renderCoordinator.showLastRender()
+                },
+                rerenderLastMarkdown: { [weak self] in
+                    self?.renderCoordinator.rerenderLastMarkdown()
+                },
+                restoreLastMarkdown: { [weak self] in
+                    self?.renderCoordinator.restoreLastMarkdown()
+                },
+                renderExample: { [weak self] kind in
+                    self?.renderCoordinator.renderExample(kind)
+                },
+                selectWidthPreset: { [weak self] preset in
+                    self?.renderCoordinator.selectWidthPreset(preset)
+                },
+                selectTheme: { [weak self] theme in
+                    self?.renderCoordinator.selectTheme(theme)
+                },
+                showSettings: { [weak self] in
+                    self?.windowPresentationCoordinator.showSettings()
+                },
+                showWelcome: { [weak self] in
+                    guard let self else { return }
+                    self.windowPresentationCoordinator.showWelcome(
+                        shortcuts: self.globalShortcutCoordinator.welcomeShortcuts
+                    )
+                },
+                showAbout: { [weak self] in
+                    self?.windowPresentationCoordinator.showAbout()
+                },
+                dismissTransientPresentation: { [weak self] in
+                    self?.sampleGuidePresenter.dismiss()
+                },
+                quit: { NSApp.terminate(nil) }
+            )
+        )
+    private lazy var terminationCoordinator: ApplicationTerminationCoordinator =
+        ApplicationTerminationCoordinator(
+            dependencies: ApplicationTerminationCoordinator.Dependencies(
+                isUpdateInstallPending: { [weak self] in
+                    self?.renderCoordinator.isUpdateInstallPending == true
+                },
+                cancelPreparedInstallation: { [weak self] completion in
+                    self?.updateController
+                        .cancelPreparedInstallationForApplicationTermination(
+                            completion: completion
+                        ) ?? false
+                }
+            ),
+            diagnosticLogger: diagnosticLogger
+        )
+    private lazy var markdownFileServiceProvider: MarkdownFileServiceProvider =
+        MarkdownFileServiceProvider(
+            onOpen: { [weak self] urls in
+                self?.receiveMarkdownFileOpenRequest(urls)
+            }
+        )
 
     private var isSampleGuidePresentationScheduled = false
     private var isReadyForFileOpen = false
