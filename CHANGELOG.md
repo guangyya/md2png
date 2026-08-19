@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-08-19
+
 ### Changed
 
 - Migrate release preparation from the deprecated GitHub App ID action input to
