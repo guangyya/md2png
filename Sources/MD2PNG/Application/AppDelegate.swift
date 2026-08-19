@@ -420,7 +420,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         do {
-            try renderMarkdownFile(at: fileURL, showsPreviewOnSuccess: false)
+            let markdown = try MarkdownFileInput.load(from: fileURL)
+            renderCoordinator.renderMarkdownFile(markdown)
         } catch {
             show(error)
         }
@@ -432,21 +433,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard renderCoordinator.canStartRenderAction else {
                 throw AppError.markdownFileOpenBusy
             }
-            try renderMarkdownFile(at: fileURL, showsPreviewOnSuccess: true)
+            let markdown = try MarkdownFileInput.load(from: fileURL)
+            renderCoordinator.previewMarkdownFile(markdown)
         } catch {
             show(error)
         }
-    }
-
-    private func renderMarkdownFile(
-        at fileURL: URL,
-        showsPreviewOnSuccess: Bool
-    ) throws {
-        let markdown = try MarkdownFileInput.load(from: fileURL)
-        renderCoordinator.renderMarkdownFile(
-            markdown,
-            showsPreviewOnSuccess: showsPreviewOnSuccess
-        )
     }
 
     private func applyRenderState(_ state: RenderCoordinatorState) {

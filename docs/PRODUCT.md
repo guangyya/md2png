@@ -47,7 +47,8 @@ sending it.
   history, persistent access, or clipboard changes on failure. The picker
   disables unsupported extensions; Finder can open one `.md` or `.markdown`
   file with md2png, or send one file through **Services → Preview with md2png**,
-  and shows Preview only after a successful render.
+  and shows Preview only after a successful render without changing the
+  clipboard. Copying remains an explicit Preview action.
 - Bundled Examples render directly into Preview without changing the clipboard;
   copying the resulting PNG remains an explicit Preview action.
 - Explicit Save-only export of tall clipboard Markdown into a new folder of

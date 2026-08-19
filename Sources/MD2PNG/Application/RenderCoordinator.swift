@@ -38,6 +38,19 @@ final class RenderCoordinator {
         let theme: RenderTheme
     }
 
+    private enum RenderDestination: Equatable {
+        case clipboard
+        case preview
+
+        var writesImageToClipboard: Bool {
+            self == .clipboard
+        }
+
+        var showsPreview: Bool {
+            self == .preview
+        }
+    }
+
     @MainActor
     struct Dependencies {
         let render: (
@@ -273,12 +286,14 @@ final class RenderCoordinator {
         }
     }
 
-    func renderMarkdownFile(
-        _ markdown: String,
-        showsPreviewOnSuccess: Bool = false
-    ) {
+    func renderMarkdownFile(_ markdown: String) {
         guard canStartRenderAction else { return }
-        render(markdown, showsPreviewOnSuccess: showsPreviewOnSuccess)
+        render(markdown)
+    }
+
+    func previewMarkdownFile(_ markdown: String) {
+        guard canStartRenderAction else { return }
+        render(markdown, destination: .preview)
     }
 
     func saveFailedRenderAsSplitPNGs() {
@@ -358,11 +373,7 @@ final class RenderCoordinator {
             return
         }
 
-        render(
-            markdown,
-            showsPreviewOnSuccess: true,
-            writesImageToClipboard: false
-        )
+        render(markdown, destination: .preview)
     }
 
     func selectWidthPreset(_ preset: RenderWidthPreset) {
@@ -394,8 +405,7 @@ final class RenderCoordinator {
 
     private func render(
         _ markdown: String,
-        showsPreviewOnSuccess: Bool = false,
-        writesImageToClipboard: Bool = true
+        destination: RenderDestination = .clipboard
     ) {
         guard canStartRenderAction else { return }
         pendingSplitExportRecovery = nil
@@ -428,7 +438,7 @@ final class RenderCoordinator {
                         to: image
                     )
                     let changeCount: Int?
-                    if writesImageToClipboard {
+                    if destination.writesImageToClipboard {
                         changeCount = try self.dependencies.writeImage(outputImage)
                     } else {
                         changeCount = nil
@@ -440,7 +450,7 @@ final class RenderCoordinator {
                         markdown: markdown,
                         clipboardChangeCount: changeCount
                     )
-                    if writesImageToClipboard {
+                    if destination.writesImageToClipboard {
                         self.diagnosticLogger.record(
                             category: .clipboard,
                             stage: .clipboardWrite,
@@ -462,14 +472,14 @@ final class RenderCoordinator {
                         dimensions: dimensions
                     )
                     self.finishRender()
-                    if writesImageToClipboard {
+                    if destination.writesImageToClipboard {
                         self.onNotice(.imageCopied)
                     }
-                    if showsPreviewOnSuccess, let lastRender = self.lastRender {
+                    if destination.showsPreview, let lastRender = self.lastRender {
                         self.onPreviewRequested(lastRender)
                     }
                 } catch {
-                    if writesImageToClipboard {
+                    if destination.writesImageToClipboard {
                         self.diagnosticLogger.record(
                             category: .clipboard,
                             stage: .clipboardWrite,

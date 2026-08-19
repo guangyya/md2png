@@ -14,10 +14,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   history or changing the clipboard when selection, reading, or rendering
   fails.
 - Open `.md` and `.markdown` files with md2png from Finder, then show the
-  successful result in Preview. The in-app file picker now disables every
-  extension other than `.md`, `.markdown`, and `.txt`.
+  successful result in Preview without changing the clipboard. The in-app file
+  picker now disables every extension other than `.md`, `.markdown`, and `.txt`.
 - Send a Finder file through **Services → Preview with md2png** to use the same
-  local, single-file rendering and Preview workflow without an extension or
+  local, preview-only workflow without an extension, clipboard change, or
   additional permission.
 - Open bundled Examples directly in Preview without changing the clipboard;
   copying the rendered PNG is now an explicit Preview action.

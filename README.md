@@ -43,8 +43,9 @@ messages.
 
 Alternatively, Control-click a `.md` or `.markdown` file in Finder, choose
 **Open With → md2png**, and md2png renders it locally and opens the successful
-result in its Preview window. Finder also offers **Services → Preview with
-md2png** for the same workflow.
+result in its Preview window without changing the clipboard. Finder also offers
+**Services → Preview with md2png** for the same workflow. Choose Copy in Preview
+only when you want the PNG on the clipboard.
 
 The render command never activates another app, pastes into it, or sends a
 message. If clipboard rendering fails, the source Markdown remains on the
@@ -193,11 +194,12 @@ reference for tables, highlighted code, and multiple diagrams in one image.
   selection, reading, or rendering fails.
 - **Open With → md2png** in Finder accepts one `.md` or `.markdown` file at a
   time, uses the same local renderer and current output settings, and opens the
-  Preview window only after success.
+  Preview window only after success without changing the clipboard.
 - **Services → Preview with md2png** accepts one Finder file at a time and
   applies the same type checks and failure behavior. macOS Services cannot hide
   the command by filename extension, so unsupported files are rejected after
-  invocation without changing the clipboard.
+  invocation. Supported files also leave the clipboard unchanged until Copy is
+  explicitly chosen in Preview.
 - Split PNG export is offered only as an explicit recovery action after a
   size-limit error, is Save-only, and never writes images to the clipboard.
 - Drag export creates one generation-isolated PNG in the system temporary

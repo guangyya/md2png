@@ -57,14 +57,12 @@ final class RenderCoordinatorTests: XCTestCase {
         XCTAssertEqual(preview.markdown, "# File source\n")
     }
 
-    func testFinderOpenedMarkdownFileShowsPreviewAfterSuccessfulRender() throws {
+    func testFinderOpenedMarkdownFileShowsPreviewWithoutChangingClipboard() throws {
         let harness = RenderCoordinatorHarness()
+        let initialChangeCount = harness.clipboardChangeCount
         let coordinator = harness.makeCoordinator()
 
-        coordinator.renderMarkdownFile(
-            "# Finder source\n",
-            showsPreviewOnSuccess: true
-        )
+        coordinator.previewMarkdownFile("# Finder source\n")
         XCTAssertTrue(harness.previews.isEmpty)
 
         let image = NSImage(size: NSSize(width: 640, height: 480))
@@ -74,7 +72,10 @@ final class RenderCoordinatorTests: XCTestCase {
         let preview = try XCTUnwrap(harness.previews.first)
         XCTAssertTrue(preview.image === image)
         XCTAssertEqual(preview.markdown, "# Finder source\n")
-        XCTAssertEqual(harness.writtenImages.count, 1)
+        XCTAssertEqual(harness.clipboardChangeCount, initialChangeCount)
+        XCTAssertTrue(harness.writtenImages.isEmpty)
+        XCTAssertTrue(harness.writtenMarkdown.isEmpty)
+        XCTAssertTrue(harness.notices.isEmpty)
     }
 
     func testExampleShowsPreviewWithoutChangingClipboard() throws {
