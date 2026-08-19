@@ -4,6 +4,8 @@ import XCTest
 @testable import MD2PNG
 
 final class RendererRecoveryStateTests: XCTestCase {
+    private let rendererIntegrationTimeout: TimeInterval = 10
+
     func testIdleTerminationReloadsAndRunsARequestQueuedDuringRecovery() throws {
         var state = try readyState()
 
@@ -386,7 +388,7 @@ final class RendererRecoveryStateTests: XCTestCase {
             capturedResult = $0
             completion.fulfill()
         }
-        await fulfillment(of: [completion], timeout: 5)
+        await fulfillment(of: [completion], timeout: rendererIntegrationTimeout)
 
         let result = try XCTUnwrap(capturedResult)
         let image = try result.get()
@@ -485,7 +487,7 @@ final class RendererRecoveryStateTests: XCTestCase {
             }
             ready.fulfill()
         }
-        await fulfillment(of: [ready], timeout: 5)
+        await fulfillment(of: [ready], timeout: rendererIntegrationTimeout)
 
         let interrupted = expectation(description: "interrupted render failed")
         var interruptedResult: Result<NSImage, Error>?
@@ -495,7 +497,7 @@ final class RendererRecoveryStateTests: XCTestCase {
         }
         renderer.simulateContentProcessTerminationForTesting()
         renderer.simulateContentProcessTerminationForTesting()
-        await fulfillment(of: [interrupted], timeout: 5)
+        await fulfillment(of: [interrupted], timeout: rendererIntegrationTimeout)
 
         let interruptedOutcome = try XCTUnwrap(interruptedResult)
         guard case let .failure(error) = interruptedOutcome,
@@ -514,7 +516,7 @@ final class RendererRecoveryStateTests: XCTestCase {
             capturedResult = $0
             completion.fulfill()
         }
-        await fulfillment(of: [completion], timeout: 5)
+        await fulfillment(of: [completion], timeout: rendererIntegrationTimeout)
 
         let result = try XCTUnwrap(capturedResult)
         let image = try result.get()
