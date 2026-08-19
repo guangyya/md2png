@@ -5,6 +5,16 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Added
+
+- Optionally export PNGs with transparent rounded corners from Settings.
+
+### Changed
+
+- Use simpler, clearer surfaces and consistent app icons across app windows.
+- Give Preview tighter spacing, better sizing for short images, and an image
+  boundary that follows rounded output.
+
 ## [0.12.0] - 2026-08-19
 
 ### Added
