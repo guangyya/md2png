@@ -114,6 +114,45 @@ final class MarkdownFileInputTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testMarkdownFileServiceReadsFinderFilenamePasteboard() {
+        let provider = MarkdownFileServiceProvider(onOpen: { _ in })
+        XCTAssertTrue(provider.responds(to: NSSelectorFromString(
+            "previewWithMd2png:userData:error:"
+        )))
+
+        let pasteboard = NSPasteboard(
+            name: NSPasteboard.Name("md2png-service-\(UUID().uuidString)")
+        )
+        pasteboard.clearContents()
+        let expected = [
+            URL(fileURLWithPath: "/tmp/source.md"),
+            URL(fileURLWithPath: "/tmp/another.markdown")
+        ]
+        XCTAssertTrue(pasteboard.setPropertyList(
+            expected.map(\.path),
+            forType: MarkdownFileServiceProvider.filenamesPasteboardType
+        ))
+
+        XCTAssertEqual(
+            MarkdownFileServiceProvider.fileURLs(from: pasteboard),
+            expected
+        )
+    }
+
+    @MainActor
+    func testMarkdownFileServiceReturnsNoFilesForUnrelatedPasteboardData() {
+        let pasteboard = NSPasteboard(
+            name: NSPasteboard.Name("md2png-service-\(UUID().uuidString)")
+        )
+        pasteboard.clearContents()
+        pasteboard.setString("# Not a Finder file request", forType: .string)
+
+        XCTAssertTrue(
+            MarkdownFileServiceProvider.fileURLs(from: pasteboard).isEmpty
+        )
+    }
+
     func testUnsupportedTypeIsRejectedBeforeReading() {
         var didRead = false
 

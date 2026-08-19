@@ -16,6 +16,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Open `.md` and `.markdown` files with md2png from Finder, then show the
   successful result in Preview. The in-app file picker now disables every
   extension other than `.md`, `.markdown`, and `.txt`.
+- Send a Finder file through **Services → Preview with md2png** to use the same
+  local, single-file rendering and Preview workflow without an extension or
+  additional permission.
 
 ## [0.13.1] - 2026-08-19
 

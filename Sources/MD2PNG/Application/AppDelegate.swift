@@ -123,6 +123,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.announce(message, priority: .medium)
         }
     )
+    private lazy var markdownFileServiceProvider = MarkdownFileServiceProvider(
+        onOpen: { [weak self] urls in
+            self?.receiveMarkdownFileOpenRequest(urls)
+        }
+    )
 
     private var statusMenuController: StatusMenuController?
     private var clipboardContainsMarkdown = false
@@ -225,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             result: .started
         )
         windowPresentationCoordinator.prepareForApplicationLaunch()
+        NSApp.servicesProvider = markdownFileServiceProvider
         configureStatusItem()
         updateStatusPresenter.presentRelaunchResultIfNeeded()
 
@@ -265,6 +271,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
+        receiveMarkdownFileOpenRequest(urls)
+    }
+
+    private func receiveMarkdownFileOpenRequest(_ urls: [URL]) {
         hasReceivedFileOpenRequest = true
         guard isReadyForFileOpen else {
             deferredFileOpenRequests.append(urls)
