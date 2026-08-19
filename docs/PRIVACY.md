@@ -18,7 +18,6 @@ The app accesses the clipboard only in response to visible user actions:
 | Save as Split PNGs after a size-limit error | Uses the unchanged non-empty source from the failed render; writes numbered PNG files only to the folder explicitly selected by the user and does not write to the clipboard |
 | Re-render Last Markdown | Reads the latest successful source from app memory; writes PNG and TIFF only after a successful render and any required clipboard confirmation |
 | Restore Last Markdown | Writes the latest successful source after any required clipboard confirmation |
-| Choose an Example | Writes the selected bundled Markdown, then renders it and writes PNG/TIFF on success |
 | Copy Version Info | Writes app version, source commit, build type, macOS version, and architecture as plain text |
 
 If **Render Clipboard as Image** fails, the source Markdown remains on the

@@ -23,10 +23,18 @@ class PageParser(HTMLParser):
         self.canonicals: list[str] = []
         self.alternates: dict[str, str] = {}
         self.json_ld_blocks: list[str] = []
+        self.ids: set[str] = set()
+        self.feature_card_count = 0
         self._json_ld_parts: list[str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = dict(attrs)
+        element_id = values.get("id")
+        if element_id:
+            self.ids.add(element_id)
+        classes = set((values.get("class") or "").split())
+        if tag == "article" and "feature-card" in classes:
+            self.feature_card_count += 1
         if tag in {"a", "link"} and values.get("href"):
             self.links.append(("href", values["href"] or ""))
         if tag in {"img", "script"} and values.get("src"):
@@ -85,6 +93,10 @@ def check_page(relative_path: str, canonical: str) -> None:
         fail(f"{relative_path} images missing alt attributes: {parser.images_without_alt}")
     if len(parser.json_ld_blocks) != 1:
         fail(f"{relative_path} must contain exactly one JSON-LD block")
+    if "features" not in parser.ids or ("href", "#features") not in parser.links:
+        fail(f"{relative_path} must expose the feature section from navigation")
+    if parser.feature_card_count != 4:
+        fail(f"{relative_path} must describe exactly four current feature groups")
 
     metadata = json.loads(parser.json_ld_blocks[0])
     if metadata.get("@type") != "SoftwareApplication":

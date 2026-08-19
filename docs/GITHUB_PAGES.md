@@ -11,7 +11,8 @@ The English page is canonical at `/`, and Simplified Chinese is available at
 ## Deploy and verify changes
 
 1. Review both `site/index.html` and `site/zh/index.html`, including navigation,
-   downloads, privacy claims, and update instructions.
+   current feature claims, downloads, privacy claims, and update instructions.
+   Keep the four feature groups synchronized across both localized pages.
 2. Merge the site changes into `main`. A change under `site/` automatically
    starts **Deploy GitHub Pages**; the workflow can also be run manually.
 3. Confirm the workflow's `github-pages` deployment succeeds.
