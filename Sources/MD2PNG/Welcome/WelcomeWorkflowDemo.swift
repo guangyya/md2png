@@ -185,38 +185,15 @@ struct WelcomeWorkflowDemo: View {
                     width: WelcomeWorkflowLayout.replayButtonSize,
                     height: WelcomeWorkflowLayout.replayButtonSize
                 )
-                .background(.thinMaterial, in: Circle())
+                .background(Color(nsColor: .controlBackgroundColor), in: Circle())
+                .overlay {
+                    Circle().stroke(Color.primary.opacity(0.14), lineWidth: 0.75)
+                }
                 .padding(WelcomeWorkflowLayout.replayButtonInset)
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: 156)
-        .background(
-            LinearGradient(
-                colors: [
-                    WelcomeDemoPalette.cyan.opacity(0.12),
-                    Color.accentColor.opacity(0.055),
-                    WelcomeDemoPalette.violet.opacity(0.1)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            WelcomeDemoPalette.cyan.opacity(0.34),
-                            WelcomeDemoPalette.violet.opacity(0.26)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.7
-                )
-        }
-        .shadow(color: WelcomeDemoPalette.violet.opacity(0.07), radius: 10, y: 4)
+        .appCardStyle()
         .task(id: sequenceID) {
             await runSequence()
         }

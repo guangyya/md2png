@@ -4,23 +4,10 @@ enum AppTheme {
     enum Metrics {
         static let cardCornerRadius: CGFloat = 10
         static let shortcutCornerRadius: CGFloat = 7
-        static let cardBorderWidth: CGFloat = 0.5
     }
 
     enum Opacity {
-        static let backdropCyan = 0.055
-        static let backdropPurple = 0.05
-        static let cardControlBackground = 0.72
-        static let cardAccent = 0.045
-        static let cardBorder = 0.1
-        static let cardHover = 0.06
-        static let prominentCardHover = 0.12
         static let activeShortcutFill = 0.18
-    }
-
-    enum CardHighlightStyle {
-        case overlay
-        case leadingGradient
     }
 
     enum Spacing {
@@ -44,6 +31,27 @@ enum AppTheme {
 
         static var shortcut: RoundedRectangle {
             RoundedRectangle(cornerRadius: Metrics.shortcutCornerRadius)
+        }
+    }
+
+    struct CardSurfaceStyle: Equatable {
+        let borderOpacity: Double
+        let borderWidth: CGFloat
+        let highlightFillOpacity: Double
+        let highlightBorderOpacity: Double
+
+        init(contrast: ColorSchemeContrast) {
+            if contrast == .increased {
+                borderOpacity = 0.48
+                borderWidth = 1.25
+                highlightFillOpacity = 0.16
+                highlightBorderOpacity = 0.72
+            } else {
+                borderOpacity = 0.14
+                borderWidth = 0.75
+                highlightFillOpacity = 0.08
+                highlightBorderOpacity = 0.34
+            }
         }
     }
 

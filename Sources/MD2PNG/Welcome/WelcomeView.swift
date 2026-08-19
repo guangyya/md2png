@@ -24,43 +24,19 @@ struct WelcomeView: View {
                             .frame(width: 44, height: 44)
                             .padding(7)
                             .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color.cyan.opacity(0.2),
-                                        Color.purple.opacity(0.16)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
+                                Color(nsColor: .controlBackgroundColor),
                                 in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                             )
                             .overlay {
                                 RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.cyan.opacity(0.5),
-                                                Color.purple.opacity(0.4)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 0.8
-                                    )
+                                    .stroke(Color.primary.opacity(0.14), lineWidth: 0.75)
                             }
-                            .shadow(color: Color.purple.opacity(0.12), radius: 9, y: 3)
                             .accessibilityHidden(true)
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text(copy.title)
                                 .font(.title2.weight(.semibold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [Color.primary, Color.purple.opacity(0.9)],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
+                                .foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(copy.subtitle)
                                 .font(.body)
@@ -166,8 +142,7 @@ private struct WelcomeLaunchAtLoginRow: View {
         .buttonStyle(.plain)
         .disabled(!state.presentation.canPerformAction)
         .appCardStyle(
-            isHighlighted: isHovering && state.presentation.canPerformAction,
-            highlightStyle: .leadingGradient
+            isHighlighted: isHovering && state.presentation.canPerformAction
         )
         .onHover { isHovering = $0 }
         .help(actionHelp)
@@ -341,18 +316,21 @@ struct WelcomeShortcutFeedbackMotion: Equatable {
 struct WelcomeShortcutRowContrastStyle: Equatable {
     let idleRowBorderOpacity: Double
     let idleRowBorderWidth: CGFloat
+    let feedbackFillOpacity: Double
     let feedbackRowBorderOpacity: Double
     let feedbackRowBorderWidth: CGFloat
 
     init(contrast: ColorSchemeContrast) {
         if contrast == .increased {
             idleRowBorderOpacity = 0.45
-            idleRowBorderWidth = 1.1
+            idleRowBorderWidth = 1.25
+            feedbackFillOpacity = 0.18
             feedbackRowBorderOpacity = 1
             feedbackRowBorderWidth = 2
         } else {
-            idleRowBorderOpacity = 0.1
-            idleRowBorderWidth = 0.5
+            idleRowBorderOpacity = 0.14
+            idleRowBorderWidth = 0.75
+            feedbackFillOpacity = 0.1
             feedbackRowBorderOpacity = 0.75
             feedbackRowBorderWidth = 1.4
         }
@@ -432,27 +410,21 @@ private struct WelcomeShortcutRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            LinearGradient(
-                colors: [
-                    isShowingVerificationFeedback
-                        ? Color.green.opacity(0.24)
-                        : Color(nsColor: .controlBackgroundColor).opacity(
-                            AppTheme.Opacity.cardControlBackground
-                        ),
-                    isShowingVerificationFeedback
-                        ? Color.green.opacity(0.12)
-                        : Color.accentColor.opacity(AppTheme.Opacity.cardAccent)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            ),
+            Color(nsColor: .controlBackgroundColor),
             in: AppTheme.Shape.card
         )
+        .overlay {
+            if isShowingVerificationFeedback {
+                AppTheme.Shape.card.fill(
+                    Color.green.opacity(contrast.feedbackFillOpacity)
+                )
+            }
+        }
         .overlay {
             AppTheme.Shape.card.stroke(
                 isShowingVerificationFeedback
                     ? Color.green.opacity(contrast.feedbackRowBorderOpacity)
-                    : Color.accentColor.opacity(contrast.idleRowBorderOpacity),
+                    : Color.primary.opacity(contrast.idleRowBorderOpacity),
                 lineWidth: isShowingVerificationFeedback
                     ? contrast.feedbackRowBorderWidth
                     : contrast.idleRowBorderWidth
