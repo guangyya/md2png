@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Simplify application lifecycle, renderer WebView ownership, and update-session
+  wiring without changing the existing render or update workflows.
+
+### Fixed
+
+- Resize the generated app icon canvas so md2png matches the visual footprint
+  of standard macOS Dock icons.
+
 ### Removed
 
 - Retire the unused in-app GitHub Releases API and cached-DMG updater pipeline;
