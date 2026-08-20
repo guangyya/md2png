@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="../styles.css">
     <title>md2png — 复制 Markdown，粘贴漂亮 PNG</title>
     <script type="application/ld+json">
-      {
+{
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "md2png",
@@ -44,11 +44,11 @@
         "image": "https://md2png.wbxsh.com/assets/og.png",
         "inLanguage": "zh-Hans",
         "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
         }
-      }
+}
     </script>
   </head>
   <body>
@@ -82,10 +82,7 @@
         <div class="shell hero-grid">
           <div class="hero-copy">
             <div class="eyebrow">原生 macOS 小工具 · 本地优先</div>
-            <h1>
-              <span>复制 Markdown，</span>
-              <span class="headline-accent">粘贴漂亮 PNG。</span>
-            </h1>
+            <h1><span>复制 Markdown，</span><span class="headline-accent">粘贴漂亮 PNG。</span></h1>
             <p class="hero-lede">把表格、代码高亮和 Mermaid 图表变成清晰图片。内容不会上传，也不会替你发送任何消息。</p>
 
             <div class="hero-actions">
@@ -100,18 +97,7 @@
           <div class="hero-visual" aria-label="Markdown 转换为精美图片的示意">
             <div class="source-card">
               <div class="window-bar"><span></span><span></span><span></span><small>weekly-update.md</small></div>
-              <pre class="source-sample lang-en"># Weekly delivery update
-
-| Area | Status |
-|:--|:--:|
-| macOS app | ✅ Done |
-| Documentation | 🚧 In progress |
-
-```mermaid
-flowchart LR
-  Copy --> Render --> Paste
-```</pre>
-              <pre class="source-sample lang-zh"># 每周交付进度
+              <pre class="source-sample"># 每周交付进度
 
 | 模块 | 状态 |
 |:--|:--:|
@@ -120,7 +106,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  复制 --> 渲染 --> 粘贴
+  复制 --&gt; 渲染 --&gt; 粘贴
 ```</pre>
             </div>
             <div class="shortcut-pill" aria-label="按下 Control Command X"><kbd>⌃</kbd><kbd>⌘</kbd><kbd>X</kbd></div>
@@ -143,24 +129,30 @@ flowchart LR
 
       <section class="section" id="how">
         <div class="shell">
-          <div class="section-heading">
-            <p class="section-kicker">一个快捷键，不打断思路。</p>
-            <h2>几秒钟，把 Markdown 变成可粘贴的图片。</h2>
-          </div>
+          <div class="section-heading"><p class="section-kicker">一个快捷键，不打断思路。</p><h2>几秒钟，把 Markdown 变成可粘贴的图片。</h2></div>
           <ol class="steps">
-            <li><span class="step-number">01</span><div><h3>复制</h3><p>从任意编辑器或应用复制 Markdown。</p></div><kbd>⌘ C</kbd></li>
-            <li><span class="step-number">02</span><div><h3>渲染</h3><p>按下全局快捷键，md2png 在本地完成渲染。</p></div><kbd>⌃⌘ X</kbd></li>
-            <li><span class="step-number">03</span><div><h3>粘贴</h3><p>粘贴 PNG，检查无误后由你亲自发送。</p></div><kbd>⌘ V</kbd></li>
+            <li>
+              <span class="step-number">01</span>
+              <div><h3>复制</h3><p>从任意编辑器或应用复制 Markdown。</p></div>
+              <kbd>⌘ C</kbd>
+            </li>
+            <li>
+              <span class="step-number">02</span>
+              <div><h3>渲染</h3><p>按下全局快捷键，md2png 在本地完成渲染。</p></div>
+              <kbd>⌃⌘ X</kbd>
+            </li>
+            <li>
+              <span class="step-number">03</span>
+              <div><h3>粘贴</h3><p>粘贴 PNG，检查无误后由你亲自发送。</p></div>
+              <kbd>⌘ V</kbd>
+            </li>
           </ol>
         </div>
       </section>
 
       <section class="section feature-section" id="features">
         <div class="shell">
-          <div class="section-heading">
-            <p class="section-kicker">不止一个快捷键</p>
-            <h2>调整输出，再按你的方式使用。</h2>
-          </div>
+          <div class="section-heading"><p class="section-kicker">不止一个快捷键</p><h2>调整输出，再按你的方式使用。</h2></div>
           <div class="feature-grid">
             <article class="feature-card">
               <div class="feature-meta"><span>01</span><span>STYLE</span></div>
@@ -233,9 +225,9 @@ flowchart LR
             <h2>三步完成，然后安静待在菜单栏。</h2>
             <p>当前公开版本使用 Developer ID 签名并经过 Apple 公证，支持运行 macOS 14 或更高版本的 Apple 芯片 Mac。</p>
             <ol class="install-steps">
-              <li><span>1</span><p>从 GitHub Releases <strong>下载</strong>最新版 DMG。</p></li>
+              <li><span>1</span><p><strong>下载</strong> GitHub Releases 中的最新版 DMG。</p></li>
               <li><span>2</span><p><strong>打开</strong> DMG，把 md2png 拖入“应用程序”。</p></li>
-              <li><span>3</span><p><strong>启动</strong> md2png，复制 Markdown，然后按 <kbd>⌃⌘ X</kbd>。</p></li>
+              <li><span>3</span><p><strong>启动</strong> md2png，复制 Markdown，然后按 ⌃⌘ X。</p></li>
             </ol>
             <div class="release-actions">
               <a class="button button-primary" href="https://github.com/guangyya/md2png/releases/latest/download/md2png-latest.dmg"><span class="button-icon" aria-hidden="true">↓</span><span>下载最新版</span></a>
@@ -246,11 +238,26 @@ flowchart LR
             <p class="section-kicker">下载前须知</p>
             <h2>几个常见问题。</h2>
             <div class="faq-list">
-              <details open><summary>md2png 会上传我的 Markdown 吗？</summary><p>不会。渲染使用内置资源和非持久化的本地 WebKit 视图。应用没有分析、遥测、账号或云端渲染服务。</p></details>
-              <details><summary>需要辅助功能权限吗？</summary><p>不需要。基础的复制、渲染和粘贴流程只使用剪贴板与全局快捷键。</p></details>
-              <details><summary>支持 Intel Mac 吗？</summary><p>目前不支持。公开版本支持运行 macOS 14 或更高版本的 Apple 芯片 Mac。</p></details>
-              <details><summary>macOS 显示安全提示怎么办？</summary><p>首次打开下载的应用时，macOS 会显示标准确认。如果提示无法验证，请删除当前副本，并从官方 Releases 页面重新下载已公证的 DMG。</p></details>
-              <details><summary>如何更新和卸载？</summary><p>更新不会自动开始。在“关于 md2png”中选择“检查更新”，先查看签名发布说明，再明确下载、验证并安装更新；已公证的 DMG 仍可作为备用。卸载时退出应用并将它从“应用程序”移到废纸篓即可；md2png 不保留渲染历史。</p></details>
+              <details open>
+                <summary>md2png 会上传我的 Markdown 吗？</summary>
+                <p>不会。渲染使用内置资源和非持久化的本地 WebKit 视图。应用没有分析、遥测、账号或云端渲染服务。</p>
+              </details>
+              <details>
+                <summary>需要辅助功能权限吗？</summary>
+                <p>不需要。基础的复制、渲染和粘贴流程只使用剪贴板与全局快捷键。</p>
+              </details>
+              <details>
+                <summary>支持 Intel Mac 吗？</summary>
+                <p>目前不支持。公开版本支持运行 macOS 14 或更高版本的 Apple 芯片 Mac。</p>
+              </details>
+              <details>
+                <summary>macOS 显示安全提示怎么办？</summary>
+                <p>首次打开下载的应用时，macOS 会显示标准确认。如果提示无法验证，请删除当前副本，并从官方 Releases 页面重新下载已公证的 DMG。</p>
+              </details>
+              <details>
+                <summary>如何更新和卸载？</summary>
+                <p>更新不会自动开始。在“关于 md2png”中选择“检查更新”，先查看签名发布说明，再明确下载、验证并安装更新；已公证的 DMG 仍可作为备用。卸载时退出应用并将它从“应用程序”移到废纸篓即可；md2png 不保留渲染历史。</p>
+              </details>
             </div>
           </div>
         </div>
@@ -277,6 +284,7 @@ flowchart LR
         </div>
       </div>
     </footer>
+
     <script src="../site.js"></script>
   </body>
 </html>

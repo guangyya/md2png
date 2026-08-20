@@ -370,18 +370,6 @@ html[lang="en"] .hero h1 > span {
   white-space: pre-wrap;
 }
 
-.lang-zh {
-  display: none;
-}
-
-html[data-locale="zh"] .lang-en {
-  display: none;
-}
-
-html[data-locale="zh"] .lang-zh {
-  display: block;
-}
-
 .shortcut-pill {
   position: absolute;
   z-index: 4;

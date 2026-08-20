@@ -241,7 +241,13 @@ make verify-dist \
 make run CONFIGURATION=debug \
   PROJECT_URL=https://github.com/OWNER/REPOSITORY \
   BUNDLE_IDENTIFIER=io.github.OWNER.md2png
+make site
+make site-check
 ```
+
+The shared Pages structure and localized copy live in `site-src/`. After an
+edit, `make site` regenerates the committed static routes under `site/`, and
+`make site-check` verifies generated output and local links.
 
 Debug builds never use the stable production update channel, even when a
 `PROJECT_URL` is packaged. Use the explicit local fixture to exercise the About
@@ -309,6 +315,8 @@ Sources/MD2PNG/{Rendering,Settings,Updates,Welcome}/
 Sources/MD2PNG/Resources/   Localized strings, renderer shell, and theme packages
 Tests/MD2PNGTests/          Mirrored feature tests and test support
 WebRenderer/                Markdown, sanitization, highlighting, and Mermaid source
+site-src/                   Shared Pages template and localized content
+site/                       Generated static Pages output
 Examples/                   Markdown samples bundled with the app
 Assets/AppIcon/             Approved app icon source
 docs/                       Product, privacy, troubleshooting, and release documentation

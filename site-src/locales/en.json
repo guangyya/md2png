@@ -1,0 +1,164 @@
+{
+  "meta": {
+    "description": "Turn clipboard Markdown into a polished PNG on your Mac—locally and privately.",
+    "og_locale": "en_US",
+    "og_locale_alternate": "zh_CN",
+    "title": "md2png — Raw Markdown in. Polished PNG out.",
+    "og_description": "A tiny native Mac app that turns clipboard Markdown into a paste-ready image. Everything stays on your Mac.",
+    "og_image_alt": "md2png turns Markdown into a polished PNG locally on Mac",
+    "twitter_description": "A tiny native Mac app that turns clipboard Markdown into a paste-ready image.",
+    "json_description": "A native macOS utility that turns clipboard Markdown into a polished, paste-ready PNG entirely on your Mac.",
+    "operating_system": "macOS 14 or later on Apple silicon"
+  },
+  "navigation": {
+    "links": [
+      {"href": "#how", "label": "How it works"},
+      {"href": "#features", "label": "Features"},
+      {"href": "#privacy", "label": "Privacy"},
+      {"href": "#install", "label": "Install & FAQ"},
+      {"href": "https://github.com/guangyya/md2png", "label": "GitHub"}
+    ]
+  },
+  "hero": {
+    "source_sample": "# Weekly delivery update\n\n| Area | Status |\n|:--|:--:|\n| macOS app | ✅ Done |\n| Documentation | 🚧 In progress |\n\n```mermaid\nflowchart LR\n  Copy --> Render --> Paste\n```"
+  },
+  "trust": {
+    "items": [
+      "100% local rendering",
+      "No Accessibility permission",
+      "Never pastes or sends",
+      "Works offline"
+    ]
+  },
+  "how": {
+    "steps": [
+      {"number": "01", "title": "Copy", "description": "Copy Markdown from any editor or app.", "key": "⌘ C"},
+      {"number": "02", "title": "Render", "description": "Press the global shortcut. md2png works locally in the background.", "key": "⌃⌘ X"},
+      {"number": "03", "title": "Paste", "description": "Paste the PNG, review it, then send it yourself.", "key": "⌘ V"}
+    ]
+  },
+  "features": {
+    "items": [
+      {
+        "number": "01",
+        "label": "STYLE",
+        "title": "Five themes. Three widths.",
+        "description": "Choose a palette and a Compact, Standard, or Wide canvas. Your choices stay local and are captured in every opaque PNG.",
+        "tags_aria": "Render choices",
+        "tags": ["Clean Light", "Dark", "Midnight Blue"]
+      },
+      {
+        "number": "02",
+        "label": "PREVIEW",
+        "title": "Inspect before you share.",
+        "description": "Preview at actual size or fit-to-window, zoom in, copy again, save explicitly, open in Apple Preview, or drag the PNG into another app.",
+        "tags_aria": "Preview actions",
+        "tags": ["Zoom", "Save", "Drag"]
+      },
+      {
+        "number": "03",
+        "label": "FILES",
+        "title": "Markdown files are welcome too.",
+        "description": "Choose a local file, use Finder’s Open With command, or invoke its Service. Successful Finder renders open in Preview without changing the clipboard.",
+        "tags_aria": "File entry points",
+        "tags": [".md", ".markdown", "Finder"]
+      },
+      {
+        "number": "04",
+        "label": "LONG FORM",
+        "title": "Long documents have a safe fallback.",
+        "description": "If one image exceeds the height limit, export numbered PNG slices. md2png prefers block boundaries and never overwrites an existing export folder.",
+        "tags_aria": "Split export behavior",
+        "tags": ["Block-aware", "Numbered", "Save-only"]
+      }
+    ]
+  },
+  "showcase": {
+    "formats": [
+      {"icon": "#", "text": "Markdown & GFM"},
+      {"icon": "{ }", "text": "Syntax-highlighted code"},
+      {"icon": "↳", "text": "Mermaid diagrams"},
+      {"icon": "✓", "text": "Tables & checklists"}
+    ]
+  },
+  "install": {
+    "steps": [
+      {"action": "Download", "detail": "the latest DMG from GitHub Releases."},
+      {"action": "Open", "detail": "the DMG and drag md2png to Applications."},
+      {"action": "Launch", "detail": "md2png, copy Markdown, then press ⌃⌘ X."}
+    ]
+  },
+  "faq": {
+    "items": [
+      {
+        "summary": "Does md2png upload my Markdown?",
+        "body": "No. Rendering uses bundled resources in a local, non-persistent WebKit view. The app has no analytics, telemetry, account, or cloud renderer."
+      },
+      {
+        "summary": "Does it need Accessibility permission?",
+        "body": "No. The basic copy, render, and paste workflow uses the clipboard and a global shortcut without Accessibility permission."
+      },
+      {
+        "summary": "Does it support Intel Macs?",
+        "body": "No. Public builds currently support Apple silicon Macs running macOS 14 or later."
+      },
+      {
+        "summary": "What if macOS shows a security prompt?",
+        "body": "A standard first-open confirmation is expected for downloaded apps. If macOS says the app cannot be verified, delete that copy and download the notarized DMG again from the official Releases page."
+      },
+      {
+        "summary": "How do updates and uninstalling work?",
+        "body": "Updates never start automatically. In About md2png, choose Check for Updates to preview signed release notes, then explicitly download, verify, and install the update. A notarized DMG remains available as a fallback. To uninstall, quit the app and move it from Applications to Trash; md2png does not keep a render history."
+      }
+    ]
+  },
+  "text": {
+    "skip_to_content": "Skip to content",
+    "brand_aria": "md2png home",
+    "navigation_aria": "Main navigation",
+    "language_aria": "Language",
+    "hero_eyebrow": "Native macOS utility · Local first",
+    "hero_title_first": "Raw Markdown in.",
+    "hero_title_second": "Polished PNG out.",
+    "hero_lede": "Turn tables, highlighted code, and Mermaid diagrams into a crisp image—without uploading your content or sending anything for you.",
+    "download_for_mac": "Download for Mac",
+    "view_source": "View source",
+    "requirements": "macOS 14+ · Apple silicon · Free and open source",
+    "hero_visual_aria": "Markdown converted to a polished image",
+    "shortcut_aria": "Press Control Command X",
+    "rendered_locally": "Rendered locally",
+    "result_image_alt": "Example output with a formatted table and Mermaid flowchart",
+    "trust_aria": "Product principles",
+    "how_kicker": "One shortcut. No detour.",
+    "how_title": "From raw Markdown to ready-to-paste in seconds.",
+    "features_kicker": "More than one shortcut",
+    "features_title": "Shape the output, then use it your way.",
+    "showcase_kicker": "The formatting survives the trip",
+    "showcase_title": "Share structure, not source code.",
+    "showcase_body": "Some chat apps flatten the parts of Markdown that matter most. md2png preserves the visual hierarchy in a Retina-friendly image that looks consistent on desktop and mobile.",
+    "showcase_image_alt": "A weekly delivery update rendered by md2png",
+    "showcase_caption": "Actual md2png output · Table + Mermaid flowchart",
+    "privacy_kicker": "Local means local",
+    "privacy_title": "Your clipboard stays on your Mac.",
+    "privacy_body": "Rendering uses a non-persistent local WebKit view with bundled scripts and styles. There is no cloud service, analytics, telemetry, account, bot, or destination-app integration.",
+    "privacy_link": "Read the privacy details",
+    "install_kicker": "Install with confidence",
+    "install_title": "Three steps, then it stays out of your way.",
+    "install_body": "The current release is Developer ID–signed and Apple-notarized for Apple silicon Macs running macOS 14 or later.",
+    "download_latest": "Download latest",
+    "release_notes": "Release notes",
+    "faq_kicker": "Good to know",
+    "faq_title": "Before you download.",
+    "final_kicker": "Small app. Clear job.",
+    "final_title": "Make your next Markdown message easy to read.",
+    "final_body": "Free, open source, and built natively for Apple silicon Macs.",
+    "app_icon_alt": "md2png app icon",
+    "footer_license": "MIT licensed.",
+    "footer_locale_href": "zh/",
+    "footer_locale_lang": "zh-Hans",
+    "footer_locale_label": "中文",
+    "footer_releases": "Releases",
+    "footer_help": "Help",
+    "footer_license_link": "License"
+  }
+}
