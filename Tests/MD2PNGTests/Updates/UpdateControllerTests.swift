@@ -21,46 +21,25 @@ final class UpdateControllerTests: XCTestCase {
         XCTAssertEqual(status.phase, .upToDate(version: SemanticVersion("0.2.0")!))
     }
 
-    func testDebugReadyMockUsesOfflineFixtureMetadata() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "MD2PNGDebugUpdateMockTests-\(UUID().uuidString)",
-            isDirectory: true
-        )
-        defer { try? FileManager.default.removeItem(at: directory) }
-
+    func testDebugReadyMockUsesOfflineSparkleMetadata() throws {
         let status = try XCTUnwrap(DebugUpdateMockState.readyToInstall.status(
             installedVersion: "0.1.0",
-            repository: repository,
-            updatesDirectory: directory
+            repository: repository
         ))
-        guard case let .failed(message, _, _, availableUpdate) = status.phase else {
-            return XCTFail("A missing cached DMG should offer a recoverable download")
+        guard case let .sparkleReadyToInstall(update) = status.phase else {
+            return XCTFail("The fixture should use the production Sparkle phase")
         }
-        let update = try XCTUnwrap(availableUpdate)
-        XCTAssertEqual(message, UpdateError.revealFailed.localizedDescription)
-        XCTAssertEqual(update.version, SemanticVersion("0.1.0")!)
-        XCTAssertEqual(update.tagName, "debug-fixture")
-        XCTAssertEqual(update.assetName, "md2png-debug-update-fixture.dmg")
-        XCTAssertEqual(update.downloadURL.host, "updates.invalid")
-        XCTAssertEqual(update.size, 3)
-        XCTAssertEqual(
-            update.sha256,
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        )
+        XCTAssertEqual(update.installedVersion, "0.1.0")
+        XCTAssertEqual(update.displayVersion, "0.8.0")
+        XCTAssertEqual(update.buildVersion, "8")
+        XCTAssertEqual(update.fullReleaseNotesURL, repository.releasesURL)
     }
 
     @MainActor
-    func testDisabledChannelAndFixtureNeverContactTheUpdateService() async throws {
-        let requestCount = LockedBox(0)
-        URLProtocolStub.handler = { _ in
-            requestCount.set(requestCount.value + 1)
-            throw URLError(.badServerResponse)
-        }
+    func testDisabledControllerAndFixtureKeepInteractiveUpdatesDisabled() async throws {
         let defaults = UpdateTestFixtures.makeDefaults()
         defer { UpdateTestFixtures.removeDefaults(defaults) }
-        let controller = UpdateController(
-            service: UpdateService(session: UpdateTestFixtures.stubbedSession()),
-            channel: { .disabled },
+        let controller = UpdateController.disabled(
             installedVersion: { "0.1.0" },
             defaults: defaults
         )
@@ -69,7 +48,6 @@ final class UpdateControllerTests: XCTestCase {
         controller.checkAgain()
         await Task.yield()
 
-        XCTAssertEqual(requestCount.value, 0)
         XCTAssertEqual(controller.status, UpdateStatus())
         XCTAssertFalse(controller.isUpdating)
         XCTAssertFalse(controller.allowsUpdatePresentation)
@@ -82,34 +60,34 @@ final class UpdateControllerTests: XCTestCase {
         controller.checkAgain()
         await Task.yield()
 
-        XCTAssertEqual(requestCount.value, 0)
         XCTAssertEqual(controller.status, fixtureStatus)
         XCTAssertTrue(controller.allowsUpdatePresentation)
         XCTAssertFalse(controller.allowsInteractiveCheck)
 
-        let availableUpdate = UpdateTestFixtures.availableUpdate()
-        let availableStatus = UpdateStatus(phase: .updateAvailable(availableUpdate))
+        let update = UpdateTestFixtures.seamlessUpdate(installedVersion: "0.1.0")
+        let availableStatus = UpdateStatus(phase: .sparkleUpdateAvailable(update))
         controller.setStatusForTesting(availableStatus)
-        controller.downloadAvailableUpdate()
-        await Task.yield()
 
-        XCTAssertEqual(requestCount.value, 0)
         XCTAssertEqual(controller.status, availableStatus)
-        XCTAssertFalse(controller.canDownload(availableUpdate))
-
-        let failedStatus = UpdateStatus(phase: .failed(
-            message: UpdateError.downloadFailed.localizedDescription,
-            releasesURL: repository.releasesURL,
-            retryAt: nil,
-            availableUpdate: availableUpdate
-        ))
-        controller.setStatusForTesting(failedStatus)
-        controller.downloadAvailableUpdate()
-        await Task.yield()
-
-        XCTAssertEqual(requestCount.value, 0)
-        XCTAssertEqual(controller.status, failedStatus)
         XCTAssertFalse(controller.isUpdating)
+        XCTAssertFalse(controller.allowsInteractiveCheck)
+    }
+
+    @MainActor
+    func testDisabledUpdateDriverFailsClosed() {
+        let driver = DisabledUpdateDriver()
+        var result: UpdateProbeResult?
+
+        driver.probe(installedVersion: "0.1.0") {
+            result = $0
+        }
+
+        guard case let .failed(message) = result else {
+            return XCTFail("A disabled driver must fail instead of starting an update")
+        }
+        XCTAssertFalse(message.isEmpty)
+        XCTAssertFalse(driver.installAndRelaunch())
+        XCTAssertFalse(driver.deferInstallation(completion: nil))
     }
 
     func testCheckPolicyPersistsReleaseAndAppliesFreshnessAndRequestWindows() throws {
@@ -372,7 +350,7 @@ final class UpdateControllerTests: XCTestCase {
         let defaults = UpdateTestFixtures.makeDefaults()
         defer { UpdateTestFixtures.removeDefaults(defaults) }
         let controller = UpdateController(
-            service: UpdateService(
+            legacyService: UpdateService(
                 session: UpdateTestFixtures.stubbedSession(),
                 cacheDirectory: directory
             ),
@@ -681,7 +659,7 @@ final class UpdateControllerTests: XCTestCase {
         now: @escaping () -> Date = Date.init
     ) -> UpdateController {
         UpdateController(
-            service: UpdateService(session: UpdateTestFixtures.stubbedSession()),
+            legacyService: UpdateService(session: UpdateTestFixtures.stubbedSession()),
             channel: { .stableGitHubReleases(repository: self.repository) },
             installedVersion: { "0.1.0" },
             defaults: defaults,

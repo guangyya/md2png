@@ -91,16 +91,9 @@ enum DebugUpdateMockState: String {
     case seamlessUpdateAvailable = "seamless-update-available"
     case seamlessReadyToInstall = "seamless-ready-to-install"
 
-    private static let fixtureVersion = SemanticVersion("0.1.0")!
-    private static let fixtureAssetName = "md2png-debug-update-fixture.dmg"
-    private static let fixtureAssetSize: Int64 = 3
-    private static let fixtureAssetSHA256 =
-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-
     func status(
         installedVersion: String?,
-        repository: GitHubRepository?,
-        updatesDirectory: URL? = nil
+        repository: GitHubRepository?
     ) -> UpdateStatus? {
         switch self {
         case .upToDate:
@@ -116,32 +109,19 @@ enum DebugUpdateMockState: String {
                 availableUpdate: nil
             ))
         case .downloadFailed:
-            guard let update = fixtureUpdate() else { return nil }
-            return UpdateStatus(phase: .failed(
+            return UpdateStatus(phase: .sparkleFailed(
                 message: UpdateError.digestMismatch.localizedDescription,
-                releasesURL: repository?.releasesURL,
-                retryAt: nil,
-                availableUpdate: update
+                update: fixtureSeamlessUpdate(
+                    installedVersion: installedVersion,
+                    releasesURL: repository?.releasesURL
+                )
             ))
         case .readyToInstall:
-            guard let update = fixtureUpdate(),
-                  let directory = updatesDirectory ?? FileManager.default.urls(
-                    for: .cachesDirectory,
-                    in: .userDomainMask
-                  ).first?
-                    .appendingPathComponent("io.github.guangyya.md2png", isDirectory: true)
-                    .appendingPathComponent("Updates", isDirectory: true) else {
-                return nil
-            }
-            let fileURL = directory.appendingPathComponent(update.assetName)
-            if (try? UpdateArtifactVerifier().verifyFile(at: fileURL, update: update)) != nil {
-                return UpdateStatus(phase: .readyToInstall(update: update, fileURL: fileURL))
-            }
-            return UpdateStatus(phase: .failed(
-                message: UpdateError.revealFailed.localizedDescription,
-                releasesURL: repository?.releasesURL,
-                retryAt: nil,
-                availableUpdate: update
+            return UpdateStatus(phase: .sparkleReadyToInstall(
+                fixtureSeamlessUpdate(
+                    installedVersion: installedVersion,
+                    releasesURL: repository?.releasesURL
+                )
             ))
         case .seamlessUpdateAvailable:
             return UpdateStatus(phase: .sparkleUpdateAvailable(
@@ -180,22 +160,6 @@ enum DebugUpdateMockState: String {
             ],
             historyIsTruncated: false,
             fullReleaseNotesURL: releasesURL
-        )
-    }
-
-    private func fixtureUpdate() -> AvailableUpdate? {
-        guard let downloadURL = URL(
-            string: "https://updates.invalid/\(Self.fixtureAssetName)"
-        ) else {
-            return nil
-        }
-        return AvailableUpdate(
-            version: Self.fixtureVersion,
-            tagName: "debug-fixture",
-            assetName: Self.fixtureAssetName,
-            downloadURL: downloadURL,
-            size: Self.fixtureAssetSize,
-            sha256: Self.fixtureAssetSHA256
         )
     }
 }
@@ -253,8 +217,69 @@ final class UpdateController {
         channel().allowsDownload(update)
     }
 
-    init(
-        service: UpdateService = UpdateService(),
+    static func disabled(
+        diagnosticLogger: DiagnosticLogger = .disabled,
+        installedVersion: @escaping () -> String? = {
+            Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+            ) as? String
+        },
+        openWebPage: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
+        defaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init
+    ) -> UpdateController {
+        UpdateController(
+            diagnosticLogger: diagnosticLogger,
+            channel: { .disabled },
+            installedVersion: installedVersion,
+            openWebPage: openWebPage,
+            defaults: defaults,
+            now: now,
+            updateDriver: DisabledUpdateDriver()
+        )
+    }
+
+    convenience init(
+        diagnosticLogger: DiagnosticLogger = .disabled,
+        channel: @escaping () -> UpdateChannel = { .current() },
+        installedVersion: @escaping () -> String? = {
+            Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+            ) as? String
+        },
+        openWebPage: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
+        defaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init,
+        manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown,
+        updateDriver: UpdateDriving,
+        beforeInstallAndRelaunch: @escaping @MainActor (SeamlessUpdate) -> Bool = { _ in
+            true
+        },
+        onInstallAccepted: @escaping @MainActor () -> Void = {},
+        onInstallEndedWithoutRelaunch: @escaping @MainActor () -> Void = {}
+    ) {
+        self.init(
+            session: SparkleUpdateSession(
+                updateDriver: updateDriver,
+                channel: channel,
+                installedVersion: installedVersion,
+                openWebPage: openWebPage,
+                defaults: defaults,
+                now: now,
+                manualCheckCooldown: manualCheckCooldown,
+                beforeInstallAndRelaunch: beforeInstallAndRelaunch,
+                onInstallAccepted: onInstallAccepted,
+                onInstallEndedWithoutRelaunch: onInstallEndedWithoutRelaunch
+            ),
+            diagnosticLogger: diagnosticLogger,
+            channel: channel,
+            installedVersion: installedVersion,
+            openWebPage: openWebPage
+        )
+    }
+
+    convenience init(
+        legacyService service: UpdateService,
         diagnosticLogger: DiagnosticLogger = .disabled,
         channel: @escaping () -> UpdateChannel = { .current() },
         installedVersion: @escaping () -> String? = {
@@ -270,33 +295,10 @@ final class UpdateController {
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = Date.init,
         automaticCheckInterval: TimeInterval = UpdateController.automaticCheckInterval,
-        manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown,
-        updateDriver: UpdateDriving? = nil,
-        beforeInstallAndRelaunch: @escaping @MainActor (SeamlessUpdate) -> Bool = { _ in
-            true
-        },
-        onInstallAccepted: @escaping @MainActor () -> Void = {},
-        onInstallEndedWithoutRelaunch: @escaping @MainActor () -> Void = {}
+        manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown
     ) {
-        self.channel = channel
-        self.openWebPage = openWebPage
-        self.diagnosticLogger = diagnosticLogger
-
-        if let updateDriver {
-            session = SparkleUpdateSession(
-                updateDriver: updateDriver,
-                channel: channel,
-                installedVersion: installedVersion,
-                openWebPage: openWebPage,
-                defaults: defaults,
-                now: now,
-                manualCheckCooldown: manualCheckCooldown,
-                beforeInstallAndRelaunch: beforeInstallAndRelaunch,
-                onInstallAccepted: onInstallAccepted,
-                onInstallEndedWithoutRelaunch: onInstallEndedWithoutRelaunch
-            )
-        } else {
-            session = LegacyUpdateSession(
+        self.init(
+            session: LegacyUpdateSession(
                 service: service,
                 channel: channel,
                 installedVersion: installedVersion,
@@ -307,8 +309,25 @@ final class UpdateController {
                 now: now,
                 automaticCheckInterval: automaticCheckInterval,
                 manualCheckCooldown: manualCheckCooldown
-            )
-        }
+            ),
+            diagnosticLogger: diagnosticLogger,
+            channel: channel,
+            installedVersion: installedVersion,
+            openWebPage: openWebPage
+        )
+    }
+
+    private init(
+        session: any UpdateSession,
+        diagnosticLogger: DiagnosticLogger,
+        channel: @escaping () -> UpdateChannel,
+        installedVersion: @escaping () -> String?,
+        openWebPage: @escaping (URL) -> Bool
+    ) {
+        self.session = session
+        self.channel = channel
+        self.openWebPage = openWebPage
+        self.diagnosticLogger = diagnosticLogger
 
 #if DEBUG
         if let rawValue = Bundle.main.object(

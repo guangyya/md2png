@@ -124,7 +124,7 @@ final class AboutController: NSWindowController, NSWindowDelegate {
 #endif
 
     init(
-        updateController: UpdateController = UpdateController(),
+        updateController: UpdateController = .disabled(),
         diagnosticLogger: DiagnosticLogger = .shared,
         diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies = .live(),
         rendererSelfTestDependencies: AboutRendererSelfTestDependencies? = nil,
