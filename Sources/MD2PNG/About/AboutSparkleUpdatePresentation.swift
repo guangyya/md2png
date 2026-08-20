@@ -213,8 +213,7 @@ extension AboutUpdatePresentation {
                 }
             )
         case .unknown, .upToDate, .runningNewerVersion,
-             .updateAvailable, .downloading, .verifying, .opening,
-             .readyToInstall, .failed:
+             .failed:
             preconditionFailure("Expected a Sparkle update phase")
         }
     }

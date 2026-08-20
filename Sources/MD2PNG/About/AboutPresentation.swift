@@ -11,14 +11,12 @@ enum AboutUpdatePrimaryAction: Equatable {
     case download
     case cancel
     case installAndRelaunch
-    case openDownloadedUpdate
 }
 
 enum AboutUpdateSecondaryAction: Equatable {
     case viewReleases
     case viewFullReleaseNotes
     case installLater
-    case revealDownloadedUpdate
 }
 
 struct AboutUpdateActionPresentation: Equatable {
@@ -73,14 +71,13 @@ struct AboutUpdatePresentation: Equatable {
     static func make(
         status: UpdateStatus,
         allowsInteractiveCheck: Bool,
-        canDownload: (AvailableUpdate) -> Bool,
         localizationBundle: Bundle? = nil,
         retryTimeText: (Date) -> String = {
             $0.formatted(date: .omitted, time: .shortened)
         }
     ) -> AboutUpdatePresentation {
         switch status.phase {
-        case .unknown, .upToDate, .runningNewerVersion:
+        case .unknown, .upToDate, .runningNewerVersion, .failed:
             return makeCommon(
                 status: status,
                 allowsInteractiveCheck: allowsInteractiveCheck,
@@ -93,15 +90,6 @@ struct AboutUpdatePresentation: Equatable {
                 status: status,
                 allowsInteractiveCheck: allowsInteractiveCheck,
                 localizationBundle: localizationBundle
-            )
-        case .updateAvailable, .downloading, .verifying, .opening,
-             .readyToInstall, .failed:
-            return makeLegacy(
-                status: status,
-                allowsInteractiveCheck: allowsInteractiveCheck,
-                canDownload: canDownload,
-                localizationBundle: localizationBundle,
-                retryTimeText: retryTimeText
             )
         }
     }
@@ -221,10 +209,65 @@ struct AboutUpdatePresentation: Equatable {
                 ),
                 secondaryAction: nil
             )
+        case let .failed(message, releasesURL, _):
+            let canPerformAction = allowsInteractiveCheck
+                && !status.isChecking
+                && status.nextManualCheckAt == nil
+            let actionTitle: String
+            if status.manualCheckFeedback == .checking {
+                actionTitle = L10n.text(
+                    "about.update_checking",
+                    defaultValue: "Checking…",
+                    bundle: localizationBundle
+                )
+            } else if status.nextManualCheckAt != nil {
+                actionTitle = L10n.text(
+                    "about.update_try_again_later",
+                    defaultValue: "Try Again Later",
+                    bundle: localizationBundle
+                )
+            } else {
+                actionTitle = L10n.text(
+                    "about.update_retry_check",
+                    defaultValue: "Try Again",
+                    bundle: localizationBundle
+                )
+            }
+            return AboutUpdatePresentation(
+                isVisible: true,
+                symbolName: "exclamationmark.triangle.fill",
+                tint: .orange,
+                title: L10n.text(
+                    "about.update_check_failed",
+                    defaultValue: "Update check failed",
+                    bundle: localizationBundle
+                ),
+                detail: message,
+                primaryAction: AboutUpdateActionPresentation(
+                    title: actionTitle,
+                    isEnabled: canPerformAction,
+                    isEmphasized: true,
+                    toolTip: retryToolTip(
+                        canPerformAction: canPerformAction,
+                        retryAt: status.nextManualCheckAt,
+                        localizationBundle: localizationBundle,
+                        retryTimeText: retryTimeText
+                    ),
+                    action: .checkAgain
+                ),
+                secondaryAction: releasesURL.map { _ in
+                    AboutUpdateSecondaryActionPresentation(
+                        title: L10n.text(
+                            "about.view_all_releases",
+                            defaultValue: "View Releases",
+                            bundle: localizationBundle
+                        ),
+                        action: .viewReleases
+                    )
+                }
+            )
         case .sparkleUpdateAvailable, .sparkleDownloading, .sparkleExtracting,
-             .sparkleReadyToInstall, .sparkleInstalling, .sparkleFailed,
-             .updateAvailable, .downloading, .verifying, .opening,
-             .readyToInstall, .failed:
+             .sparkleReadyToInstall, .sparkleInstalling, .sparkleFailed:
             preconditionFailure("Expected a common update phase")
         }
     }

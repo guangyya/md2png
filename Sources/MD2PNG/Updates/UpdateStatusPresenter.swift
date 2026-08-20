@@ -25,17 +25,15 @@ struct UpdateStatusPresentation {
         }
 
         let symbolName: String? = switch updateStatus.phase {
-        case .sparkleDownloading, .downloading:
+        case .sparkleDownloading:
             "arrow.down.circle"
-        case .sparkleExtracting, .verifying:
+        case .sparkleExtracting:
             "checkmark.shield"
         case .sparkleInstalling:
             "arrow.triangle.2.circlepath"
-        case .opening:
-            "opticaldiscdrive"
         case .unknown, .upToDate, .runningNewerVersion,
              .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleFailed,
-             .updateAvailable, .readyToInstall, .failed:
+             .failed:
             nil
         }
         return StatusItemPresentation(
@@ -86,28 +84,9 @@ struct UpdateStatusPresentation {
                 defaultValue: "Installing md2png %@…",
                 update.displayVersion
             )
-        case let .downloading(update, progressPercent):
-            return L10n.format(
-                "about.update_downloading_progress",
-                defaultValue: "Downloading md2png %1$@ — %2$ld%%",
-                update.version.description,
-                progressPercent
-            )
-        case let .verifying(update):
-            return L10n.format(
-                "about.update_verifying_version",
-                defaultValue: "Verifying md2png %@…",
-                update.version.description
-            )
-        case let .opening(update):
-            return L10n.format(
-                "about.update_opening_version",
-                defaultValue: "Opening md2png %@…",
-                update.version.description
-            )
         case .unknown, .upToDate, .runningNewerVersion,
              .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleFailed,
-             .updateAvailable, .readyToInstall, .failed:
+             .failed:
             return L10n.text("accessibility.app", defaultValue: "md2png")
         }
     }
@@ -266,53 +245,7 @@ final class UpdateStatusPresenter {
                 )
             }
             announce(message)
-        case let .updateAvailable(update):
-            if previousPhase.isDownloadActive {
-                let message = L10n.text(
-                    "update.accessibility.cancelled",
-                    defaultValue: "Update cancelled"
-                )
-                if !isAboutVisible() {
-                    showHUD(message, "xmark.circle.fill", .informational)
-                }
-                announce(message)
-            } else {
-                announce(L10n.format(
-                    "update.accessibility.available",
-                    defaultValue: "md2png %@ is available.",
-                    update.version.description
-                ))
-            }
-        case let .downloading(update, _):
-            if case .downloading = previousPhase { return }
-            announce(L10n.format(
-                "update.accessibility.downloading",
-                defaultValue: "Downloading md2png %@.",
-                update.version.description
-            ))
-        case let .verifying(update):
-            announce(L10n.format(
-                "update.accessibility.verifying",
-                defaultValue: "Verifying md2png %@.",
-                update.version.description
-            ))
-        case let .opening(update):
-            announce(L10n.format(
-                "update.accessibility.opening",
-                defaultValue: "Opening md2png %@.",
-                update.version.description
-            ))
-        case let .readyToInstall(update, _):
-            let message = L10n.format(
-                "update.accessibility.ready",
-                defaultValue: "md2png %@ DMG opened — drag it into Applications",
-                update.version.description
-            )
-            if !isAboutVisible() {
-                showHUD(message, "arrow.down.app.fill", .informational)
-            }
-            announce(message)
-        case let .failed(message, _, _, _):
+        case let .failed(message, _, _):
             if previousPhase.isDownloadActive, !isAboutVisible() {
                 showHUD(
                     L10n.format(

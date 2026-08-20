@@ -86,6 +86,9 @@ flowchart LR
 - Automatic checks, automatic downloads, automatic installation, and system
   profile submission are disabled. `SURequireSignedFeed` and
   `SUVerifyUpdateBeforeExtraction` fail closed.
+- The app has no parallel GitHub Releases API client, DMG downloader, or DMG
+  cache. The notarized DMG is published only for an explicit browser-based
+  manual install or recovery.
 - Release notes are read only from the signed appcast, capped to three
   versioned entries and rendered as bounded, non-interactive plain text. Raw
   HTML, images, script execution, and automatic link navigation are absent.

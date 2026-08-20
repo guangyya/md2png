@@ -6,7 +6,6 @@ protocol UpdateSession: AnyObject {
     var isUpdating: Bool { get }
     var onStatusChange: (@MainActor (UpdateStatus) -> Void)? { get set }
 
-    func refreshIfNeeded()
     func checkAgain()
     func downloadAvailableUpdate()
     func cancelUpdate()
@@ -16,10 +15,7 @@ protocol UpdateSession: AnyObject {
         completion: @escaping @MainActor () -> Void
     ) -> Bool
     func viewFullReleaseNotes()
-    func openDownloadedUpdate()
-    func revealDownloadedUpdate()
     func viewReleasesFallback()
-    func refreshManualCheckAvailability()
 
 #if DEBUG
     func setStatusForTesting(_ status: UpdateStatus)
@@ -27,7 +23,6 @@ protocol UpdateSession: AnyObject {
 }
 
 extension UpdateSession {
-    func refreshIfNeeded() {}
     func downloadAvailableUpdate() {}
     func cancelUpdate() {}
     func installAndRelaunch() {}
@@ -42,7 +37,4 @@ extension UpdateSession {
     func viewFullReleaseNotes() {
         viewReleasesFallback()
     }
-
-    func openDownloadedUpdate() {}
-    func revealDownloadedUpdate() {}
 }

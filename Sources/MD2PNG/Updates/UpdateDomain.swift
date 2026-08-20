@@ -77,14 +77,6 @@ struct GitHubRepository: Equatable, Sendable {
         }
     }
 
-    var latestReleaseAPIURL: URL {
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "api.github.com"
-        components.path = "/repos/\(owner)/\(name)/releases/latest"
-        return components.url!
-    }
-
     var releasesURL: URL {
         var components = URLComponents()
         components.scheme = "https"
@@ -101,54 +93,11 @@ struct GitHubRepository: Equatable, Sendable {
     }
 }
 
-struct UpdateRelease: Codable, Equatable, Sendable {
-    let tagName: String
-    let draft: Bool
-    let prerelease: Bool
-    let assets: [UpdateReleaseAsset]
-}
-
-struct UpdateReleaseAsset: Codable, Equatable, Sendable {
-    let name: String
-    let contentType: String
-    let size: Int64
-    let digest: String?
-    let downloadURL: URL
-}
-
-struct AvailableUpdate: Equatable, Sendable {
-    let version: SemanticVersion
-    let tagName: String
-    let assetName: String
-    let downloadURL: URL
-    let size: Int64
-    let sha256: String
-}
-
-enum UpdateCheckResult: Equatable, Sendable {
-    case upToDate(installed: SemanticVersion, latest: SemanticVersion)
-    case updateAvailable(AvailableUpdate)
-}
-
 enum UpdateError: LocalizedError, Equatable {
     case invalidInstalledVersion
-    case unsupportedRepository
     case networkUnavailable
-    case invalidServerResponse
-    case httpStatus(Int)
     case rateLimited(retryAt: Date)
-    case invalidRelease
-    case invalidReleaseVersion
-    case missingAsset
-    case duplicateAsset
-    case invalidAssetMetadata
-    case insecureDownloadURL
-    case cacheUnavailable
-    case downloadFailed
-    case fileSizeMismatch
     case digestMismatch
-    case openFailed
-    case revealFailed
 
     var errorDescription: String? {
         switch self {
@@ -157,26 +106,10 @@ enum UpdateError: LocalizedError, Equatable {
                 "update.error.installed_version",
                 defaultValue: "The installed app version is not valid."
             )
-        case .unsupportedRepository:
-            return L10n.text(
-                "update.error.repository",
-                defaultValue: "This build does not contain a valid GitHub repository address."
-            )
         case .networkUnavailable:
             return L10n.text(
                 "update.error.network",
                 defaultValue: "The update service could not be reached. Check your connection and try again."
-            )
-        case .invalidServerResponse:
-            return L10n.text(
-                "update.error.response",
-                defaultValue: "GitHub returned an invalid update response."
-            )
-        case let .httpStatus(status):
-            return L10n.format(
-                "update.error.http",
-                defaultValue: "The update request failed (HTTP %ld).",
-                status
             )
         case let .rateLimited(retryAt):
             return L10n.format(
@@ -184,45 +117,10 @@ enum UpdateError: LocalizedError, Equatable {
                 defaultValue: "GitHub temporarily limited update checks. Try again after %@.",
                 retryAt.formatted(date: .omitted, time: .shortened)
             )
-        case .invalidRelease, .invalidReleaseVersion:
-            return L10n.text(
-                "update.error.release",
-                defaultValue: "The latest release has invalid version information."
-            )
-        case .missingAsset:
-            return L10n.text(
-                "update.error.asset_missing",
-                defaultValue: "The latest release does not contain the expected Apple silicon DMG."
-            )
-        case .duplicateAsset, .invalidAssetMetadata, .insecureDownloadURL:
-            return L10n.text(
-                "update.error.asset_invalid",
-                defaultValue: "The latest release contains invalid download metadata."
-            )
-        case .cacheUnavailable:
-            return L10n.text(
-                "update.error.cache",
-                defaultValue: "The update could not be saved in the app cache."
-            )
-        case .downloadFailed:
-            return L10n.text(
-                "update.error.download",
-                defaultValue: "The update could not be downloaded."
-            )
-        case .fileSizeMismatch, .digestMismatch:
+        case .digestMismatch:
             return L10n.text(
                 "update.error.integrity",
-                defaultValue: "The downloaded DMG did not pass its integrity check and was removed."
-            )
-        case .openFailed:
-            return L10n.text(
-                "update.error.open",
-                defaultValue: "The downloaded DMG could not be opened."
-            )
-        case .revealFailed:
-            return L10n.text(
-                "update.error.reveal",
-                defaultValue: "The downloaded DMG is no longer in the app cache. Download it again."
+                defaultValue: "The downloaded update did not pass its integrity check."
             )
         }
     }

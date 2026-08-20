@@ -265,7 +265,7 @@ rejected by the release publisher. `TEST_UPDATE_VERSION` changes only the
 packaged test app version and is also rejected by `publish-release`; public
 releases always use `CFBundleShortVersionString` from `Info.plist`.
 The download and ready-to-install mocks use offline Sparkle-shaped metadata and
-cannot start an update or artifact request while the Debug update channel is
+cannot start an update request or action while the Debug update channel is
 disabled. The shorter `ready-to-install` state remains an alias for the seamless
 ready-to-install layout.
 

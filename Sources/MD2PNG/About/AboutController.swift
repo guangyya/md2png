@@ -220,8 +220,6 @@ final class AboutController: NSWindowController, NSWindowDelegate {
             updateController.cancelUpdate()
         case .installAndRelaunch:
             updateController.installAndRelaunch()
-        case .openDownloadedUpdate:
-            updateController.openDownloadedUpdate()
         }
     }
 
@@ -233,16 +231,13 @@ final class AboutController: NSWindowController, NSWindowDelegate {
             updateController.viewFullReleaseNotes()
         case .installLater:
             closeAbout()
-        case .revealDownloadedUpdate:
-            updateController.revealDownloadedUpdate()
         }
     }
 
     private func applyUpdateStatus(_ status: UpdateStatus) {
         let presentation = AboutUpdatePresentation.make(
             status: status,
-            allowsInteractiveCheck: updateController.allowsInteractiveCheck,
-            canDownload: updateController.canDownload
+            allowsInteractiveCheck: updateController.allowsInteractiveCheck
         )
         contentModel.apply(
             updatePresentation: presentation,
