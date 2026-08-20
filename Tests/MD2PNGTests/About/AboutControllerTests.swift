@@ -132,7 +132,7 @@ final class AboutControllerTests: XCTestCase {
         var suggestedFileName = ""
         var didPresentFailure = false
         let controller = AboutController(
-            updateController: UpdateController(),
+            updateController: .disabled(),
             diagnosticLogger: logger,
             diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies(
                 chooseDestination: { _, suggestion in
@@ -186,7 +186,7 @@ final class AboutControllerTests: XCTestCase {
         )
         var didPresentFailure = false
         let controller = AboutController(
-            updateController: UpdateController(),
+            updateController: .disabled(),
             diagnosticLogger: logger,
             diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies(
                 chooseDestination: { _, _ in nil },
@@ -218,7 +218,7 @@ final class AboutControllerTests: XCTestCase {
         _ = NSApplication.shared
         var didPresentFailure = false
         let controller = AboutController(
-            updateController: UpdateController(),
+            updateController: .disabled(),
             diagnosticLogger: .disabled,
             diagnosticSaveDependencies: AboutDiagnosticLogSaveDependencies(
                 chooseDestination: { _, _ in
@@ -273,7 +273,7 @@ final class AboutControllerTests: XCTestCase {
             PackagedRenderSelfTestFailure
         >?
         let controller = AboutController(
-            updateController: UpdateController(),
+            updateController: .disabled(),
             diagnosticLogger: .disabled,
             rendererSelfTestDependencies: AboutRendererSelfTestDependencies(
                 run: { capturedCompletion in
@@ -631,9 +631,7 @@ final class AboutControllerTests: XCTestCase {
     @MainActor
     func testAboutKeepsProjectLinkButHidesUpdatesForDisabledChannel() {
         _ = NSApplication.shared
-        let controller = AboutController(updateController: UpdateController(
-            channel: { .disabled }
-        ))
+        let controller = AboutController(updateController: .disabled())
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
             build: "1",
@@ -651,7 +649,7 @@ final class AboutControllerTests: XCTestCase {
     func testAboutOfflineFixtureDisablesProductionDownloadAction() {
         _ = NSApplication.shared
         let update = UpdateTestFixtures.availableUpdate()
-        let updateController = UpdateController(channel: { .disabled })
+        let updateController = UpdateController.disabled()
         updateController.setStatusForTesting(UpdateStatus(
             phase: .updateAvailable(update)
         ))
@@ -807,10 +805,7 @@ final class AboutControllerTests: XCTestCase {
         manualCheckFeedback: ManualCheckFeedback = .none,
         onVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) -> AboutController {
-        let repository = GitHubRepository(projectURL: testProjectURL)!
-        let updateController = UpdateController(
-            channel: { .stableGitHubReleases(repository: repository) }
-        )
+        let updateController = UpdateController.disabled()
         updateController.setStatusForTesting(UpdateStatus(
             phase: phase,
             isChecking: isChecking,

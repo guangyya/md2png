@@ -43,6 +43,35 @@ protocol UpdateDriving: AnyObject {
 }
 
 @MainActor
+final class DisabledUpdateDriver: UpdateDriving {
+    func setEventHandler(_ handler: @escaping @MainActor (UpdateDriverEvent) -> Void) {}
+
+    func probe(
+        installedVersion: String,
+        completion: @escaping @MainActor (UpdateProbeResult) -> Void
+    ) {
+        completion(.failed(message: L10n.text(
+            "about.update_configuration_failed",
+            defaultValue: "The signed updater could not be started."
+        )))
+    }
+
+    func downloadUpdate(expectedBuildVersion: String) {}
+
+    func cancelDownload() {}
+
+    func deferInstallation(
+        completion: (@MainActor () -> Void)?
+    ) -> Bool {
+        false
+    }
+
+    func installAndRelaunch() -> Bool {
+        false
+    }
+}
+
+@MainActor
 final class SparkleUpdateDriver: NSObject, UpdateDriving, SPUUpdaterDelegate {
     private let feedURL: () -> URL?
     private var eventHandler: (@MainActor (UpdateDriverEvent) -> Void)?

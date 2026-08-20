@@ -193,10 +193,9 @@ make run CONFIGURATION=debug \
 
 `TEST_UPDATE_STATE` 仅允许用于本地 Debug app/run 构建，发布流程会拒绝它。
 `TEST_UPDATE_VERSION` 只修改打包后的测试 App 版本，`publish-release` 同样会拒绝它；
-公开发布始终使用 `Info.plist` 中的 `CFBundleShortVersionString`。下载相关 mock
-使用不可路由的 fixture 元数据；Debug 更新渠道禁用时，它无法发起更新或资产请求。
-如果 fixture 文件不存在，`ready-to-install` 会先显示仅供界面测试的可恢复下载失败
-状态，而不会提供一个指向缺失文件的“打开”操作。
+公开发布始终使用 `Info.plist` 中的 `CFBundleShortVersionString`。下载和待安装 mock
+使用离线的 Sparkle 形态元数据；Debug 更新渠道禁用时，它无法发起更新或资产请求。
+较短的 `ready-to-install` 状态继续作为无缝待安装界面的别名。
 
 `PROJECT_URL` 只在打包时写入 App；省略时 About 会隐藏项目与更新控件。Debug
 构建会保留已配置的项目链接，但隐藏生产更新控件。只有显式打包了
