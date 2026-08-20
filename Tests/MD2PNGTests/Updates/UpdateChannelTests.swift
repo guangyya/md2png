@@ -29,11 +29,8 @@ final class UpdateChannelTests: XCTestCase {
         )
         XCTAssertEqual(repository.owner, "guangyya")
         XCTAssertEqual(repository.name, "md2png")
-        XCTAssertEqual(repository.latestReleaseAPIURL.host, "api.github.com")
-        XCTAssertEqual(
-            repository.latestReleaseAPIURL.path,
-            "/repos/guangyya/md2png/releases/latest"
-        )
+        XCTAssertEqual(repository.releasesURL.host, "github.com")
+        XCTAssertEqual(repository.appcastURL.lastPathComponent, "appcast.xml")
         XCTAssertTrue(channel.allowsUpdateChecks)
     }
 
@@ -62,32 +59,5 @@ final class UpdateChannelTests: XCTestCase {
                 "Unexpected stable channel for \(configuredValue)"
             )
         }
-    }
-
-    func testOnlyStableChannelAllowsItsExactReleaseArtifact() throws {
-        let repository = try XCTUnwrap(GitHubRepository(projectURL: projectURL))
-        let update = UpdateTestFixtures.availableUpdate()
-        let stableChannel = UpdateChannel.stableGitHubReleases(repository: repository)
-
-        XCTAssertFalse(UpdateChannel.disabled.allowsDownload(update))
-        XCTAssertTrue(stableChannel.allowsDownload(update))
-
-        let wrongRepository = try XCTUnwrap(GitHubRepository(
-            projectURL: URL(string: "https://github.com/guangyya/another-app")!
-        ))
-        XCTAssertFalse(
-            UpdateChannel.stableGitHubReleases(repository: wrongRepository)
-                .allowsDownload(update)
-        )
-
-        let wrongArtifact = AvailableUpdate(
-            version: update.version,
-            tagName: update.tagName,
-            assetName: "nightly.dmg",
-            downloadURL: update.downloadURL,
-            size: update.size,
-            sha256: update.sha256
-        )
-        XCTAssertFalse(stableChannel.allowsDownload(wrongArtifact))
     }
 }

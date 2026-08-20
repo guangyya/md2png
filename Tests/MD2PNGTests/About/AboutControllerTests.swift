@@ -428,8 +428,7 @@ final class AboutControllerTests: XCTestCase {
             phase: .failed(
                 message: UpdateError.networkUnavailable.localizedDescription,
                 releasesURL: testProjectURL.appendingPathComponent("releases"),
-                retryAt: retryAt,
-                availableUpdate: nil
+                retryAt: retryAt
             ),
             nextManualCheckAt: retryAt
         )
@@ -448,8 +447,7 @@ final class AboutControllerTests: XCTestCase {
         let controller = makeAboutController(phase: .failed(
             message: message,
             releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
-            retryAt: nil,
-            availableUpdate: nil
+            retryAt: nil
         ))
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
@@ -486,12 +484,10 @@ final class AboutControllerTests: XCTestCase {
     func testAboutDownloadFailureWrapsCompleteIntegrityMessage() throws {
         _ = NSApplication.shared
         let message = UpdateError.digestMismatch.localizedDescription
-        let update = UpdateTestFixtures.availableUpdate()
-        let controller = makeAboutController(phase: .failed(
+        let update = UpdateTestFixtures.seamlessUpdate()
+        let controller = makeAboutController(phase: .sparkleFailed(
             message: message,
-            releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
-            retryAt: nil,
-            availableUpdate: update
+            update: update
         ))
         controller.show(metadata: AppMetadata(
             version: "0.1.0",
@@ -508,54 +504,6 @@ final class AboutControllerTests: XCTestCase {
 
         writeSnapshotIfRequested(
             environmentKey: "MD2PNG_ABOUT_DOWNLOAD_FAILURE_SNAPSHOT_PATH",
-            contentView: try XCTUnwrap(controller.window?.contentView)
-        )
-    }
-
-    @MainActor
-    func testAboutReadyStatusCanBeSelectedAndOffersOpenAgain() throws {
-        _ = NSApplication.shared
-        let update = UpdateTestFixtures.availableUpdate()
-        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-            update.assetName
-        )
-        let controller = makeAboutController(phase: .readyToInstall(
-            update: update,
-            fileURL: fileURL
-        ))
-        controller.show(metadata: AppMetadata(
-            version: "0.1.0",
-            build: "1",
-            buildConfiguration: .debug,
-            releaseNotes: "Added\n• Reopen downloaded DMGs.",
-            projectURL: testProjectURL
-        ))
-        defer { controller.close() }
-
-        XCTAssertEqual(
-            controller.displayedUpdateButtonTitle,
-            L10n.text("about.update_open_again", defaultValue: "Open")
-        )
-        XCTAssertEqual(
-            controller.displayedSecondaryUpdateButtonTitle,
-            L10n.text("about.update_show_in_finder", defaultValue: "Show in Finder")
-        )
-        XCTAssertEqual(
-            controller.displayedUpdateDetail,
-            L10n.text(
-                "about.update_ready_detail",
-                defaultValue: "Downloaded — open the DMG and drag md2png into Applications."
-            )
-        )
-        XCTAssertTrue(controller.displayedUpdateStatusIsSelectable)
-        controller.selectAllUpdateStatusForTesting()
-        XCTAssertEqual(
-            controller.displayedUpdateStatusSelectedRange,
-            NSRange(location: 0, length: (controller.displayedUpdateStatus as NSString).length)
-        )
-
-        writeSnapshotIfRequested(
-            environmentKey: "MD2PNG_ABOUT_READY_SNAPSHOT_PATH",
             contentView: try XCTUnwrap(controller.window?.contentView)
         )
     }
@@ -580,8 +528,7 @@ final class AboutControllerTests: XCTestCase {
         let expandedController = makeAboutController(phase: .failed(
             message: UpdateError.networkUnavailable.localizedDescription,
             releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
-            retryAt: nil,
-            availableUpdate: nil
+            retryAt: nil
         ))
         expandedController.show(metadata: metadata)
         defer { expandedController.close() }
@@ -648,10 +595,10 @@ final class AboutControllerTests: XCTestCase {
     @MainActor
     func testAboutOfflineFixtureDisablesProductionDownloadAction() {
         _ = NSApplication.shared
-        let update = UpdateTestFixtures.availableUpdate()
+        let update = UpdateTestFixtures.seamlessUpdate()
         let updateController = UpdateController.disabled()
         updateController.setStatusForTesting(UpdateStatus(
-            phase: .updateAvailable(update)
+            phase: .sparkleUpdateAvailable(update)
         ))
         let controller = AboutController(updateController: updateController)
         controller.show(metadata: AppMetadata(

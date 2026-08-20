@@ -10,26 +10,19 @@ enum UpdatePhase: Equatable, Sendable {
     case sparkleReadyToInstall(SeamlessUpdate)
     case sparkleInstalling(SeamlessUpdate)
     case sparkleFailed(message: String, update: SeamlessUpdate?)
-    case updateAvailable(AvailableUpdate)
-    case downloading(AvailableUpdate, progressPercent: Int)
-    case verifying(AvailableUpdate)
-    case opening(AvailableUpdate)
-    case readyToInstall(update: AvailableUpdate, fileURL: URL)
     case failed(
         message: String,
         releasesURL: URL?,
-        retryAt: Date?,
-        availableUpdate: AvailableUpdate?
+        retryAt: Date?
     )
 
     var isDownloadActive: Bool {
         switch self {
-        case .sparkleDownloading, .sparkleExtracting,
-             .downloading, .verifying, .opening:
+        case .sparkleDownloading, .sparkleExtracting:
             return true
         case .unknown, .upToDate, .runningNewerVersion,
              .sparkleUpdateAvailable, .sparkleReadyToInstall, .sparkleInstalling,
-             .sparkleFailed, .updateAvailable, .readyToInstall, .failed:
+             .sparkleFailed, .failed:
             return false
         }
     }
@@ -45,25 +38,7 @@ enum UpdatePhase: Equatable, Sendable {
         case let .sparkleFailed(_, update):
             return update
         case .unknown, .upToDate, .runningNewerVersion,
-             .updateAvailable, .downloading, .verifying, .opening,
-             .readyToInstall, .failed:
-            return nil
-        }
-    }
-
-    var availableUpdate: AvailableUpdate? {
-        switch self {
-        case let .updateAvailable(update),
-             let .downloading(update, _),
-             let .verifying(update),
-             let .opening(update),
-             let .readyToInstall(update, _):
-            return update
-        case let .failed(_, _, _, update):
-            return update
-        case .unknown, .upToDate, .runningNewerVersion,
-             .sparkleUpdateAvailable, .sparkleDownloading, .sparkleExtracting,
-             .sparkleReadyToInstall, .sparkleInstalling, .sparkleFailed:
+             .failed:
             return nil
         }
     }
@@ -105,8 +80,7 @@ enum DebugUpdateMockState: String {
             return UpdateStatus(phase: .failed(
                 message: UpdateError.networkUnavailable.localizedDescription,
                 releasesURL: repository?.releasesURL,
-                retryAt: nil,
-                availableUpdate: nil
+                retryAt: nil
             ))
         case .downloadFailed:
             return UpdateStatus(phase: .sparkleFailed(
@@ -169,7 +143,6 @@ enum DebugUpdateMockState: String {
 final class UpdateController {
     typealias StatusObserver = @MainActor (UpdateStatus) -> Void
 
-    static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
     static let manualCheckCooldown: TimeInterval = 60
 
     private let session: any UpdateSession
@@ -211,10 +184,6 @@ final class UpdateController {
         }
 #endif
         return channel().allowsUpdateChecks
-    }
-
-    func canDownload(_ update: AvailableUpdate) -> Bool {
-        channel().allowsDownload(update)
     }
 
     static func disabled(
@@ -270,45 +239,6 @@ final class UpdateController {
                 beforeInstallAndRelaunch: beforeInstallAndRelaunch,
                 onInstallAccepted: onInstallAccepted,
                 onInstallEndedWithoutRelaunch: onInstallEndedWithoutRelaunch
-            ),
-            diagnosticLogger: diagnosticLogger,
-            channel: channel,
-            installedVersion: installedVersion,
-            openWebPage: openWebPage
-        )
-    }
-
-    convenience init(
-        legacyService service: UpdateService,
-        diagnosticLogger: DiagnosticLogger = .disabled,
-        channel: @escaping () -> UpdateChannel = { .current() },
-        installedVersion: @escaping () -> String? = {
-            Bundle.main.object(
-                forInfoDictionaryKey: "CFBundleShortVersionString"
-            ) as? String
-        },
-        openFile: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
-        revealFile: @escaping (URL) -> Void = {
-            NSWorkspace.shared.activateFileViewerSelecting([$0])
-        },
-        openWebPage: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
-        defaults: UserDefaults = .standard,
-        now: @escaping () -> Date = Date.init,
-        automaticCheckInterval: TimeInterval = UpdateController.automaticCheckInterval,
-        manualCheckCooldown: TimeInterval = UpdateController.manualCheckCooldown
-    ) {
-        self.init(
-            session: LegacyUpdateSession(
-                service: service,
-                channel: channel,
-                installedVersion: installedVersion,
-                openFile: openFile,
-                revealFile: revealFile,
-                openWebPage: openWebPage,
-                defaults: defaults,
-                now: now,
-                automaticCheckInterval: automaticCheckInterval,
-                manualCheckCooldown: manualCheckCooldown
             ),
             diagnosticLogger: diagnosticLogger,
             channel: channel,
@@ -378,19 +308,6 @@ final class UpdateController {
     }
 #endif
 
-    func refreshIfNeeded() {
-#if DEBUG
-        if usesTestingStatusOverride {
-            if usesPackagedTestingStatusOverride {
-                session.refreshManualCheckAvailability()
-                status = session.status
-            }
-            return
-        }
-#endif
-        session.refreshIfNeeded()
-    }
-
     func checkAgain() {
 #if DEBUG
         guard !usesTestingStatusOverride else { return }
@@ -429,14 +346,6 @@ final class UpdateController {
             result: .started
         )
         session.viewFullReleaseNotes()
-    }
-
-    func openDownloadedUpdate() {
-        session.openDownloadedUpdate()
-    }
-
-    func revealDownloadedUpdate() {
-        session.revealDownloadedUpdate()
     }
 
     func viewReleasesFallback() {

@@ -78,59 +78,13 @@ final class AboutPresentationTests: XCTestCase {
         XCTAssertEqual(completed.primaryAction?.isEnabled, false)
     }
 
-    func testDownloadAndActiveProgressPresentExpectedActions() {
-        let update = UpdateTestFixtures.availableUpdate()
-        let unavailable = makePresentation(
-            status: UpdateStatus(phase: .updateAvailable(update)),
-            canDownload: false
-        )
-        XCTAssertEqual(unavailable.symbolName, "arrow.down.circle.fill")
-        XCTAssertEqual(unavailable.primaryAction?.action, .download)
-        XCTAssertEqual(unavailable.primaryAction?.title, "Download Update")
-        XCTAssertEqual(unavailable.primaryAction?.isEnabled, false)
-        XCTAssertEqual(unavailable.primaryAction?.isEmphasized, true)
-
-        let downloading = makePresentation(status: UpdateStatus(
-            phase: .downloading(update, progressPercent: 42)
-        ))
-        XCTAssertEqual(downloading.title, "Downloading md2png 0.2.0 — 42%")
-        XCTAssertEqual(downloading.primaryAction?.action, .cancel)
-        XCTAssertEqual(downloading.primaryAction?.title, "Cancel")
-
-        let verifying = makePresentation(status: UpdateStatus(phase: .verifying(update)))
-        XCTAssertEqual(verifying.primaryAction?.action, .cancel)
-
-        let opening = makePresentation(status: UpdateStatus(phase: .opening(update)))
-        XCTAssertNil(opening.primaryAction)
-    }
-
-    func testReadyToInstallHasOpenAndFinderActions() {
-        let update = UpdateTestFixtures.availableUpdate()
-        let presentation = makePresentation(status: UpdateStatus(phase: .readyToInstall(
-            update: update,
-            fileURL: URL(fileURLWithPath: "/tmp/update.dmg")
-        )))
-
-        XCTAssertEqual(presentation.tint, .green)
-        XCTAssertEqual(presentation.title, "Ready to install · 0.2.0")
-        XCTAssertEqual(
-            presentation.detail,
-            "Downloaded — open the DMG and drag md2png into Applications."
-        )
-        XCTAssertEqual(presentation.primaryAction?.action, .openDownloadedUpdate)
-        XCTAssertEqual(presentation.primaryAction?.title, "Open")
-        XCTAssertEqual(presentation.secondaryAction?.action, .revealDownloadedUpdate)
-        XCTAssertEqual(presentation.secondaryAction?.title, "Show in Finder")
-    }
-
-    func testFailurePresentationDistinguishesCheckAndDownloadRecovery() {
+    func testFailurePresentationOffersCheckRecoveryAndReleasesFallback() {
         let retryAt = Date(timeIntervalSince1970: 1_000)
         let checkFailure = makePresentation(status: UpdateStatus(
             phase: .failed(
                 message: "Offline",
                 releasesURL: URL(string: "https://github.com/owner/md2png/releases"),
-                retryAt: retryAt,
-                availableUpdate: nil
+                retryAt: retryAt
             ),
             nextManualCheckAt: retryAt
         ))
@@ -142,32 +96,12 @@ final class AboutPresentationTests: XCTestCase {
         XCTAssertEqual(checkFailure.primaryAction?.isEnabled, false)
         XCTAssertEqual(checkFailure.primaryAction?.toolTip, "Try again after 12:34.")
         XCTAssertEqual(checkFailure.secondaryAction?.action, .viewReleases)
-
-        let update = UpdateTestFixtures.availableUpdate()
-        let downloadFailure = makePresentation(
-            status: UpdateStatus(phase: .failed(
-                message: "Invalid download",
-                releasesURL: nil,
-                retryAt: nil,
-                availableUpdate: update
-            )),
-            canDownload: true
-        )
-        XCTAssertEqual(downloadFailure.title, "Download failed")
-        XCTAssertEqual(downloadFailure.primaryAction?.action, .download)
-        XCTAssertEqual(downloadFailure.primaryAction?.title, "Retry Download")
-        XCTAssertEqual(downloadFailure.primaryAction?.isEnabled, true)
-        XCTAssertNil(downloadFailure.secondaryAction)
     }
 
-    private func makePresentation(
-        status: UpdateStatus,
-        canDownload: Bool = true
-    ) -> AboutUpdatePresentation {
+    private func makePresentation(status: UpdateStatus) -> AboutUpdatePresentation {
         AboutUpdatePresentation.make(
             status: status,
             allowsInteractiveCheck: true,
-            canDownload: { _ in canDownload },
             localizationBundle: english,
             retryTimeText: { _ in "12:34" }
         )

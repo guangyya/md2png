@@ -54,7 +54,6 @@ final class SparkleUpdateSession: UpdateSession {
         relaunchMarker = UpdateRelaunchMarker(defaults: defaults)
         checkPolicy = UpdateCheckPolicy(
             defaults: defaults,
-            automaticCheckInterval: UpdateController.automaticCheckInterval,
             manualCheckCooldown: manualCheckCooldown
         )
         updateDriver.setEventHandler { [weak self] event in
@@ -71,7 +70,7 @@ final class SparkleUpdateSession: UpdateSession {
         guard let configuration = configurationOrShowFailure() else { return }
         let currentDate = now()
         guard checkPolicy.canMakeRequest(at: currentDate) else {
-            let retryAt = checkPolicy.nextAllowedRequestDate(at: currentDate)
+            let retryAt = checkPolicy.nextAllowedRequestDate()
             if case .unknown = status.phase {
                 showRateLimitFailure(
                     repository: configuration.repository,
@@ -158,10 +157,6 @@ final class SparkleUpdateSession: UpdateSession {
         _ = openWebPage(releasesURL)
     }
 
-    func refreshManualCheckAvailability() {
-        publishManualCheckAvailability(at: now())
-    }
-
 #if DEBUG
     func setStatusForTesting(_ status: UpdateStatus) {
         self.status = status
@@ -209,8 +204,7 @@ final class SparkleUpdateSession: UpdateSession {
             phase = .failed(
                 message: message,
                 releasesURL: repository.releasesURL,
-                retryAt: nil,
-                availableUpdate: nil
+                retryAt: nil
             )
         }
         finishCheck(with: phase)
@@ -286,8 +280,7 @@ final class SparkleUpdateSession: UpdateSession {
                 return .failed(
                     message: UpdateError.invalidInstalledVersion.localizedDescription,
                     releasesURL: repository.releasesURL,
-                    retryAt: nil,
-                    availableUpdate: nil
+                    retryAt: nil
                 )
             }
             return .upToDate(version: version)
@@ -337,8 +330,7 @@ final class SparkleUpdateSession: UpdateSession {
         .failed(
             message: message,
             releasesURL: repository.releasesURL,
-            retryAt: nil,
-            availableUpdate: nil
+            retryAt: nil
         )
     }
 
@@ -348,8 +340,7 @@ final class SparkleUpdateSession: UpdateSession {
             updateStatus(phase: .failed(
                 message: UpdateError.invalidInstalledVersion.localizedDescription,
                 releasesURL: repository.releasesURL,
-                retryAt: nil,
-                availableUpdate: nil
+                retryAt: nil
             ))
             return nil
         }
@@ -380,13 +371,12 @@ final class SparkleUpdateSession: UpdateSession {
         updateStatus(phase: .failed(
             message: UpdateError.rateLimited(retryAt: retryDate).localizedDescription,
             releasesURL: repository.releasesURL,
-            retryAt: retryDate,
-            availableUpdate: nil
+            retryAt: retryDate
         ))
     }
 
     private func publishManualCheckAvailability(at date: Date) {
-        let nextAllowed = checkPolicy.nextAllowedRequestDate(at: date)
+        let nextAllowed = checkPolicy.nextAllowedRequestDate()
         status.nextManualCheckAt = nextAllowed.flatMap { $0 > date ? $0 : nil }
         scheduleManualCheckAvailabilityRefresh()
     }

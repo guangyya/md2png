@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Removed
+
+- Retire the unused in-app GitHub Releases API and cached-DMG updater pipeline;
+  Sparkle remains the only in-app update authority, while the notarized DMG is
+  still published for explicit manual installation and recovery.
+
 ## [0.13.2] - 2026-08-19
 
 ### Added
