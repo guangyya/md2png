@@ -5,6 +5,8 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-08-20
+
 ### Fixed
 
 - Make the md2png Dock icon size match standard macOS apps.
