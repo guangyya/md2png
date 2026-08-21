@@ -1,13 +1,13 @@
 {
   "meta": {
-    "description": "Turn clipboard Markdown into a polished PNG on your Mac—locally and privately.",
+    "description": "Turn clipboard or local-file Markdown into a polished PNG on your Mac—locally and privately.",
     "og_locale": "en_US",
     "og_locale_alternate": "zh_CN",
     "title": "md2png — Raw Markdown in. Polished PNG out.",
-    "og_description": "A tiny native Mac app that turns clipboard Markdown into a paste-ready image. Everything stays on your Mac.",
+    "og_description": "A tiny native Mac app that turns clipboard or Finder Markdown into a polished image. Everything stays on your Mac.",
     "og_image_alt": "md2png turns Markdown into a polished PNG locally on Mac",
-    "twitter_description": "A tiny native Mac app that turns clipboard Markdown into a paste-ready image.",
-    "json_description": "A native macOS utility that turns clipboard Markdown into a polished, paste-ready PNG entirely on your Mac.",
+    "twitter_description": "A tiny native Mac app that turns clipboard or Finder Markdown into a polished image.",
+    "json_description": "A native macOS utility that turns clipboard or local-file Markdown into a polished PNG entirely on your Mac.",
     "operating_system": "macOS 14 or later on Apple silicon"
   },
   "navigation": {
@@ -43,9 +43,9 @@
         "number": "01",
         "label": "STYLE",
         "title": "Five themes. Three widths.",
-        "description": "Choose a palette and a Compact, Standard, or Wide canvas. Your choices stay local and are captured in every opaque PNG.",
+        "description": "Choose a palette, a Compact, Standard, or Wide canvas, and optional transparent rounded corners. Every choice stays local.",
         "tags_aria": "Render choices",
-        "tags": ["Clean Light", "Dark", "Midnight Blue"]
+        "tags": ["Five themes", "Three widths", "Rounded corners"]
       },
       {
         "number": "02",
@@ -120,7 +120,7 @@
     "hero_eyebrow": "Native macOS utility · Local first",
     "hero_title_first": "Raw Markdown in.",
     "hero_title_second": "Polished PNG out.",
-    "hero_lede": "Turn tables, highlighted code, and Mermaid diagrams into a crisp image—without uploading your content or sending anything for you.",
+    "hero_lede": "Turn clipboard or Finder Markdown with tables, highlighted code, and Mermaid diagrams into a crisp image—without uploading or sending it.",
     "download_for_mac": "Download for Mac",
     "view_source": "View source",
     "requirements": "macOS 14+ · Apple silicon · Free and open source",

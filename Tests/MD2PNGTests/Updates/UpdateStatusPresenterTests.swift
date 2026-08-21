@@ -79,6 +79,82 @@ final class UpdateStatusPresenterTests: XCTestCase {
         XCTAssertEqual(harness.announcements.last, "Download failed")
     }
 
+    func testEveryMajorUpdateTransitionHasAnAccessibleAnnouncement() throws {
+        let harness = UpdateStatusPresenterHarness()
+        let presenter = harness.makePresenter()
+        let update = UpdateTestFixtures.seamlessUpdate()
+
+        presenter.apply(UpdateStatus(phase: .upToDate(
+            version: try XCTUnwrap(SemanticVersion("0.13.3"))
+        )))
+        presenter.apply(UpdateStatus(phase: .runningNewerVersion(version: "0.14.0")))
+        presenter.apply(UpdateStatus(phase: .sparkleUpdateAvailable(update)))
+        presenter.apply(UpdateStatus(phase: .sparkleExtracting(
+            update,
+            progressPercent: 25
+        )))
+        presenter.apply(UpdateStatus(phase: .sparkleInstalling(update)))
+
+        XCTAssertEqual(harness.announcements, [
+            "md2png 0.13.3 is up to date.",
+            "This md2png build is newer than the latest published version.",
+            "md2png 0.8.0 is available.",
+            "Preparing md2png 0.8.0 for installation.",
+            "Installing md2png 0.8.0 and relaunching."
+        ])
+    }
+
+    func testFailureAfterActiveDownloadShowsOneRecoveryHUDWhenAboutIsHidden() {
+        let harness = UpdateStatusPresenterHarness()
+        let presenter = harness.makePresenter()
+        let update = UpdateTestFixtures.seamlessUpdate()
+
+        presenter.apply(UpdateStatus(phase: .sparkleDownloading(
+            update,
+            progressPercent: 40
+        )))
+        presenter.apply(UpdateStatus(phase: .failed(
+            message: "The update service could not be reached.",
+            releasesURL: UpdateTestFixtures.repository.releasesURL,
+            retryAt: nil
+        )))
+
+        XCTAssertEqual(harness.hudMessages.count, 1)
+        XCTAssertEqual(
+            harness.hudMessages[0].message,
+            "The update service could not be reached. Open About md2png to retry."
+        )
+        XCTAssertEqual(harness.hudMessages[0].symbol, "exclamationmark.triangle.fill")
+        XCTAssertEqual(harness.hudMessages[0].style, .error)
+        XCTAssertEqual(
+            harness.announcements.last,
+            "The update service could not be reached."
+        )
+    }
+
+    func testProgressOnlyChangesUpdateStatusItemWithoutRepeatingAnnouncement() {
+        let harness = UpdateStatusPresenterHarness()
+        let presenter = harness.makePresenter()
+        let update = UpdateTestFixtures.seamlessUpdate()
+
+        presenter.apply(UpdateStatus(phase: .sparkleExtracting(
+            update,
+            progressPercent: 10
+        )))
+        presenter.apply(UpdateStatus(phase: .sparkleExtracting(
+            update,
+            progressPercent: 90
+        )))
+
+        XCTAssertEqual(harness.announcements, [
+            "Preparing md2png 0.8.0 for installation."
+        ])
+        XCTAssertEqual(harness.statusItems.last?.symbolName, "checkmark.shield")
+        XCTAssertTrue(
+            harness.statusItems.last?.accessibilityLabel.contains("90%") == true
+        )
+    }
+
     private func renderState(
         isRendering: Bool = false,
         isUpdateInstallPending: Bool = false

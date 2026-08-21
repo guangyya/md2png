@@ -1,0 +1,98 @@
+name: Bug report
+description: Report a reproducible problem in md2png without sharing confidential content.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve md2png. Before filing, check the troubleshooting guide and existing issues for the same problem.
+
+        Never include confidential Markdown, clipboard contents, credentials, full private paths, or an unreviewed diagnostic export.
+
+  - type: input
+    id: version
+    attributes:
+      label: md2png version
+      description: Copy the complete diagnostic line using the icon beside Version in About md2png.
+      placeholder: md2png 0.13.3 (13) · RELEASE · macOS 15.x · arm64 · source abc1234
+    validations:
+      required: true
+
+  - type: dropdown
+    id: entry-point
+    attributes:
+      label: Entry point
+      description: How did the render or action start?
+      options:
+        - Render Clipboard as Image
+        - Render Markdown File
+        - Finder Open With
+        - Finder Service
+        - Bundled Example
+        - Preview action
+        - Settings, Welcome, or About
+        - In-app update
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest repeatable sequence. Sanitize any sample Markdown first.
+      placeholder: |
+        1. Copy or open...
+        2. Choose...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: The PNG should...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include visible recovery text or a screenshot only after removing private content.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: self-test
+    attributes:
+      label: Renderer Self-Test
+      description: Run About md2png → Diagnostics → Renderer Self-Test when the problem involves rendering.
+      options:
+        - Passed
+        - Failed
+        - Not applicable
+        - Could not run
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Privacy-safe diagnostics
+      description: Optional. Paste Copy Error Details output or attach a diagnostic export only after reviewing it.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and read the troubleshooting guide.
+          required: true
+        - label: I removed confidential Markdown, clipboard content, credentials, and private paths.
+          required: true
+        - label: I understand that md2png never uploads diagnostics automatically.
+          required: true

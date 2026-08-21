@@ -11,6 +11,7 @@ PROJECT_URL ?=
 UPDATE_CHANNEL ?= disabled
 TEST_UPDATE_VERSION ?=
 TEST_UPDATE_STATE ?=
+DEBUG_FINDER_INTEGRATION ?= 0
 BUMP ?=
 RELEASE_DATE ?= $(shell TZ=Asia/Shanghai date +%F)
 BASE_ROOT ?=
@@ -34,6 +35,7 @@ LEGAL_RESOURCES := $(CONTENTS)/Resources/Legal
 THIRD_PARTY_LICENSES := $(LEGAL_RESOURCES)/ThirdPartyLicenses
 SPARKLE_LICENSE_SOURCE := ThirdPartyLicenses/Sparkle-2.9.5.txt
 SPARKLE_LICENSE := $(THIRD_PARTY_LICENSES)/Sparkle-2.9.5.txt
+LSREGISTER := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 # SwiftPM's test runner must be able to load binary-target frameworks before
 # the app packaging step copies them into Contents/Frameworks.
 SPARKLE_TEST_FRAMEWORKS := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
@@ -48,8 +50,8 @@ BUNDLE_IDENTIFIER ?= $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifi
 SOURCE_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 COVERAGE_DIR ?= .build/coverage
 release_asset_field = $(shell "$(NODE)" scripts/release-assets.mjs field --version "$(VERSION)" --key "$(1)" --field "$(2)")
-COVERAGE_JSON := $(COVERAGE_DIR)/$(call release_asset_field,coverageJson,name)
-COVERAGE_MARKDOWN := $(COVERAGE_DIR)/$(call release_asset_field,coverageMarkdown,name)
+COVERAGE_JSON = $(COVERAGE_DIR)/$(call release_asset_field,coverageJson,name)
+COVERAGE_MARKDOWN = $(COVERAGE_DIR)/$(call release_asset_field,coverageMarkdown,name)
 RELEASE_QUALIFIER := $(if $(strip $(RELEASE_SUFFIX)),-$(strip $(RELEASE_SUFFIX)),)
 ARTIFACT_BASENAME := md2png-$(VERSION)-macOS-arm64$(RELEASE_QUALIFIER)
 ifeq ($(strip $(RELEASE_SUFFIX)),developer-id)
@@ -153,6 +155,9 @@ debug-stop:
 		--repo-root "$(CURDIR)" \
 		--app "$(APP_DIR)" \
 		--executable "$(TARGET_NAME)"
+	@if [ -d "$(APP_DIR)" ]; then \
+		"$(LSREGISTER)" -u "$(APP_DIR)" >/dev/null 2>&1 || true; \
+	fi
 
 app: build icon $(DEBUG_APP_PREREQUISITE)
 	rm -rf "$(APP_DIR)"
@@ -201,6 +206,15 @@ app: build icon $(DEBUG_APP_PREREQUISITE)
 		exit 1; \
 	fi
 	/usr/bin/plutil -replace MD2PNGUpdateChannel -string "$(UPDATE_CHANNEL)" "$(CONTENTS)/Info.plist"
+	@if [ "$(CONFIGURATION)" = "debug" ]; then \
+		case "$(DEBUG_FINDER_INTEGRATION)" in \
+			0) \
+				/usr/bin/plutil -remove CFBundleDocumentTypes "$(CONTENTS)/Info.plist"; \
+				/usr/bin/plutil -remove NSServices "$(CONTENTS)/Info.plist" ;; \
+			1) ;; \
+			*) echo "DEBUG_FINDER_INTEGRATION must be 0 or 1"; exit 1 ;; \
+		esac; \
+	fi
 	@if [ -n "$(TEST_UPDATE_VERSION)" ]; then \
 		if ! /usr/bin/printf '%s\n' "$(TEST_UPDATE_VERSION)" | /usr/bin/grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$$'; then \
 			echo "TEST_UPDATE_VERSION must be a stable semantic version such as 0.0.0"; \

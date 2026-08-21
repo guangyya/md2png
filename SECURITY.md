@@ -19,7 +19,9 @@ Markdown is sanitized before display, rendering uses a non-persistent local
 `WKWebView`, raw Markdown HTML is disabled, and external Markdown images are
 blocked. The application has no backend service, privileged updater helper,
 analytics, or automatic chat action. Its About-only update discovery sends no
-user content, and the user-initiated download accepts only the expected
-versioned HTTPS DMG, verifies its GitHub-provided size and SHA-256,
-then relies on Developer ID signing, notarization, stapling, and macOS Gatekeeper
-when opening it. See [Privacy](docs/PRIVACY.md) for clipboard and network behavior.
+user content. A user-initiated in-app update lets Sparkle download only the
+versioned HTTPS ZIP selected by the signed appcast, verify its EdDSA archive
+signature and app code signature, and pause before the separate Install and
+Relaunch decision. The Developer ID-signed, notarized, and stapled DMG remains
+an explicit browser-based installation and recovery path. See
+[Privacy](docs/PRIVACY.md) for clipboard and network behavior.

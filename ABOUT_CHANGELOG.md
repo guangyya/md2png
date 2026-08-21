@@ -5,6 +5,11 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep update preparation progress from repeating the same VoiceOver
+  announcement.
+
 ## [0.13.3] - 2026-08-20
 
 ### Fixed

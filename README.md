@@ -5,7 +5,7 @@
 <h1 align="center">md2png for Mac</h1>
 
 <p align="center">
-  Turn clipboard Markdown into a polished PNG—locally and privately.
+  Turn clipboard or local-file Markdown into a polished PNG—locally and privately.
 </p>
 
 <p align="center">
@@ -15,15 +15,17 @@
 <p align="center">
   <a href="https://md2png.wbxsh.com/"><strong>Website</strong></a>
   ·
+  <a href="https://github.com/guangyya/md2png/releases/latest/download/md2png-latest.dmg"><strong>Download latest</strong></a>
+  ·
   <a href="#build-from-source"><strong>Build from source</strong></a>
   ·
   <a href="docs/PRIVACY.md">Privacy</a>
 </p>
 
-md2png is a small native macOS menu bar companion for chat apps that do not
-fully render GitHub-style tables, syntax-highlighted code, or Mermaid diagrams.
-It does not modify or inject code into another app, paste content, or send
-messages.
+md2png is a small native macOS menu bar companion that renders Markdown copied
+from any app or explicitly opened from Finder. It keeps GitHub-style tables,
+syntax-highlighted code, and Mermaid diagrams readable in chat apps without
+modifying another app, uploading content, pasting, or sending messages.
 
 ![Markdown rendered as a table and Mermaid flowchart](docs/images/example-render.png)
 
@@ -31,6 +33,17 @@ messages.
 
 - macOS 14 or newer
 - Apple silicon (`arm64`); Intel Macs are not supported
+
+## Install
+
+1. [Download the latest notarized DMG](https://github.com/guangyya/md2png/releases/latest/download/md2png-latest.dmg).
+2. Open it and drag **md2png** into **Applications**.
+3. Launch md2png once, then find its icon in the menu bar.
+
+Public builds are Developer ID-signed and Apple-notarized. If macOS reports
+that the app cannot be verified, delete that copy and download the DMG again
+from the official Release rather than bypassing Gatekeeper. See
+[Troubleshooting](docs/TROUBLESHOOTING.md) for recovery steps.
 
 ## Use it
 
@@ -106,8 +119,7 @@ A GFM table needs a separator row:
 | Theme | — | Selects one of five bundled render palettes and remembers the selection locally |
 | Output Width | — | Selects Compact, Standard, or Wide for subsequent renders and remembers the selection locally |
 | Examples | — | Renders the selected bundled sample and opens Preview without changing the clipboard |
-| Launch at Login | — | Opts the main app into the native macOS login service; off by default |
-| Settings… | `Command-,` | Records, applies, and restores the two global shortcuts |
+| Settings… | `Command-,` | Manages Launch at Login, optional transparent rounded PNG corners, and the two global shortcuts |
 | Show Welcome | — | Reopens the copy, render, and paste guide with current shortcut status |
 | About md2png | — | Shows release and update information, runs the bundled renderer self-test, and saves privacy-safe diagnostic logs |
 
@@ -117,7 +129,8 @@ sooner, while Wide gives large tables and diagrams more room. Clean Light is the
 default theme; Warm Paper, Dark, High Contrast, and Midnight Blue apply
 coordinated Markdown, code-highlighting, and Mermaid colors without changing
 typography, spacing, or output width. The chosen theme is fixed into an opaque
-PNG. While a render is running, additional render commands, width or theme
+surface; enabling **Settings → PNG Output → Rounded Corners** makes only the
+four outer corners transparent. While a render is running, additional render commands, width or theme
 changes, and examples are temporarily disabled.
 Re-render Last Markdown and Restore Last Markdown become available only after a
 successful render and ask before replacing clipboard content changed by another
@@ -131,12 +144,13 @@ than a full slice is cut at the hard limit so export can still finish. Files are
 written into one newly created folder with stable zero-padded numbering; an
 existing folder is never overwritten.
 
-Choose **Settings…** to change either global shortcut. A shortcut must include
-Control, Option, or Command, and the two commands cannot use the same
-combination. Changes apply immediately and stay local. If macOS cannot register
-a combination, Settings marks it unavailable while the equivalent menu command
-continues to work; **Restore Defaults** returns to `Control-Command-X` and
-`Control-Command-Z`.
+Choose **Settings…** to manage three local preferences. **General** controls the
+off-by-default native Launch at Login registration. **PNG Output** optionally
+makes the corners of newly rendered clipboard, Preview, Save, drag, and split
+PNGs transparent. **Keyboard Shortcuts** changes the Render and Show Last Render
+combinations; each shortcut must include Control, Option, or Command, and the
+two commands cannot match. If macOS cannot register a combination, the menu
+command remains available; **Restore Defaults** affects shortcuts only.
 
 The Preview window opened by **Show Last Render** reflects the output width,
 stays within the current screen, and identifies the preset and PNG pixel
@@ -159,11 +173,10 @@ opens a status-item menu guide that first shows the main menu, then reveals
 Examples; rendering starts only after the user chooses a sample. While the guide
 is open, md2png appears in Command-Tab so the window cannot become unreachable;
 closing the guide returns the app to its menu bar-only mode.
-Launch at Login always reflects the effective macOS state with an explicit
-action. If approval is required, the single menu row becomes **Allow Launch at
-Login…**, shows a trailing alert badge, and opens Login Items settings when
-selected. Disabling it unregisters the login item; no helper or background
-worker is installed.
+Launch at Login always reflects the effective macOS state in Settings and
+Welcome. If approval is required, md2png explains the state and opens Login
+Items settings only after an explicit action. Disabling it unregisters the
+login item; no helper or background worker is installed.
 See the [width preset feature notes](docs/PRODUCT.md#width-presets) for exact
 dimensions and same-source reference renders, and the
 [theme notes](docs/PRODUCT.md#render-themes) for the bundled palette boundaries.
@@ -280,6 +293,10 @@ stable GitHub Releases channel; missing, unknown, and future channel values stay
 disabled. The source contains no repository URL. `BUNDLE_IDENTIFIER` defaults
 to the personal identifier in `Info.plist` and can be overridden without
 editing source files.
+Debug builds omit Finder document and Service registrations by default so local
+test bundles do not add a second **Preview with md2png** item beside an installed
+release. Use `DEBUG_FINDER_INTEGRATION=1` only for an explicit Finder integration
+test; the next Debug build unregisters the prior bundle before replacing it.
 `make verify-dist` rebuilds the app, verifies its signature and arm64
 architecture, then renders a bundled Markdown, GFM table, highlighted Swift
 snippet, and Mermaid diagram without reading or modifying the clipboard.

@@ -1,7 +1,8 @@
 # Product brief
 
-md2png is a local-first macOS menu bar companion that converts clipboard
-Markdown into a paste-ready PNG without uploading, pasting, or sending content.
+md2png is a local-first macOS menu bar companion that converts clipboard or
+explicitly selected local Markdown into a polished PNG without uploading,
+pasting, or sending content.
 
 ## Problem
 
@@ -90,6 +91,9 @@ sending it.
   selection remembered locally and Standard preserving the original sizing.
 - Five bundled render themes, with the last explicit selection remembered
   locally and Clean Light preserving the original look.
+- An off-by-default Rounded Corners option under Settings → PNG Output. It
+  applies one transparent alpha mask to the final rendered pixels and preserves
+  the same result across clipboard, Preview, Save, drag, and split exports.
 
 ## Width presets
 
@@ -124,10 +128,12 @@ softer navy background with cool blue and violet accents. Each palette is
 bundled and applies together to Markdown surfaces, borders, syntax highlighting,
 and Mermaid flowcharts, sequence diagrams, and Gantt charts.
 
-Theme selection is explicit and local. The shortcut, menu command, and bundled
-examples capture the currently selected theme when rendering starts, and the
-resulting PNG never changes afterward. Themes do not change fonts, spacing,
-render width, or diagram layout. Arbitrary CSS, custom fonts, a theme editor, and
+Theme and corner selection is explicit and local. The shortcut, file routes,
+menu command, and bundled examples capture the current settings when rendering
+starts, and the resulting PNG never changes afterward. Themes do not change
+fonts, spacing, render width, or diagram layout. Rounded Corners changes only
+the final alpha channel near the four corners; square output keeps the themed
+surface fully opaque. Arbitrary CSS, custom fonts, a theme editor, and
 System/Auto appearance matching remain outside this phase.
 
 ## Safety and privacy constraints

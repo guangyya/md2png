@@ -10,20 +10,25 @@ final class ApplicationFeedbackPresenter {
     private let actions: Actions
     private let splitImageExportCompletionPresenter: SplitImageExportCompletionPresenter
     private let rendererErrorDetailsPresenter: RendererErrorDetailsPresenter
-    private lazy var hud = HUDController(announce: { [weak self] message, priority in
-        self?.announce(message, priority: priority)
-    })
+    private let hudOverride: HUDController?
+    private lazy var hud = hudOverride ?? HUDController(
+        announce: { [weak self] message, priority in
+            self?.announce(message, priority: priority)
+        }
+    )
 
     init(
         actions: Actions,
         splitImageExportCompletionPresenter: SplitImageExportCompletionPresenter =
             SplitImageExportCompletionPresenter(),
         rendererErrorDetailsPresenter: RendererErrorDetailsPresenter =
-            RendererErrorDetailsPresenter()
+            RendererErrorDetailsPresenter(),
+        hud: HUDController? = nil
     ) {
         self.actions = actions
         self.splitImageExportCompletionPresenter = splitImageExportCompletionPresenter
         self.rendererErrorDetailsPresenter = rendererErrorDetailsPresenter
+        hudOverride = hud
     }
 
     func showHUD(

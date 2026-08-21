@@ -211,6 +211,7 @@ final class UpdateStatusPresenter {
                 update.displayVersion
             ))
         case let .sparkleExtracting(update, _):
+            if case .sparkleExtracting = previousPhase { return }
             announce(L10n.format(
                 "update.accessibility.preparing",
                 defaultValue: "Preparing md2png %@ for installation.",
