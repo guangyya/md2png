@@ -1,13 +1,13 @@
 {
   "meta": {
-    "description": "在 Mac 上把剪贴板 Markdown 转为精美 PNG——全程本地，保护隐私。",
+    "description": "在 Mac 上把剪贴板或本地文件中的 Markdown 转为精美 PNG——全程本地，保护隐私。",
     "og_locale": "zh_CN",
     "og_locale_alternate": "en_US",
     "title": "md2png — 复制 Markdown，粘贴漂亮 PNG",
-    "og_description": "原生 Mac 小工具，在本地把剪贴板 Markdown 转成可以直接粘贴的图片。",
+    "og_description": "原生 Mac 小工具，在本地把剪贴板或 Finder 中的 Markdown 转成精美图片。",
     "og_image_alt": "md2png 在 Mac 本地把 Markdown 转为精美 PNG",
-    "twitter_description": "原生 Mac 小工具，在本地把剪贴板 Markdown 转成图片。",
-    "json_description": "原生 macOS 小工具，在本地把剪贴板 Markdown 转为精美、可直接粘贴的 PNG。",
+    "twitter_description": "原生 Mac 小工具，在本地把剪贴板或 Finder 中的 Markdown 转成图片。",
+    "json_description": "原生 macOS 小工具，在本地把剪贴板或本地文件中的 Markdown 转为精美 PNG。",
     "operating_system": "macOS 14 或更高版本，Apple 芯片"
   },
   "navigation": {
@@ -43,9 +43,9 @@
         "number": "01",
         "label": "STYLE",
         "title": "五种主题，三档宽度。",
-        "description": "选择配色以及紧凑、标准或宽幅画布。设置只保存在本机，并固定写入每张不透明 PNG。",
+        "description": "选择配色、紧凑/标准/宽幅画布，以及可选的透明圆角。所有设置只保存在本机。",
         "tags_aria": "渲染选项",
-        "tags": ["简洁浅色", "深色", "午夜蓝"]
+        "tags": ["五种主题", "三档宽度", "透明圆角"]
       },
       {
         "number": "02",
@@ -120,7 +120,7 @@
     "hero_eyebrow": "原生 macOS 小工具 · 本地优先",
     "hero_title_first": "复制 Markdown，",
     "hero_title_second": "粘贴漂亮 PNG。",
-    "hero_lede": "把表格、代码高亮和 Mermaid 图表变成清晰图片。内容不会上传，也不会替你发送任何消息。",
+    "hero_lede": "把剪贴板或 Finder 中带表格、代码高亮和 Mermaid 图表的 Markdown 变成清晰图片；内容不会上传或发送。",
     "download_for_mac": "下载 Mac 版",
     "view_source": "查看源代码",
     "requirements": "macOS 14+ · Apple 芯片 · 免费开源",

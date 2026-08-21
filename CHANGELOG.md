@@ -7,6 +7,31 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add a structured, privacy-aware bug report form covering app identity, render
+  entry point, reproduction steps, Renderer Self-Test, and reviewed diagnostics.
+- Add automated contracts that keep installation, file input, Settings, rounded
+  output, update security, issue routing, and localized website copy aligned.
+
+### Changed
+
+- Refresh the English and Simplified Chinese project introduction with a direct
+  notarized-DMG install path, clipboard and Finder positioning, current Settings
+  behavior, optional transparent rounded corners, and the Sparkle ZIP trust model.
+- Update the accessibility release checklist for Preview, Finder entry points,
+  split export, rounded output, current Settings, and explicit update states.
+- Defer coverage-path evaluation in the Makefile so site-only targets do not
+  invoke Node-backed release tooling.
+
+### Fixed
+
+- Avoid repeating the VoiceOver preparation announcement for every Sparkle
+  extraction progress update.
+- Keep normal Debug builds from registering duplicate Finder document and
+  **Preview with md2png** Service entries beside an installed release, while
+  retaining an explicit Finder-integration test option.
+
 ## [0.13.3] - 2026-08-20
 
 ### Changed

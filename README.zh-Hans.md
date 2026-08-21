@@ -5,7 +5,7 @@
 <h1 align="center">md2png for Mac</h1>
 
 <p align="center">
-  在 Mac 上将剪贴板中的 Markdown 转为精美 PNG——全程本地，保护隐私。
+  在 Mac 上将剪贴板或本地文件中的 Markdown 转为精美 PNG——全程本地，保护隐私。
 </p>
 
 <p align="center">
@@ -15,14 +15,16 @@
 <p align="center">
   <a href="https://md2png.wbxsh.com/zh/"><strong>官方网站</strong></a>
   ·
+  <a href="https://github.com/guangyya/md2png/releases/latest/download/md2png-latest.dmg"><strong>下载最新版</strong></a>
+  ·
   <a href="#从源码构建"><strong>从源码构建</strong></a>
   ·
   <a href="docs/PRIVACY.md">隐私说明</a>
 </p>
 
-md2png 是一个原生 macOS 菜单栏小工具，适合在无法完整显示 GFM 表格、
-代码高亮或 Mermaid 图表的聊天应用中使用。它不修改或注入其它应用，
-不会自动粘贴，也不会自动发送消息。
+md2png 是一个原生 macOS 菜单栏小工具，可以渲染从任意应用复制或从 Finder
+明确打开的 Markdown。它让 GFM 表格、代码高亮和 Mermaid 图表在聊天应用中
+保持清晰，同时不修改其它应用、不上传内容，也不会自动粘贴或发送消息。
 
 ![Markdown 渲染后的表格和 Mermaid 流程图](docs/images/example-render.png)
 
@@ -30,6 +32,16 @@ md2png 是一个原生 macOS 菜单栏小工具，适合在无法完整显示 GF
 
 - macOS 14 或更高版本
 - Apple 芯片（`arm64`）；不支持 Intel Mac
+
+## 安装
+
+1. [下载最新版已公证 DMG](https://github.com/guangyya/md2png/releases/latest/download/md2png-latest.dmg)。
+2. 打开 DMG，把 **md2png** 拖入“应用程序”。
+3. 首次启动 md2png，然后在菜单栏找到它的图标。
+
+公开版本使用 Developer ID 签名并经过 Apple 公证。如果 macOS 提示无法验证，
+请删除当前副本并从官方 Release 重新下载 DMG，不要绕过 Gatekeeper。恢复步骤见
+[故障排查](docs/TROUBLESHOOTING.md)。
 
 ## 使用方式
 
@@ -89,15 +101,15 @@ flowchart LR
 | 主题 | — | 在简洁浅色、暖色纸张、深色、高对比度和午夜蓝之间选择，并在本地记住选择 |
 | 输出宽度 | — | 为后续渲染选择紧凑、标准或宽幅，并在本地记住选择 |
 | 示例 | — | 渲染选中的内置示例并打开预览，不改变剪贴板 |
-| 登录时启动 | — | 将主 App 注册到原生 macOS 登录项；默认关闭 |
-| 设置… | `Command-,` | 录制、应用和恢复两个全局快捷键 |
+| 设置… | `Command-,` | 管理登录时启动、可选的透明 PNG 圆角和两个全局快捷键 |
 | 显示欢迎指南 | — | 重新打开复制、渲染和粘贴指南，并显示当前快捷键状态 |
 | 关于 md2png | — | 显示发布与更新信息、运行内置渲染器自测，并保存不含内容的诊断日志 |
 
 菜单顶部会显示紧凑的剪贴板预览。“标准”保持原有输出尺寸，“紧凑”会更早换行，
 “宽幅”则为大型表格和图表留出更多空间。“简洁浅色”是默认主题；“暖色纸张”、
 “深色”、“高对比度”和“午夜蓝”会统一切换 Markdown、代码高亮和 Mermaid 配色，
-但不会改变字体、间距或输出宽度。所选主题会固定写入不透明的 PNG。正在渲染时，
+但不会改变字体、间距或输出宽度。主题表面保持不透明；开启“设置 → PNG 输出 → 圆角”后，
+只有四个外角会变为透明。正在渲染时，
 新的渲染命令、宽度或主题切换和示例会暂时禁用，避免重复渲染。只有成功渲染后才会
 启用“重新渲染上次的 Markdown”和“恢复上次的 Markdown”；如果其他应用已经修改
 剪贴板，覆盖前会要求确认。
@@ -105,10 +117,10 @@ flowchart LR
 切分，让标题跟随后续内容，并在代码块、Mermaid 图或表格行能放进单片时避免从中间切开；
 如果某个元素本身超过单片上限，则会按硬上限切分以完成导出。文件会放入一个新建文件夹，
 采用固定补零编号，绝不覆盖已有文件夹。
-选择“设置…”可以修改两个全局快捷键。每个快捷键必须包含 Control、Option 或 Command，
-且两个命令不能使用同一组合。修改会立即生效并只保存在本机；如果 macOS 无法注册某个
-组合，“设置”会将其标记为不可用，而对应菜单命令仍可使用。“恢复默认值”会还原为
-`Control-Command-X` 和 `Control-Command-Z`。
+“设置…”包含三个本地配置区域：“通用”管理默认关闭的原生登录项；“PNG 输出”可让新生成的
+剪贴板、预览、保存、拖动和分片 PNG 使用透明圆角；“键盘快捷键”管理渲染与显示上次渲染
+两个组合。快捷键必须包含 Control、Option 或 Command，且不能相同；注册失败时对应菜单命令
+仍可使用。“恢复默认值”只影响快捷键。
 通过“显示上次渲染”打开的“预览”窗口会在当前屏幕范围内按输出宽度打开，并在
 标题中标明所用预设和 PNG 像素尺寸。可以把渲染图片拖到 Finder 或其他兼容应用，
 在所选目标中创建 PNG。工具栏可以再次复制图片、明确保存、在 Apple“预览”中
@@ -119,9 +131,9 @@ flowchart LR
 示例按钮会在菜单栏图标下先展示主菜单，再展开“示例”；只有用户再次选择一个示例后
 才会开始渲染。指南打开期间，md2png 会出现在 Command-Tab 中，关闭指南后会恢复为
 纯菜单栏模式。
-“登录时启动”会通过明确操作反映 macOS 中的实际状态。需要用户批准时，单个菜单项会变为
-“允许登录时启动…”，在右侧显示提醒标记，点击后打开“登录项”设置；关闭选项会注销登录项，
-不会安装 Helper 或后台进程。
+“登录时启动”会在“设置”和欢迎指南中反映 macOS 的实际状态。需要用户批准时，md2png
+会先说明原因，只有明确操作后才打开“登录项”设置；关闭选项会注销登录项，不会安装 Helper
+或后台进程。
 实际尺寸和同源渲染对比见[宽度预设功能说明](docs/PRODUCT.md#width-presets)，
 内置配色边界见[渲染主题说明](docs/PRODUCT.md#render-themes)。
 
@@ -202,6 +214,9 @@ make run CONFIGURATION=debug \
 `UPDATE_CHANNEL=stable` 且带有效 GitHub 项目地址的构建才使用稳定 GitHub Releases
 渠道；缺失、未知和未来新增的渠道值默认禁用。源码不包含固定仓库地址。
 `BUNDLE_IDENTIFIER` 默认读取 `Info.plist` 中的个人标识，也可在构建时覆盖。
+Debug 构建默认移除 Finder 文档和服务注册，避免本地测试包在已安装正式版旁再增加一个
+“Preview with md2png”。只有明确测试 Finder 集成时才使用
+`DEBUG_FINDER_INTEGRATION=1`；下一次 Debug 构建会先注销旧测试包再替换它。
 `make verify-dist` 会重新构建 App，检查签名和 arm64 架构，再通过内置
 Markdown、GFM 表格、高亮 Swift 代码和 Mermaid 图执行离线渲染自测；
 该过程不会读取或修改剪贴板。

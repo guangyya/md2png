@@ -9,7 +9,7 @@ body:
       value: |
         Thanks for helping improve md2png. Please describe the user problem before the implementation idea.
 
-        md2png stays local-first, never uploads rendered content, and never pastes or sends a chat message automatically. Check `BACKLOG.md` and existing issues before submitting a duplicate.
+        md2png stays local-first, never uploads rendered content, and never pastes or sends a chat message automatically. Check the public issues, including items labeled `backlog`, before submitting a duplicate.
 
   - type: textarea
     id: problem
@@ -34,7 +34,7 @@ body:
     attributes:
       label: Suggested approach
       description: Optional. Share a UI or technical idea if you already have one.
-      placeholder: The Last Render window could offer...
+      placeholder: The Preview window could offer...
 
   - type: textarea
     id: examples
