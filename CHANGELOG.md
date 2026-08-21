@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-21
+
 ### Added
 
 - Add a structured, privacy-aware bug report form covering app identity, render
