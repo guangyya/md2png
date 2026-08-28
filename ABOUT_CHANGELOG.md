@@ -5,6 +5,10 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent the hidden renderer window from appearing after display changes.
+
 ## [0.14.0] - 2026-08-21
 
 ### Fixed
