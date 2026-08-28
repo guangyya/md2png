@@ -7,6 +7,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep the hidden WebKit renderer host window from appearing after display
+  changes or monitor reconnection.
+
 ## [0.14.0] - 2026-08-21
 
 ### Added
