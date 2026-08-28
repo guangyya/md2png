@@ -373,6 +373,41 @@ final class RendererRecoveryStateTests: XCTestCase {
     }
 
     @MainActor
+    func testRendererHostWindowIsNotPresentedAsAUserWindow() {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        let hostWindow = renderer.rendererHostWindowForTesting
+
+        XCTAssertEqual(hostWindow.alphaValue, 0)
+        XCTAssertEqual(hostWindow.backgroundColor, .clear)
+        XCTAssertFalse(hostWindow.isOpaque)
+        XCTAssertFalse(hostWindow.hasShadow)
+        XCTAssertTrue(hostWindow.ignoresMouseEvents)
+        XCTAssertTrue(hostWindow.isExcludedFromWindowsMenu)
+        XCTAssertTrue(hostWindow.collectionBehavior.contains(.transient))
+        XCTAssertTrue(hostWindow.collectionBehavior.contains(.ignoresCycle))
+    }
+
+    @MainActor
+    func testRendererHostWindowIsolationIsRestoredAfterScreenChanges() {
+        _ = NSApplication.shared
+        let renderer = MarkdownRenderer()
+        let hostWindow = renderer.rendererHostWindowForTesting
+
+        hostWindow.setFrameOrigin(NSPoint(x: 100, y: 100))
+        hostWindow.alphaValue = 1
+        hostWindow.ignoresMouseEvents = false
+        hostWindow.isExcludedFromWindowsMenu = false
+
+        renderer.reassertRendererHostWindowIsolationForTesting()
+
+        XCTAssertEqual(hostWindow.alphaValue, 0)
+        XCTAssertEqual(hostWindow.frame.origin, NSPoint(x: -20_000, y: -20_000))
+        XCTAssertTrue(hostWindow.ignoresMouseEvents)
+        XCTAssertTrue(hostWindow.isExcludedFromWindowsMenu)
+    }
+
+    @MainActor
     func testRendererReloadsAfterSimulatedInitialProcessTermination() async throws {
         _ = NSApplication.shared
         let renderer = MarkdownRenderer()

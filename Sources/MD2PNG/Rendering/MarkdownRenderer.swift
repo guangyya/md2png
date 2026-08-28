@@ -188,6 +188,14 @@ final class MarkdownRenderer {
         webViewLifecycle.webViewIdentityForTesting
     }
 
+    var rendererHostWindowForTesting: NSWindow {
+        webViewLifecycle.hostWindowForTesting
+    }
+
+    func reassertRendererHostWindowIsolationForTesting() {
+        webViewLifecycle.reassertHostWindowIsolationForTesting()
+    }
+
     var recoveryPhaseForTesting: RendererRecoveryState.Phase {
         recoveryState.phase
     }

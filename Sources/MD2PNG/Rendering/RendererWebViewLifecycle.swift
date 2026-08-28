@@ -38,8 +38,18 @@ final class RendererWebViewLifecycle: NSObject, WKNavigationDelegate {
         )
         super.init()
         hostWindow.contentView = webView
-        hostWindow.orderBack(nil)
+        reassertHostWindowIsolation()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenParametersDidChange),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
         webView.navigationDelegate = self
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     func prepareRenderer(for attempt: RendererRecoveryState.LoadAttempt) -> Bool {
@@ -111,6 +121,14 @@ final class RendererWebViewLifecycle: NSObject, WKNavigationDelegate {
         ObjectIdentifier(webView)
     }
 
+    var hostWindowForTesting: NSWindow {
+        hostWindow
+    }
+
+    func reassertHostWindowIsolationForTesting() {
+        reassertHostWindowIsolation()
+    }
+
     func simulateContentProcessTerminationForTesting() {
         webViewWebContentProcessDidTerminate(webView)
     }
@@ -127,6 +145,24 @@ final class RendererWebViewLifecycle: NSObject, WKNavigationDelegate {
         )
         webView.setValue(false, forKey: "drawsBackground")
         return webView
+    }
+
+    private func reassertHostWindowIsolation() {
+        hostWindow.setFrameOrigin(NSPoint(x: -20_000, y: -20_000))
+        hostWindow.alphaValue = 0
+        hostWindow.backgroundColor = .clear
+        hostWindow.hasShadow = false
+        hostWindow.isOpaque = false
+        hostWindow.ignoresMouseEvents = true
+        hostWindow.isExcludedFromWindowsMenu = true
+        hostWindow.collectionBehavior = [.transient, .ignoresCycle]
+        hostWindow.orderBack(nil)
+    }
+
+    @objc private nonisolated func screenParametersDidChange(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            reassertHostWindowIsolation()
+        }
     }
 
     private func installWebView(for attempt: RendererRecoveryState.LoadAttempt) {
