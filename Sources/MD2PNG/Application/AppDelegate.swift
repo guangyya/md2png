@@ -360,7 +360,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             result: .succeeded,
             level: .verbose
         )
+        windowPresentationCoordinator.reconcileWindowPresentation()
         windowPresentationCoordinator.refreshLaunchAtLoginIfVisible()
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        windowPresentationCoordinator.reconcileWindowPresentation()
+    }
+
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication,
+        hasVisibleWindows flag: Bool
+    ) -> Bool {
+        windowPresentationCoordinator.handleApplicationReopen()
+        return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
