@@ -5,6 +5,8 @@ for the complete project history and release details.
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-09-08
+
 ### Fixed
 
 - Remove a stale Dock icon after closing the last md2png window, and restore a
