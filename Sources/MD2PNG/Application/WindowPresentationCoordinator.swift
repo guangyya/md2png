@@ -9,12 +9,12 @@ enum AppWindowSurface: Hashable {
 
 @MainActor
 final class WindowActivationCoordinator {
-    private let applyPolicy: (NSApplication.ActivationPolicy) -> Void
+    private let applyPolicy: (NSApplication.ActivationPolicy) -> Bool
     private(set) var visibleSurfaces: Set<AppWindowSurface> = []
     private var appliedPolicy: NSApplication.ActivationPolicy?
 
     init(
-        applyPolicy: @escaping (NSApplication.ActivationPolicy) -> Void = {
+        applyPolicy: @escaping (NSApplication.ActivationPolicy) -> Bool = {
             NSApp.setActivationPolicy($0)
         }
     ) {
@@ -38,10 +38,24 @@ final class WindowActivationCoordinator {
         visibleSurfaces.contains(surface)
     }
 
-    private func apply(_ policy: NSApplication.ActivationPolicy) {
-        guard policy != appliedPolicy else { return }
+    func reconcilePresentedSurfaces(
+        _ isPresented: (AppWindowSurface) -> Bool
+    ) {
+        visibleSurfaces = Set(visibleSurfaces.filter(isPresented))
+        apply(desiredPolicy, force: true)
+    }
+
+    private var desiredPolicy: NSApplication.ActivationPolicy {
+        visibleSurfaces.isEmpty ? .accessory : .regular
+    }
+
+    private func apply(
+        _ policy: NSApplication.ActivationPolicy,
+        force: Bool = false
+    ) {
+        guard force || policy != appliedPolicy else { return }
+        guard applyPolicy(policy) else { return }
         appliedPolicy = policy
-        applyPolicy(policy)
     }
 }
 
@@ -212,12 +226,57 @@ final class WindowPresentationCoordinator {
         }
     }
 
+    func reconcileWindowPresentation() {
+        activationCoordinator.reconcilePresentedSurfaces { [weak self] surface in
+            self?.isPresented(surface) == true
+        }
+    }
+
+    @discardableResult
+    func handleApplicationReopen() -> Bool {
+        reconcileWindowPresentation()
+        let presentationOrder: [AppWindowSurface] = [
+            .preview,
+            .settings,
+            .about,
+            .welcome
+        ]
+        guard let surface = presentationOrder.first(where: activationCoordinator.isVisible),
+              let window = window(for: surface) else {
+            return false
+        }
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        return true
+    }
+
     func isVisible(_ surface: AppWindowSurface) -> Bool {
         activationCoordinator.isVisible(surface)
     }
 
     private func setVisible(_ isVisible: Bool, surface: AppWindowSurface) {
         activationCoordinator.setVisible(isVisible, surface: surface)
+    }
+
+    private func window(for surface: AppWindowSurface) -> NSWindow? {
+        switch surface {
+        case .preview:
+            previewController.window
+        case .welcome:
+            welcomeController.window
+        case .settings:
+            settingsController.window
+        case .about:
+            aboutController.window
+        }
+    }
+
+    private func isPresented(_ surface: AppWindowSurface) -> Bool {
+        guard let window = window(for: surface) else { return false }
+        return window.isVisible || window.isMiniaturized
     }
 
     private func refreshWelcomeLaunchAtLoginIfVisible() {

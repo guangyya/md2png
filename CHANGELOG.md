@@ -7,6 +7,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- Reconcile the Dock activation state with the windows actually presented, and
+  restore a minimized window when reopening md2png from the Dock.
+
 ## [0.14.1] - 2026-08-28
 
 ### Fixed
